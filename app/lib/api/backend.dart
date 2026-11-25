@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../core/typing_session.dart';
 import '../models/post.dart';
 import '../models/profile.dart';
@@ -20,6 +22,11 @@ abstract class Backend {
     required String locale,
     required String timeZone,
   });
+
+  /// Sets the profile photo from a JPEG taken with the camera. Throws
+  /// [ApiException] whose code is the reason when the photo is turned down:
+  /// `no_face`, `many_faces`, `unclear`, `inappropriate` or `bad_image`.
+  Future<Profile> setPhoto(Uint8List jpeg);
 
   Future<Profile> user(String id);
 

@@ -172,6 +172,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
                       initial: widget.state.me?.initial ?? '?',
                       color: avatarPalette[(widget.state.me?.id.hashCode ?? 0).abs() % avatarPalette.length],
                       label: '내 프로필 사진',
+                      photoUrl: widget.state.me?.photoUrl,
                     ),
                     const SizedBox(width: 12),
                     Expanded(

@@ -319,6 +319,18 @@ export class AuroraRepository implements Repository {
     return rows.length > 0;
   }
 
+  async setPhoto(userId: string, photoKey: string): Promise<{ previous: string | null } | null> {
+    const rows = await this.query(
+      `UPDATE users u SET photo_key = :k
+       FROM (SELECT id, photo_key FROM users WHERE id = :u::uuid FOR UPDATE) old
+       WHERE u.id = old.id
+       RETURNING old.photo_key AS previous`,
+      { u: userId, k: photoKey },
+    );
+    if (rows.length === 0) return null;
+    return { previous: (rows[0]!.previous as string | null) ?? null };
+  }
+
   async saveProfile(userId: string, i: ProfileInput): Promise<'ok' | 'handle_taken'> {
     const taken = await this.query(
       `SELECT 1 FROM users WHERE lower(handle) = lower(:h) AND id <> :u::uuid`,

@@ -38,7 +38,8 @@ setup below is done.
 
 - Builds the Flutter web app and uploads it behind CloudFront, with a
   `config.json` that points it at this deploy's API and sign-in.
-- Deploys the Lambdas, the API, Cognito and Aurora.
+- Deploys the Lambdas, the API, Cognito and Aurora, and the profile photo
+  bucket (kept if the stack is ever deleted).
 - Runs `backend/src/db/migrations/*.sql` that have not run yet. Add schema
   changes as new numbered files; never edit one that has been deployed.
 

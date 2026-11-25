@@ -10,10 +10,11 @@ TypeScript Lambdas behind an HTTP API, deployed with CDK.
 | `GET /feed?tab=all\|following&author=&lang=ko\|en&before=` | Newest posts, with a cached Amazon Translate translation for posts in the other language. |
 | `POST /posts/{id}/empathy` | Toggles 공감. Not allowed on your own post. |
 | `GET /me`, `PUT /me` | Your profile with writing days and follow status. `PUT` creates it after sign-up (handle, name, bio, language, time zone); a changed name or bio goes through the content filter. |
+| `PUT /me/photo` | `{ jpeg: base64 }`, a square JPEG of at most 2 MB taken with the app's camera. Amazon Rekognition must find exactly one clear, frontal face and no explicit or violent content; otherwise `422 { error: 'photo_refused', problem }` with `no_face`, `many_faces`, `unclear` or `inappropriate`. Counts toward the hourly write limit. |
 | `GET /users/{id}` | Someone's profile, with whether you follow them. |
 | `PUT /users/{id}/follow`, `DELETE /users/{id}/follow` | Follow and unfollow. Both people need follow permission. |
 
-Two Lambdas serve these: `write` (posting, editing and `PUT /me`, which call Bedrock) and `api` (everything else).
+Two Lambdas serve these: `write` (posting, editing, `PUT /me` and `PUT /me/photo`, which call the content filter or Rekognition) and `api` (everything else).
 Every route needs a Cognito access token; API Gateway checks it.
 
 Rules the server enforces on its own, whatever the app sends:
@@ -34,6 +35,7 @@ Rules the server enforces on its own, whatever the app sends:
   - Titan Text Embeddings v2 for similar thoughts.
   - Claude on Amazon Bedrock for the content filter. If the filter declines to review a post, the post is held as blocked for human review.
   - Amazon Translate.
+  - Amazon Rekognition for profile photos, stored in a private S3 bucket and served by CloudFront at `/photos/*`.
 - `src/db/migrations/`: the schema as numbered SQL files, applied after each deploy by the `migrate` Lambda.
 - `infra/stack.ts`: Cognito, Aurora Serverless v2 (Data API on, isolated subnets), the write, api and migrate Lambdas, the HTTP API with throttling, and the web app on S3 and CloudFront.
 
@@ -56,4 +58,5 @@ Deploys run from GitHub Actions; see `../deploy/README.md`. The schema is applie
 
 - CloudFront and WAF in front of the API (bot control, rate rules) for scraping.
 - Narrow the `bedrock-mantle:*` permission to the exact action and model.
-- Endpoints still to add: profile photo upload, report, block a user, notifications.
+- Endpoints still to add: report, block a user, notifications.
+- Face Liveness (Rekognition) in the iOS and Android apps, so a photo of a screen or a printout can't pass as a live face.

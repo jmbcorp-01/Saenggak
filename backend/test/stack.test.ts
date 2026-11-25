@@ -18,7 +18,7 @@ describe('SaenggakStack', () => {
   });
 
   it('protects every route with the Cognito JWT authorizer', () => {
-    template.resourceCountIs('AWS::ApiGatewayV2::Route', 10);
+    template.resourceCountIs('AWS::ApiGatewayV2::Route', 11);
     template.allResourcesProperties('AWS::ApiGatewayV2::Route', { AuthorizationType: 'JWT' });
   });
 
@@ -39,6 +39,21 @@ describe('SaenggakStack', () => {
     });
     template.resourceCountIs('AWS::CloudFront::Distribution', 1);
     template.resourceCountIs('Custom::CDKBucketDeployment', 1);
+  });
+
+  it('serves profile photos at /photos/* and lets only the write function store them', () => {
+    template.hasResourceProperties('AWS::CloudFront::Distribution', {
+      DistributionConfig: Match.objectLike({
+        CacheBehaviors: Match.arrayWith([Match.objectLike({ PathPattern: '/photos/*' })]),
+      }),
+    });
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({ Action: ['rekognition:DetectFaces', 'rekognition:DetectModerationLabels'] }),
+        ]),
+      }),
+    });
   });
 
   it('throttles the API', () => {

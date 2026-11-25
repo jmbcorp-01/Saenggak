@@ -1,3 +1,5 @@
+import 'post.dart' show avatarPalette;
+
 /// A writer's profile and follow status.
 class Profile {
   const Profile({
@@ -14,6 +16,7 @@ class Profile {
     this.following = 0,
     this.followedByMe = false,
     this.isMe = false,
+    this.photoUrl,
   });
 
   factory Profile.fromJson(Map<String, dynamic> j) => Profile(
@@ -30,6 +33,7 @@ class Profile {
     following: (j['following'] as num? ?? 0).toInt(),
     followedByMe: j['followedByMe'] as bool? ?? false,
     isMe: j['isMe'] as bool? ?? false,
+    photoUrl: j['photoUrl'] as String?,
   );
 
   final String id;
@@ -45,6 +49,11 @@ class Profile {
   final int following;
   final bool followedByMe;
   final bool isMe;
+
+  /// The profile photo, taken with the camera. Null until one is set.
+  final String? photoUrl;
+
+  int get avatarColor => avatarPalette[id.hashCode.abs() % avatarPalette.length];
 
   String get initial => displayName.isEmpty ? '?' : String.fromCharCode(displayName.runes.first).toUpperCase();
 
@@ -62,5 +71,6 @@ class Profile {
     following: following,
     followedByMe: followedByMe ?? this.followedByMe,
     isMe: isMe,
+    photoUrl: photoUrl,
   );
 }

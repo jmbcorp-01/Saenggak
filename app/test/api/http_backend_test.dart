@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:saenggak/api/backend.dart';
 import 'package:saenggak/api/cognito_auth.dart';
 import 'package:saenggak/api/config.dart';
 import 'package:saenggak/api/http_backend.dart';
@@ -100,6 +102,29 @@ void main() {
     expect(p.similarPeople, 12);
     expect(p.firstPhrases, ['기대고 싶었던 날']);
     expect(p.typingTime, const Duration(seconds: 61));
+  });
+
+  test('uploads the photo as base64 and reads the new photo URL', () async {
+    api = (_) => http.Response(
+      jsonEncode({'id': 'user-1', 'handle': 'me', 'displayName': 'Me', 'photoUrl': 'https://cdn.example/photos/a.jpg'}),
+      200,
+    );
+    final jpeg = Uint8List.fromList([0xFF, 0xD8, 0xFF, 1, 2]);
+    final me = await backend.setPhoto(jpeg);
+
+    final req = apiCalls.single;
+    expect(req.method, 'PUT');
+    expect(req.url.toString(), 'https://api.example.com/me/photo');
+    expect((jsonDecode(req.body) as Map)['jpeg'], base64Encode(jpeg));
+    expect(me.photoUrl, 'https://cdn.example/photos/a.jpg');
+  });
+
+  test('a refused photo throws with the reason', () async {
+    api = (_) => http.Response(jsonEncode({'error': 'photo_refused', 'problem': 'many_faces'}), 422);
+    await expectLater(
+      backend.setPhoto(Uint8List.fromList([0xFF, 0xD8, 0xFF])),
+      throwsA(isA<ApiException>().having((e) => e.code, 'code', 'many_faces')),
+    );
   });
 
   test('turns a blocked post into a message', () async {

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:material_ui/material_ui.dart';
 
 import '../api/backend.dart';
@@ -135,6 +137,12 @@ class AppState extends ChangeNotifier {
       locale: me?.locale ?? 'ko',
       timeZone: me?.timeZone ?? 'Asia/Seoul',
     );
+    notifyListeners();
+  }
+
+  /// Throws [ApiException] with the reason when the server turns the photo down.
+  Future<void> setPhoto(Uint8List jpeg) async {
+    me = await backend.setPhoto(jpeg);
     notifyListeners();
   }
 

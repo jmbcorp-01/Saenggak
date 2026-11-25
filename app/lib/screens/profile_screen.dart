@@ -8,6 +8,7 @@ import '../theme/tokens.dart';
 import '../widgets/post_actions.dart';
 import '../widgets/post_tile.dart';
 import '../widgets/symbol_mark.dart';
+import 'photo_capture_screen.dart';
 import 'profile_setup_screen.dart';
 
 /// A writer's profile: photo, counts, follow progress or button, and posts.
@@ -71,6 +72,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _takePhoto() async {
+    final saved = await Navigator.of(context)
+        .push<bool>(MaterialPageRoute(builder: (context) => PhotoCaptureScreen(state: widget.state)));
+    if (saved == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('프로필 사진을 바꿨어요.')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -117,12 +126,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       padding: const EdgeInsets.all(4),
                       child: Avatar(
                         initial: profile.initial,
-                        color: avatarPalette[profile.id.hashCode.abs() % avatarPalette.length],
+                        color: profile.avatarColor,
                         size: 80,
                         label: '${profile.displayName} 프로필 사진',
+                        photoUrl: profile.photoUrl,
                       ),
                     ),
                   ),
+                  if (_isMe)
+                    Positioned(
+                      left: 16 + 88 - 34,
+                      top: 104 + 44 - 30,
+                      child: Material(
+                        color: SgColors.ink,
+                        shape: const CircleBorder(side: BorderSide(color: Colors.white, width: 2)),
+                        child: IconButton(
+                          onPressed: _takePhoto,
+                          tooltip: profile.photoUrl == null ? '프로필 사진 찍기' : '프로필 사진 다시 찍기',
+                          icon: const Icon(Icons.photo_camera_outlined, size: 18, color: Colors.white),
+                          constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+                          padding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ),
                   Positioned(
                     right: 16,
                     top: 104 + 6,

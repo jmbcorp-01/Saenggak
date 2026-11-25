@@ -14,6 +14,7 @@ class Post {
     this.editedAt,
     this.empathizedByMe = false,
     this.isMine = false,
+    this.authorPhotoUrl,
   });
 
   factory Post.fromJson(Map<String, dynamic> j, {required String myId}) {
@@ -32,6 +33,7 @@ class Post {
       empathyCount: (j['empathyCount'] as num).toInt(),
       empathizedByMe: j['empathizedByMe'] as bool? ?? false,
       isMine: j['authorId'] == myId,
+      authorPhotoUrl: j['photoUrl'] as String?,
     );
   }
 
@@ -54,6 +56,9 @@ class Post {
   final bool empathizedByMe;
   final bool isMine;
 
+  /// The author's profile photo, or null when they have none.
+  final String? authorPhotoUrl;
+
   /// Posts can be edited only until they get their first empathy.
   bool get editable => isMine && empathyCount == 0;
 
@@ -62,7 +67,7 @@ class Post {
 
   String get authorInitial => authorName.isEmpty ? '?' : authorName.characters.first.toUpperCase();
 
-  /// Shown in place of the profile photo until photos are wired up.
+  /// Behind the initial when the author has no photo.
   int get avatarColor => avatarPalette[authorId.hashCode.abs() % avatarPalette.length];
 
   Post copyWith({int? empathyCount, bool? empathizedByMe}) => Post(
@@ -79,6 +84,7 @@ class Post {
     empathyCount: empathyCount ?? this.empathyCount,
     empathizedByMe: empathizedByMe ?? this.empathizedByMe,
     isMine: isMine,
+    authorPhotoUrl: authorPhotoUrl,
   );
 }
 
