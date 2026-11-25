@@ -3,6 +3,7 @@ import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 }
 export type Event = APIGatewayProxyEventV2WithJWTAuthorizer;
 
 export function json(statusCode: number, body: unknown): APIGatewayProxyResultV2 {
+  if (statusCode === 204) return { statusCode, headers: { 'cache-control': 'no-store' } };
   return {
     statusCode,
     headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
@@ -28,4 +29,9 @@ export function parseBody(event: Event): Record<string, unknown> | null {
   } catch {
     return null;
   }
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function isUuid(v: unknown): v is string {
+  return typeof v === 'string' && UUID.test(v);
 }

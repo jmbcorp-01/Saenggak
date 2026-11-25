@@ -18,13 +18,13 @@ describe('SaenggakStack', () => {
   });
 
   it('protects every route with the Cognito JWT authorizer', () => {
-    template.resourceCountIs('AWS::ApiGatewayV2::Route', 3);
+    template.resourceCountIs('AWS::ApiGatewayV2::Route', 10);
     template.allResourcesProperties('AWS::ApiGatewayV2::Route', { AuthorizationType: 'JWT' });
   });
 
-  it('runs three Node 22 Lambdas outside the VPC', () => {
+  it('runs two Node 22 Lambdas outside the VPC', () => {
     const fns = template.findResources('AWS::Lambda::Function', { Properties: { Runtime: 'nodejs22.x' } });
-    expect(Object.keys(fns)).toHaveLength(3);
+    expect(Object.keys(fns)).toHaveLength(2);
     for (const f of Object.values(fns)) expect(f.Properties.VpcConfig).toBeUndefined();
   });
 
