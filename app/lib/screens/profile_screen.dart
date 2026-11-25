@@ -92,41 +92,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return ListView(
           padding: EdgeInsets.zero,
           children: [
-            Container(
-              height: 104,
-              decoration: const BoxDecoration(color: SgColors.band),
-              alignment: Alignment.topRight,
-              clipBehavior: Clip.hardEdge,
-              child: const SymbolMark(
-                size: 150,
-                strokeColor: SgColors.bandMark,
-                dotColor: SgColors.bandMark,
-                semanticLabel: null,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            // Band, photo overlapping its lower edge, and the action button.
+            SizedBox(
+              height: 104 + 60,
+              child: Stack(
                 children: [
-                  Transform.translate(
-                    offset: const Offset(0, -40),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
-                          padding: const EdgeInsets.all(4),
-                          child: Avatar(
-                            initial: profile.initial,
-                            color: avatarPalette[profile.id.hashCode.abs() % avatarPalette.length],
-                            size: 72,
-                            label: '${profile.displayName} 프로필 사진',
-                          ),
-                        ),
-                        if (_isMe)
-                          OutlinedButton(
+                  Container(
+                    height: 104,
+                    decoration: const BoxDecoration(color: SgColors.band),
+                    alignment: Alignment.topRight,
+                    clipBehavior: Clip.hardEdge,
+                    child: const SymbolMark(
+                      size: 150,
+                      strokeColor: SgColors.bandMark,
+                      dotColor: SgColors.bandMark,
+                      semanticLabel: null,
+                    ),
+                  ),
+                  Positioned(
+                    left: 16,
+                    top: 104 - 44,
+                    child: Container(
+                      decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+                      padding: const EdgeInsets.all(4),
+                      child: Avatar(
+                        initial: profile.initial,
+                        color: avatarPalette[profile.id.hashCode.abs() % avatarPalette.length],
+                        size: 80,
+                        label: '${profile.displayName} 프로필 사진',
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: 16,
+                    top: 104 + 6,
+                    child: _isMe
+                        ? OutlinedButton(
                             onPressed: () => Navigator.of(context).push(
                               MaterialPageRoute<void>(
                                 builder: (context) =>
@@ -136,52 +137,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             style: OutlinedButton.styleFrom(
                               foregroundColor: SgColors.ink,
                               side: const BorderSide(color: SgColors.outline),
-                              textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                              minimumSize: const Size(0, 40),
+                              textStyle: SgText.label(size: 14),
                             ),
                             child: const Text('프로필 수정'),
                           )
-                        else
-                          _FollowButton(
+                        : _FollowButton(
                             profile: profile,
                             canFollow: (widget.state.me?.followUnlocked ?? false) && profile.followUnlocked,
                             busy: _busy,
                             onPressed: () => _toggleFollow(profile),
                           ),
-                      ],
-                    ),
                   ),
-                  Transform.translate(
-                    offset: const Offset(0, -28),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(profile.displayName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+                  Text('@${profile.handle}', style: SgText.meta),
+                  if (profile.bio.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(profile.bio, style: const TextStyle(fontSize: 15, height: 1.5)),
+                  ],
+                  const SizedBox(height: 10),
+                  // Follow counts mean nothing until follow is open, so they are left out.
+                  Text.rich(
+                    TextSpan(
+                      style: SgText.small,
                       children: [
-                        Text(profile.displayName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-                        Text('@${profile.handle}', style: SgText.meta),
-                        if (profile.bio.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          Text(profile.bio, style: const TextStyle(fontSize: 15, height: 1.5)),
+                        if (profile.followUnlocked) ...[
+                          _count('${profile.following}'),
+                          const TextSpan(text: ' 팔로잉    '),
+                          _count('${profile.followers}'),
+                          const TextSpan(text: ' 팔로워    '),
                         ],
-                        const SizedBox(height: 10),
-                        Text.rich(
-                          TextSpan(
-                            style: SgText.small,
-                            children: [
-                              _count(profile.followUnlocked ? '${profile.following}' : '–'),
-                              const TextSpan(text: ' 팔로잉    '),
-                              _count(profile.followUnlocked ? '${profile.followers}' : '–'),
-                              const TextSpan(text: ' 팔로워    '),
-                              _count('$received'),
-                              const TextSpan(text: ' 받은 공감'),
-                            ],
-                          ),
-                        ),
-                        if (_isMe && !profile.followUnlocked) ...[
-                          const SizedBox(height: 14),
-                          FollowProgress(days: profile.writingDays, total: profile.daysToFollow),
-                        ],
+                        _count('$received'),
+                        const TextSpan(text: ' 받은 공감'),
                       ],
                     ),
                   ),
+                  if (_isMe && !profile.followUnlocked) ...[
+                    const SizedBox(height: 14),
+                    FollowProgress(days: profile.writingDays, total: profile.daysToFollow),
+                  ],
+                  if (!_isMe &&
+                      !profile.followedByMe &&
+                      !((widget.state.me?.followUnlocked ?? false) && profile.followUnlocked)) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      (widget.state.me?.followUnlocked ?? false)
+                          ? '${profile.displayName}님이 글을 쓴 날이 ${profile.daysToFollow}일이 되면 팔로우할 수 있어요.'
+                          : '내가 글을 쓴 날이 ${widget.state.me?.daysToFollow ?? 10}일이 되면 팔로우할 수 있어요. '
+                                '지금 ${widget.state.me?.writingDays ?? 0}일째예요.',
+                      style: SgText.small,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -220,7 +234,7 @@ class _FollowButton extends StatelessWidget {
         ? OutlinedButton.styleFrom(
             foregroundColor: SgColors.ink,
             side: const BorderSide(color: SgColors.outline),
-            textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            textStyle: SgText.label(size: 14, weight: FontWeight.w700),
           )
         : OutlinedButton.styleFrom(
             backgroundColor: SgColors.ink,
@@ -228,7 +242,7 @@ class _FollowButton extends StatelessWidget {
             disabledBackgroundColor: SgColors.line,
             disabledForegroundColor: SgColors.muted,
             side: BorderSide.none,
-            textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            textStyle: SgText.label(size: 14, weight: FontWeight.w700),
           );
     final button = OutlinedButton(
       key: const Key('follow'),
@@ -236,8 +250,7 @@ class _FollowButton extends StatelessWidget {
       style: style,
       child: Text(following ? '팔로잉' : '팔로우'),
     );
-    if (following || canFollow) return button;
-    return Tooltip(message: '팔로우는 두 사람 모두 글을 쓴 날이 10일이 되면 열려요', child: button);
+    return button;
   }
 }
 

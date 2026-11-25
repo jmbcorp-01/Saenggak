@@ -131,7 +131,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 foregroundColor: Colors.white,
                 minimumSize: const Size.fromHeight(50),
                 shape: pill,
-                textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                textStyle: SgText.label(size: 16, weight: FontWeight.w700),
               ),
               child: _busy
                   ? const SizedBox(

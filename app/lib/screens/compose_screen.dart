@@ -144,10 +144,11 @@ class _ComposeScreenState extends State<ComposeScreen> {
                       style: FilledButton.styleFrom(
                         backgroundColor: SgColors.ink,
                         foregroundColor: Colors.white,
-                        disabledBackgroundColor: SgColors.outline,
-                        disabledForegroundColor: Colors.white,
+                        // Muted text on a light fill stays readable while disabled.
+                        disabledBackgroundColor: SgColors.line,
+                        disabledForegroundColor: SgColors.muted,
                         minimumSize: const Size(0, 36),
-                        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                        textStyle: SgText.label(size: 15, weight: FontWeight.w700),
                       ),
                       child: _sending
                           ? const SizedBox(
@@ -252,17 +253,37 @@ class LengthRing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String label;
-    if (status.tooShort) {
-      label = '길이 부족';
-    } else if (status.tooLong) {
-      label = '최대 길이 넘음';
-    } else {
-      label = '최대까지 ${status.remaining}';
-    }
+    // Words only when the draft cannot be posted, so the writer knows why the
+    // post button is off without watching a number while writing.
+    final String? hint = status.units == 0
+        ? null
+        : status.tooShort
+        ? '조금 더 써주세요'
+        : status.tooLong
+        ? '조금 줄여주세요'
+        : null;
+    final label = status.tooShort
+        ? '길이 부족'
+        : status.tooLong
+        ? '최대 길이 넘음'
+        : '최대까지 ${status.remaining}';
     return Semantics(
       label: label,
-      child: CustomPaint(size: const Size.square(26), painter: _RingPainter(status)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (hint != null) ...[
+            ExcludeSemantics(
+              child: Text(
+                hint,
+                style: SgText.small.copyWith(color: status.tooLong ? SgColors.accentText : SgColors.muted),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          CustomPaint(size: const Size.square(26), painter: _RingPainter(status)),
+        ],
+      ),
     );
   }
 }

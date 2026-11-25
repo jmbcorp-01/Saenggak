@@ -66,7 +66,7 @@ class PublishResultScreen extends StatelessWidget {
               const SizedBox(height: 28),
               const Text('처음 쓴 표현', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
               const SizedBox(height: 4),
-              const Text('생각에서 이 글보다 먼저 쓰인 적이 없는 표현이에요.', style: SgText.small),
+              const Text('지금까지 아무도 쓰지 않았던 표현이에요.', style: SgText.small),
               const SizedBox(height: 8),
               for (final phrase in outcome.firstPhrases)
                 Container(
@@ -79,9 +79,16 @@ class PublishResultScreen extends StatelessWidget {
                       Expanded(
                         child: Text('“$phrase”', style: const TextStyle(fontSize: 16, color: SgColors.ink)),
                       ),
-                      Text(
-                        '처음 씀',
-                        style: SgText.mono.copyWith(color: SgColors.accentText, fontWeight: FontWeight.w500),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: SgColors.accentText),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '처음 씀',
+                          style: SgText.label(size: 12, weight: FontWeight.w500).copyWith(color: SgColors.accentText),
+                        ),
                       ),
                     ],
                   ),
@@ -101,7 +108,7 @@ class PublishResultScreen extends StatelessWidget {
                 foregroundColor: Colors.white,
                 minimumSize: const Size.fromHeight(50),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-                textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                textStyle: SgText.label(size: 16, weight: FontWeight.w700),
               ),
               child: const Text('피드로'),
             ),

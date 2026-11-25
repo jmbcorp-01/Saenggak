@@ -25,23 +25,32 @@ class FeedScreen extends StatelessWidget {
             SizedBox(
               height: 52,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Row(
                   children: [
                     Semantics(
                       button: true,
                       label: '내 프로필',
                       child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
                         onTap: onOpenProfile,
-                        child: Avatar(
-                          initial: state.me?.initial ?? '?',
-                          color: avatarPalette[(state.me?.id.hashCode ?? 0).abs() % avatarPalette.length],
-                          size: 32,
+                        // A 32px photo in a 48px touch area.
+                        child: SizedBox.square(
+                          dimension: 48,
+                          child: Center(
+                            child: ExcludeSemantics(
+                              child: Avatar(
+                                initial: state.me?.initial ?? '?',
+                                color: avatarPalette[(state.me?.id.hashCode ?? 0).abs() % avatarPalette.length],
+                                size: 32,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
                     const Expanded(child: Center(child: SymbolMark())),
-                    const SizedBox(width: 32),
+                    const SizedBox(width: 48),
                   ],
                 ),
               ),

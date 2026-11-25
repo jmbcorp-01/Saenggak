@@ -141,16 +141,23 @@ class _PostTileState extends State<PostTile> {
     final canDelete = post.isMine && widget.onDelete != null;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 8, 4),
+      padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: SgColors.line)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          GestureDetector(
-            onTap: widget.onOpenAuthor,
-            child: Avatar(initial: post.authorInitial, color: post.avatarColor, label: '${post.authorName} 프로필 사진'),
+          // The name beside it is the labelled way to the profile; the photo is
+          // a second place to tap and is left out of the screen reader.
+          ExcludeSemantics(
+            child: GestureDetector(
+              onTap: widget.onOpenAuthor,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Avatar(initial: post.authorInitial, color: post.avatarColor),
+              ),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -160,19 +167,30 @@ class _PostTileState extends State<PostTile> {
                 Row(
                   children: [
                     Flexible(
-                      child: GestureDetector(
-                        onTap: widget.onOpenAuthor,
-                        child: Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(text: post.authorName, style: SgText.name),
-                              TextSpan(
-                                text: ' @${post.authorHandle} · $ago${post.editedAt != null ? ' · 수정됨' : ''}',
-                                style: SgText.meta,
+                      child: Semantics(
+                        button: widget.onOpenAuthor != null,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: widget.onOpenAuthor,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(minHeight: 48),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              widthFactor: 1,
+                              child: Text.rich(
+                                TextSpan(
+                                  children: [
+                                    TextSpan(text: post.authorName, style: SgText.name),
+                                    TextSpan(
+                                      text: ' @${post.authorHandle} · $ago${post.editedAt != null ? ' · 수정됨' : ''}',
+                                      style: SgText.meta,
+                                    ),
+                                  ],
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ],
+                            ),
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ),
@@ -193,28 +211,29 @@ class _PostTileState extends State<PostTile> {
                         ],
                       )
                     else
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 48),
                   ],
                 ),
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: Text(translated ? post.translation! : post.body, style: SgText.body),
                 ),
-                if (post.translation != null) ...[
-                  const SizedBox(height: 4),
+                if (post.translation != null)
                   Row(
                     children: [
                       Text(translated ? '${languageName(post.lang)}에서 번역됨 · ' : '원문 · ', style: SgText.small),
-                      GestureDetector(
-                        onTap: () => setState(() => _showOriginal = !_showOriginal),
-                        child: Text(
-                          translated ? '원문 보기' : '번역 보기',
-                          style: SgText.small.copyWith(color: SgColors.accentText, fontWeight: FontWeight.w500),
+                      TextButton(
+                        onPressed: () => setState(() => _showOriginal = !_showOriginal),
+                        style: TextButton.styleFrom(
+                          foregroundColor: SgColors.accentText,
+                          padding: const EdgeInsets.symmetric(horizontal: 2),
+                          minimumSize: const Size(48, 44),
+                          textStyle: SgText.label(size: 13, weight: FontWeight.w500),
                         ),
+                        child: Text(translated ? '원문 보기' : '번역 보기'),
                       ),
                     ],
                   ),
-                ],
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: Row(
