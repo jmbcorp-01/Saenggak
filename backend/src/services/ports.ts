@@ -81,6 +81,7 @@ export interface ProfileInput {
 
 export interface PostState {
   authorId: string;
+  body: string;
   status: 'published' | 'blocked';
   empathyCount: number;
 }
@@ -88,6 +89,7 @@ export interface PostState {
 export interface PostUpdate {
   body: string;
   lang: string;
+  /** Typing time of the edit, added to the post's existing typing time. */
   typingMs: number;
   embedding: number[];
   session: TypingSession;

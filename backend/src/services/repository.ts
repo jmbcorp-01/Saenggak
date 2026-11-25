@@ -231,20 +231,25 @@ export class AuroraRepository implements Repository {
 
   async postState(postId: string): Promise<PostState | null> {
     const rows = await this.query(
-      `SELECT author_id::text, status, (SELECT count(*) FROM empathies e WHERE e.post_id = p.id) AS n
+      `SELECT author_id::text, body, status, (SELECT count(*) FROM empathies e WHERE e.post_id = p.id) AS n
        FROM posts p WHERE id = :p::uuid AND status <> 'deleted'`,
       { p: postId },
     );
     const r = rows[0];
     if (!r) return null;
-    return { authorId: r.author_id as string, status: r.status as PostState['status'], empathyCount: Number(r.n) };
+    return {
+      authorId: r.author_id as string,
+      body: r.body as string,
+      status: r.status as PostState['status'],
+      empathyCount: Number(r.n),
+    };
   }
 
   async updatePost(postId: string, authorId: string, u: PostUpdate): Promise<boolean> {
     // One statement, so a 공감 arriving mid-edit either blocks the edit or comes after it.
     const rows = await this.query(
       `WITH updated AS (
-         UPDATE posts SET body = :body, lang = :lang, typing_ms = :typing,
+         UPDATE posts SET body = :body, lang = :lang, typing_ms = typing_ms + CAST(:typing AS integer),
                 embedding = :emb::vector, edited_at = now()
          WHERE id = :p::uuid AND author_id = :a::uuid AND status = 'published'
            AND NOT EXISTS (SELECT 1 FROM empathies e WHERE e.post_id = posts.id)

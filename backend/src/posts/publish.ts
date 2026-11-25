@@ -55,15 +55,19 @@ interface Screened {
   session: TypingSession;
 }
 
-/** Length and hand-typing checks. No service is called before these pass. */
-function screen(input: PublishInput): Screened | Rejected {
+/**
+ * Length and hand-typing checks. No service is called before these pass.
+ * [baseText] is the text the draft started from: empty for a new post, the
+ * current text for an edit, so the session only has to account for the change.
+ */
+function screen(input: PublishInput, baseText = ''): Screened | Rejected {
   const body = input.text.trim();
   const verdict = checkLength(body);
   if (verdict !== 'ok') return { kind: 'invalid_length', verdict };
 
   const session = parseSession(input.session);
   if (!session || !DATE.test(input.localDate)) return { kind: 'not_human', issues: ['invalid_session'] };
-  const issues = evaluate(session, [...input.text].length);
+  const issues = evaluate(session, [...input.text].length - [...baseText].length);
   if (issues.length > 0) return { kind: 'not_human', issues };
 
   return { body, lang: detectLang(body), session };
@@ -138,15 +142,17 @@ export async function publishPost(deps: PublishDeps, input: PublishInput): Promi
 /**
  * Replaces a post's text. Allowed only for the author and only until the
  * first 공감. The new text goes through every check a new post does, and the
- * post's first-used phrases are worked out again from the new text.
+ * post's first-used phrases are worked out again from the new text. Typing
+ * time spent on the edit is added to the post's typing time.
  */
 export async function editPost(deps: PublishDeps, input: EditInput): Promise<EditResult> {
-  const s = screen(input);
-  if ('kind' in s) return s;
-
   const current = await deps.repo.postState(input.postId);
   if (!current || current.authorId !== input.authorId || current.status !== 'published') return { kind: 'not_found' };
   if (current.empathyCount > 0) return { kind: 'locked' };
+
+  // The app opens the editor with the current text, so the session records only the change.
+  const s = screen(input, current.body);
+  if ('kind' in s) return s;
 
   const rejected = await moderate(deps, input, s);
   if (rejected) return rejected;

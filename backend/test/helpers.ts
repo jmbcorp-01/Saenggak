@@ -21,6 +21,12 @@ export function humanSession(text: string) {
   return { events, rejectedPastes: 0 };
 }
 
+/** Deletes [oldText] then types [newText], as an edit that rewrites the post. */
+export function editSession(oldText: string, newText: string) {
+  const typed = humanSession(newText);
+  return { ...typed, events: [{ t: 0, i: 0, d: [...oldText].length, s: 'keyboard' }, ...typed.events] };
+}
+
 /** Fake repository kept in memory. */
 export class MemoryRepo implements Repository {
   posts: (NewPost & { id: string })[] = [];
@@ -64,12 +70,12 @@ export class MemoryRepo implements Repository {
     const p = this.posts.find((x) => x.id === postId);
     if (!p) return null;
     const empathyCount = [...this.empathies].filter((e) => e.startsWith(`${postId}:`)).length;
-    return { authorId: p.authorId, status: p.status, empathyCount };
+    return { authorId: p.authorId, body: p.body, status: p.status, empathyCount };
   }
   async updatePost(postId: string, authorId: string, u: PostUpdate) {
     const p = this.posts.find((x) => x.id === postId && x.authorId === authorId && x.status === 'published');
     if (!p || [...this.empathies].some((e) => e.startsWith(`${postId}:`))) return false;
-    Object.assign(p, { body: u.body, lang: u.lang, typingMs: u.typingMs, embedding: u.embedding, session: u.session });
+    Object.assign(p, { body: u.body, lang: u.lang, typingMs: p.typingMs + u.typingMs, embedding: u.embedding, session: u.session });
     for (const [k, v] of this.firsts) if (v === postId) this.firsts.delete(k);
     return true;
   }

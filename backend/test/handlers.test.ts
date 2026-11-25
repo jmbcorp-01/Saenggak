@@ -3,7 +3,7 @@ import { apiHandler } from '../src/handlers/api.js';
 import type { Event } from '../src/handlers/http.js';
 import { writeHandler } from '../src/handlers/write.js';
 import type { FeedPost } from '../src/services/ports.js';
-import { humanSession, MemoryRepo } from './helpers.js';
+import { editSession, humanSession, MemoryRepo } from './helpers.js';
 
 const U1 = '11111111-1111-4111-8111-111111111111';
 const U2 = '22222222-2222-4222-8222-222222222222';
@@ -26,6 +26,7 @@ const parse = (r: unknown) => {
 const TEXT = 'I keep thinking about the quiet morning walks I took last spring, and how slow they felt.';
 const EDITED = 'Some evenings the city sounds like the sea, and I let myself believe it for a while.';
 const post = (text: string) => JSON.stringify({ text, session: humanSession(text), localDate: '2026-11-25' });
+const edit = (from: string, to: string) => JSON.stringify({ text: to, session: editSession(from, to), localDate: '2026-11-25' });
 
 function setup() {
   const repo = new MemoryRepo();
@@ -60,7 +61,7 @@ describe('PATCH /posts/{id}', () => {
   it('edits until the first 공감, then refuses', async () => {
     const { write, api } = setup();
     const id = parse(await write(event('POST /posts', { body: post(TEXT) }))).body.id;
-    const patch = (sub = U1) => write(event('PATCH /posts/{id}', { sub, pathParameters: { id }, body: post(EDITED) }));
+    const patch = (sub = U1) => write(event('PATCH /posts/{id}', { sub, pathParameters: { id }, body: edit(TEXT, EDITED) }));
 
     const edited = parse(await patch());
     expect(edited.status).toBe(200);
@@ -75,7 +76,7 @@ describe('PATCH /posts/{id}', () => {
   it('frees the old phrases for others after an edit', async () => {
     const { write } = setup();
     const id = parse(await write(event('POST /posts', { body: post(TEXT) }))).body.id;
-    await write(event('PATCH /posts/{id}', { pathParameters: { id }, body: post(EDITED) }));
+    await write(event('PATCH /posts/{id}', { pathParameters: { id }, body: edit(TEXT, EDITED) }));
     const other = parse(await write(event('POST /posts', { sub: U2, body: post(TEXT) })));
     expect(other.body.firstPhrases.length).toBeGreaterThan(0);
   });
@@ -84,10 +85,30 @@ describe('PATCH /posts/{id}', () => {
     const { repo, write } = setup();
     const id = parse(await write(event('POST /posts', { body: post(TEXT) }))).body.id;
     const bad = `${EDITED} BAD`;
-    const r = parse(await write(event('PATCH /posts/{id}', { pathParameters: { id }, body: post(bad) })));
+    const r = parse(await write(event('PATCH /posts/{id}', { pathParameters: { id }, body: edit(TEXT, bad) })));
     expect(r).toMatchObject({ status: 422, body: { error: 'blocked', reason: 'spam' } });
     expect(repo.posts.find((p) => p.id === id)?.body).toBe(TEXT.trim());
     expect(repo.posts.filter((p) => p.status === 'blocked')).toHaveLength(1);
+  });
+});
+
+describe('editing in place', () => {
+  it('checks only the change, and adds the edit time to the typing time', async () => {
+    const { repo, write } = setup();
+    const id = parse(await write(event('POST /posts', { body: post(TEXT) }))).body.id;
+    const before = repo.posts[0]!.typingMs;
+    const changed = `${TEXT} Still.`;
+    const typed = humanSession(' Still.');
+    const r = parse(await write(event('PATCH /posts/{id}', {
+      pathParameters: { id },
+      body: JSON.stringify({ text: changed, session: typed, localDate: '2026-11-25' }),
+    })));
+    expect(r.status).toBe(200);
+    expect(repo.posts[0]!.typingMs).toBeGreaterThan(before);
+
+    // A session that does not match the change is refused.
+    const wrong = parse(await write(event('PATCH /posts/{id}', { pathParameters: { id }, body: post(EDITED) })));
+    expect(wrong).toMatchObject({ status: 422, body: { error: 'not_human', issues: ['text_mismatch'] } });
   });
 });
 

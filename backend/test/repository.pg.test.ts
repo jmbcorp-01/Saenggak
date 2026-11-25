@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { deletePost, editPost, publishPost } from '../src/posts/publish.js';
 import { MAX_COSINE_DISTANCE } from '../src/rules/similar.js';
 import { AuroraRepository } from '../src/services/repository.js';
-import { humanSession } from './helpers.js';
+import { editSession, humanSession } from './helpers.js';
 import { PgDataApi } from './pgDataApi.js';
 
 /**
@@ -102,7 +102,7 @@ describe.skipIf(!url)('AuroraRepository on Postgres', () => {
     const id = post!.id;
     await repo.saveTranslation(id, 'en', 'old translation');
 
-    const edited = await editPost(deps(), { ...input(A, EDITED), postId: id });
+    const edited = await editPost(deps(), { ...input(A, EDITED), session: editSession(TEXT, EDITED), postId: id });
     expect(edited.kind).toBe('published');
     expect(await repo.cachedTranslation(id, 'en')).toBeNull();
     const [after] = await repo.feed(C, { following: false, authorId: A, limit: 1 });
@@ -110,7 +110,7 @@ describe.skipIf(!url)('AuroraRepository on Postgres', () => {
     expect(after!.editedAt).not.toBeNull();
 
     expect(await repo.toggleEmpathy(id, C)).toEqual({ empathized: true, count: 1 });
-    expect(await editPost(deps(), { ...input(A, TEXT), postId: id })).toEqual({ kind: 'locked' });
+    expect(await editPost(deps(), { ...input(A, TEXT), session: editSession(EDITED, TEXT), postId: id })).toEqual({ kind: 'locked' });
     expect(await repo.toggleEmpathy(id, A)).toBeNull();
   });
 
