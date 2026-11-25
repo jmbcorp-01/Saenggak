@@ -55,7 +55,7 @@ export class AuroraRepository implements Repository {
     const rows = await this.query(
       `INSERT INTO posts (author_id, body, lang, typing_ms, local_date, status, blocked_reason, embedding)
        VALUES (:author::uuid, :body, :lang, :typing, :day::date, :status, :reason,
-               CASE WHEN :emb IS NULL THEN NULL ELSE :emb::vector END)
+               CAST(CAST(:emb AS text) AS vector))
        RETURNING id::text`,
       {
         author: p.authorId,
@@ -79,12 +79,17 @@ export class AuroraRepository implements Repository {
 
   async countSimilarAuthors(postId: string, embedding: number[], maxDistance: number): Promise<number> {
     const rows = await this.query(
-      `SELECT count(DISTINCT p.author_id) AS n
-       FROM posts p, posts me
-       WHERE me.id = :id::uuid
-         AND p.status = 'published'
-         AND p.author_id <> me.author_id
-         AND p.embedding <=> :emb::vector <= :maxd`,
+      // ORDER BY distance with LIMIT lets the HNSW index do the search; a plain
+      // distance filter would scan every post.
+      `SELECT count(DISTINCT near.author_id) AS n
+       FROM (
+         SELECT p.author_id, p.embedding <=> :emb::vector AS dist
+         FROM posts p
+         WHERE p.status = 'published' AND p.id <> :id::uuid
+         ORDER BY p.embedding <=> :emb::vector
+         LIMIT 500
+       ) near, posts me
+       WHERE me.id = :id::uuid AND near.author_id <> me.author_id AND near.dist <= :maxd`,
       { id: postId, emb: JSON.stringify(embedding), maxd: maxDistance },
     );
     return Number(rows[0]?.n ?? 0);
@@ -113,7 +118,7 @@ export class AuroraRepository implements Repository {
     const rows = await this.query(
       `SELECT count(*) AS n FROM posts
        WHERE author_id = :a::uuid AND status = 'blocked'
-         AND created_at > now() - make_interval(days => :d)`,
+         AND created_at > now() - make_interval(days => CAST(:d AS integer))`,
       { a: authorId, d: windowDays },
     );
     return Number(rows[0]?.n ?? 0);
@@ -173,7 +178,7 @@ export class AuroraRepository implements Repository {
               EXISTS (SELECT 1 FROM empathies e WHERE e.post_id = p.id AND e.user_id = :v::uuid) AS mine
        FROM posts p JOIN users u ON u.id = p.author_id
        WHERE p.status = 'published'
-         AND (:before IS NULL OR p.created_at < :before::timestamptz)
+         AND (CAST(:before AS text) IS NULL OR p.created_at < CAST(:before AS timestamptz))
          AND (NOT :following OR EXISTS (
                SELECT 1 FROM follows f
                WHERE f.follower_id = :v::uuid AND f.followee_id = p.author_id AND NOT f.hidden))
