@@ -19,11 +19,11 @@ setup below is done.
    Variables: `AWS_DEPLOY_ROLE_ARN` and `AWS_REGION`.
 4. **Claude for the content filter.** Two routes; pick one with the
    `MODERATION_PROVIDER` variable in GitHub:
-   - `bedrock` (default): Claude on Amazon Bedrock. In the Bedrock console,
+   - `bedrock`: Claude on Amazon Bedrock. In the Bedrock console,
      submit the Anthropic use-case form, then check that Claude Haiku 5.5
      answers in the playground. Some new accounts are blocked from Anthropic
      models until AWS support lifts it.
-   - `anthropic`: the Claude API. Create a key at console.anthropic.com,
+   - `anthropic` (default for now): the Claude API. Create a key at console.anthropic.com,
      then after the first deploy paste it as the value of the
      `ClaudeApiKeySecret` secret (named in the deploy summary) in the AWS
      Secrets Manager console. No redeploy is needed.

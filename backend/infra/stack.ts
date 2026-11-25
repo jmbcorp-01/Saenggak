@@ -73,7 +73,8 @@ export class SaenggakStack extends Stack {
       DB_NAME: 'saenggak',
       // The content filter's route ("bedrock" or "anthropic") and model, from
       // the MODERATION_PROVIDER and MODERATION_MODEL variables in GitHub.
-      MODERATION_PROVIDER: process.env.MODERATION_PROVIDER || 'bedrock',
+      // Claude API until the account's Bedrock access to Anthropic models is lifted.
+      MODERATION_PROVIDER: process.env.MODERATION_PROVIDER || 'anthropic',
       ...(process.env.MODERATION_MODEL ? { MODERATION_MODEL: process.env.MODERATION_MODEL } : {}),
     };
     const fn = (name: string, timeout = 10) => {
