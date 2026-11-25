@@ -3,12 +3,7 @@ enum InputSource { keyboard, voice }
 
 /// One accepted change to the draft.
 class TypingEvent {
-  const TypingEvent({
-    required this.atMs,
-    required this.inserted,
-    required this.deleted,
-    required this.source,
-  });
+  const TypingEvent({required this.atMs, required this.inserted, required this.deleted, required this.source});
 
   /// Milliseconds since the session started.
   final int atMs;
@@ -21,12 +16,7 @@ class TypingEvent {
 
   final InputSource source;
 
-  Map<String, Object> toJson() => {
-        't': atMs,
-        'i': inserted,
-        'd': deleted,
-        's': source.name,
-      };
+  Map<String, Object> toJson() => {'t': atMs, 'i': inserted, 'd': deleted, 's': source.name};
 }
 
 /// Records how a draft was typed, so the server can check that a person wrote
@@ -49,20 +39,18 @@ class TypingSession {
   /// How many times a paste or other bulk insert was blocked.
   int get rejectedPastes => _rejectedPastes;
 
-  void record({
-    required int inserted,
-    required int deleted,
-    InputSource source = InputSource.keyboard,
-  }) {
+  void record({required int inserted, required int deleted, InputSource source = InputSource.keyboard}) {
     if (inserted == 0 && deleted == 0) return;
     final now = _clock();
     _startedAt ??= now;
-    _events.add(TypingEvent(
-      atMs: now.difference(_startedAt!).inMilliseconds,
-      inserted: inserted,
-      deleted: deleted,
-      source: source,
-    ));
+    _events.add(
+      TypingEvent(
+        atMs: now.difference(_startedAt!).inMilliseconds,
+        inserted: inserted,
+        deleted: deleted,
+        source: source,
+      ),
+    );
   }
 
   void recordRejectedPaste() => _rejectedPastes++;
@@ -84,9 +72,7 @@ class TypingSession {
     for (var i = 1; i < _events.length; i++) {
       final a = _events[i - 1];
       final b = _events[i];
-      if (a.source == InputSource.keyboard &&
-          b.source == InputSource.keyboard &&
-          b.inserted > 0) {
+      if (a.source == InputSource.keyboard && b.source == InputSource.keyboard && b.inserted > 0) {
         out.add(b.atMs - a.atMs);
       }
     }
@@ -94,10 +80,10 @@ class TypingSession {
   }
 
   Map<String, Object> toJson() => {
-        'events': _events.map((e) => e.toJson()).toList(),
-        'rejectedPastes': _rejectedPastes,
-        'activeMs': activeDuration.inMilliseconds,
-      };
+    'events': _events.map((e) => e.toJson()).toList(),
+    'rejectedPastes': _rejectedPastes,
+    'activeMs': activeDuration.inMilliseconds,
+  };
 
   void reset() {
     _startedAt = null;

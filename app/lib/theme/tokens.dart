@@ -80,11 +80,7 @@ ThemeData buildTheme() {
     scaffoldBackgroundColor: SgColors.surface,
     fontFamily: SgFonts.sans,
     fontFamilyFallback: SgFonts.sansFallback,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: SgColors.accent,
-      primary: SgColors.ink,
-      surface: SgColors.surface,
-    ),
+    colorScheme: ColorScheme.fromSeed(seedColor: SgColors.accent, primary: SgColors.ink, surface: SgColors.surface),
     dividerColor: SgColors.line,
     splashFactory: NoSplash.splashFactory,
   );

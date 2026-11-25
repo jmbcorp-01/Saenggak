@@ -7,17 +7,23 @@ import '../core/human_check.dart';
 import '../core/human_input_formatter.dart';
 import '../core/typing_session.dart';
 import '../core/weighted_length.dart';
-import '../data/post_store.dart';
+import '../data/app_state.dart';
 import '../models/post.dart';
+import '../models/publish_outcome.dart';
 import '../theme/tokens.dart';
 import '../widgets/post_tile.dart';
+import 'publish_result_screen.dart';
 
 /// Writing screen. Only hand-typed (or dictated) text gets in, and the typing
 /// session is kept so the post can show its real typing time.
+///
+/// With [editing], the post's text is filled in and only the changes are
+/// recorded; the server checks the session against the change.
 class ComposeScreen extends StatefulWidget {
-  const ComposeScreen({super.key, required this.store, this.clock});
+  const ComposeScreen({super.key, required this.state, this.editing, this.clock});
 
-  final PostStore store;
+  final AppState state;
+  final Post? editing;
   final DateTime Function()? clock;
 
   @override
@@ -31,9 +37,10 @@ class _ComposeScreenState extends State<ComposeScreen> {
     isVoiceActive: () => _voice,
     onRejected: _onPasteRejected,
   );
-  final _controller = TextEditingController();
+  late final _controller = TextEditingController(text: widget.editing?.body ?? '');
   Timer? _ticker;
   bool _voice = false;
+  bool _sending = false;
 
   @override
   void initState() {
@@ -54,34 +61,58 @@ class _ComposeScreenState extends State<ComposeScreen> {
   void _onPasteRejected() {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(
-        content: Text('붙여넣기는 할 수 없어요. 한 글자씩 직접 써주세요.'),
-      ));
+      ..showSnackBar(const SnackBar(content: Text('붙여넣기는 할 수 없어요. 한 글자씩 직접 써주세요.')));
   }
 
-  void _submit() {
-    final status = WeightedLength.status(_controller.text);
-    if (!status.postable) return;
-    final check = HumanCheck.evaluate(_session);
-    if (!check.passed) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('사람이 직접 입력한 기록으로 확인되지 않았어요. 다시 써주세요.'),
-      ));
+  void _say(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _submit() async {
+    final text = _controller.text;
+    if (!WeightedLength.status(text).postable || _sending) return;
+    if (_session.events.isEmpty) {
+      _say('바뀐 내용이 없어요.');
       return;
     }
-    widget.store.add(Post(
-      id: 'local-${DateTime.now().microsecondsSinceEpoch}',
-      authorName: '윤서',
-      authorHandle: 'yoonseo',
-      authorInitial: '윤',
-      avatarColor: 0xFF3B4A42,
-      body: _controller.text.trim(),
-      postedAgo: '방금',
-      typingTime: _session.activeDuration,
-      empathyCount: 0,
-      isMine: true,
-    ));
-    Navigator.of(context).pop();
+    if (!HumanCheck.evaluate(_session).passed) {
+      _say(const Rejected(RejectReason.notHuman).message);
+      return;
+    }
+    setState(() => _sending = true);
+    final PublishOutcome outcome;
+    try {
+      final editing = widget.editing;
+      outcome = editing == null
+          ? await widget.state.publish(text, _session)
+          : await widget.state.edit(editing, text, _session);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _sending = false);
+        _say(const Rejected(RejectReason.network).message);
+      }
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _sending = false);
+    switch (outcome) {
+      case final Published published:
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute<void>(
+            builder: (_) => PublishResultScreen(
+              outcome: published,
+              body: text.trim(),
+              edited: widget.editing != null,
+              daysToFollow: widget.state.me?.daysToFollow ?? 10,
+            ),
+          ),
+        );
+      case final Rejected rejected:
+        // The draft stays so the writer can change it and try again.
+        _say(rejected.message);
+    }
   }
 
   @override
@@ -109,17 +140,22 @@ class _ComposeScreenState extends State<ComposeScreen> {
                     ),
                     FilledButton(
                       key: const Key('submit'),
-                      onPressed: status.postable ? _submit : null,
+                      onPressed: status.postable && !_sending ? _submit : null,
                       style: FilledButton.styleFrom(
                         backgroundColor: SgColors.ink,
                         foregroundColor: Colors.white,
                         disabledBackgroundColor: SgColors.outline,
                         disabledForegroundColor: Colors.white,
                         minimumSize: const Size(0, 36),
-                        textStyle: const TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w700),
+                        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                       ),
-                      child: const Text('게시하기'),
+                      child: _sending
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : Text(widget.editing == null ? '게시하기' : '수정하기'),
                     ),
                   ],
                 ),
@@ -131,21 +167,20 @@ class _ComposeScreenState extends State<ComposeScreen> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Avatar(
-                      initial: '윤',
-                      color: 0xFF3B4A42,
+                    Avatar(
+                      initial: widget.state.me?.initial ?? '?',
+                      color: avatarPalette[(widget.state.me?.id.hashCode ?? 0).abs() % avatarPalette.length],
                       label: '내 프로필 사진',
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Actions(
-                        actions: {
-                          PasteTextIntent: DoNothingAction(consumesKey: true),
-                        },
+                        actions: {PasteTextIntent: DoNothingAction(consumesKey: true)},
                         child: TextField(
                           key: const Key('thought'),
                           controller: _controller,
                           autofocus: true,
+                          readOnly: _sending,
                           maxLines: null,
                           expands: true,
                           textAlignVertical: TextAlignVertical.top,
@@ -154,13 +189,11 @@ class _ComposeScreenState extends State<ComposeScreen> {
                           enableIMEPersonalizedLearning: false,
                           inputFormatters: [_formatter],
                           contextMenuBuilder: _menuWithoutPaste,
-                          style: const TextStyle(
-                              fontSize: 19, height: 1.6, color: SgColors.ink),
+                          style: const TextStyle(fontSize: 19, height: 1.6, color: SgColors.ink),
                           decoration: const InputDecoration(
                             border: InputBorder.none,
                             hintText: '지금 어떤 생각을 하고 있나요?',
-                            hintStyle:
-                                TextStyle(fontSize: 19, color: SgColors.muted),
+                            hintStyle: TextStyle(fontSize: 19, color: SgColors.muted),
                           ),
                         ),
                       ),
@@ -187,13 +220,10 @@ class _ComposeScreenState extends State<ComposeScreen> {
                   Container(
                     width: 7,
                     height: 7,
-                    decoration: const BoxDecoration(
-                        color: SgColors.accent, shape: BoxShape.circle),
+                    decoration: const BoxDecoration(color: SgColors.accent, shape: BoxShape.circle),
                   ),
                   const SizedBox(width: 6),
-                  Text(timer,
-                      style: SgText.mono.copyWith(
-                          fontSize: 12, color: SgColors.ink)),
+                  Text(timer, style: SgText.mono.copyWith(fontSize: 12, color: SgColors.ink)),
                   const SizedBox(width: 14),
                   Container(width: 1, height: 24, color: SgColors.line),
                   const SizedBox(width: 14),
@@ -209,13 +239,8 @@ class _ComposeScreenState extends State<ComposeScreen> {
   }
 
   Widget _menuWithoutPaste(BuildContext context, EditableTextState state) {
-    final items = state.contextMenuButtonItems
-        .where((i) => i.type != ContextMenuButtonType.paste)
-        .toList();
-    return AdaptiveTextSelectionToolbar.buttonItems(
-      anchors: state.contextMenuAnchors,
-      buttonItems: items,
-    );
+    final items = state.contextMenuButtonItems.where((i) => i.type != ContextMenuButtonType.paste).toList();
+    return AdaptiveTextSelectionToolbar.buttonItems(anchors: state.contextMenuAnchors, buttonItems: items);
   }
 }
 
@@ -237,10 +262,7 @@ class LengthRing extends StatelessWidget {
     }
     return Semantics(
       label: label,
-      child: CustomPaint(
-        size: const Size.square(26),
-        painter: _RingPainter(status),
-      ),
+      child: CustomPaint(size: const Size.square(26), painter: _RingPainter(status)),
     );
   }
 }
@@ -262,20 +284,14 @@ class _RingPainter extends CustomPainter {
     final color = status.tooLong
         ? SgColors.accentText
         : status.tooShort
-            ? SgColors.muted
-            : SgColors.accent;
+        ? SgColors.muted
+        : SgColors.accent;
     final arc = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5
       ..strokeCap = StrokeCap.round;
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: r),
-      -math.pi / 2,
-      2 * math.pi * status.progress,
-      false,
-      arc,
-    );
+    canvas.drawArc(Rect.fromCircle(center: center, radius: r), -math.pi / 2, 2 * math.pi * status.progress, false, arc);
   }
 
   @override

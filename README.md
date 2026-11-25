@@ -9,12 +9,10 @@ photos except a profile picture. Web, iOS and Android from one Flutter app.
 | --- | --- |
 | `app/` | Flutter app (web, iOS, Android) |
 | `app/lib/core/` | Post rules: weighted length, typing session, paste blocking, human-typing check |
-| `app/lib/screens/` | Start, feed, compose and profile screens |
+| `app/lib/api/` | Server client, Cognito sign-in, and an offline demo backend |
+| `app/lib/screens/` | Start, sign-in, profile setup, feed, compose, post result and profile screens |
 | `app/lib/theme/` | Colors and type from the approved design |
-
-The AWS backend (Cognito, API Gateway + Lambda, Aurora PostgreSQL, Bedrock
-content filter, Amazon Translate) comes in a later change. Until then the app
-runs on in-memory sample posts.
+| `backend/` | AWS server: Lambdas, Aurora PostgreSQL with pgvector, CDK stack. See `backend/README.md`. |
 
 ## Rules the app enforces
 
@@ -37,5 +35,14 @@ runs on in-memory sample posts.
 cd app
 flutter pub get
 flutter test
-flutter run -d chrome
+flutter run -d chrome          # offline demo data, no sign-in
+```
+
+To use a deployed backend, pass the CDK stack outputs:
+
+```sh
+flutter run -d chrome \
+  --dart-define=API_URL=<ApiUrl> \
+  --dart-define=COGNITO_REGION=us-east-1 \
+  --dart-define=COGNITO_CLIENT_ID=<UserPoolClientId>
 ```

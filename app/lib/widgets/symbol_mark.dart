@@ -20,10 +20,7 @@ class SymbolMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mark = CustomPaint(
-      size: Size.square(size),
-      painter: _SymbolPainter(strokeColor, dotColor),
-    );
+    final mark = CustomPaint(size: Size.square(size), painter: _SymbolPainter(strokeColor, dotColor));
     if (semanticLabel == null) return ExcludeSemantics(child: mark);
     return Semantics(label: semanticLabel, image: true, child: mark);
   }
@@ -59,6 +56,5 @@ class _SymbolPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_SymbolPainter old) =>
-      old.stroke != stroke || old.dot != dot;
+  bool shouldRepaint(_SymbolPainter old) => old.stroke != stroke || old.dot != dot;
 }

@@ -30,15 +30,13 @@ void main() {
   test('flags typing faster than a person can', () {
     final rnd = Random(3);
     final gaps = List.generate(80, (_) => 20 + rnd.nextInt(30));
-    expect(HumanCheck.evaluate(sessionWithGaps(gaps)).issues,
-        contains(HumanCheckIssue.tooFast));
+    expect(HumanCheck.evaluate(sessionWithGaps(gaps)).issues, contains(HumanCheckIssue.tooFast));
   });
 
   test('flags text that arrived in few large chunks', () {
     final rnd = Random(5);
     final gaps = List.generate(10, (_) => 400 + rnd.nextInt(600));
-    expect(HumanCheck.evaluate(sessionWithGaps(gaps, perEvent: 4)).issues,
-        contains(HumanCheckIssue.tooFewEvents));
+    expect(HumanCheck.evaluate(sessionWithGaps(gaps, perEvent: 4)).issues, contains(HumanCheckIssue.tooFewEvents));
   });
 
   test('voice input is left out of the keyboard checks', () {
