@@ -1,8 +1,10 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../core/links.dart';
 import '../data/app_state.dart';
 import '../theme/tokens.dart';
 import 'admin_screen.dart';
+import 'blocked_screen.dart';
 import 'photo_capture_screen.dart';
 import 'profile_setup_screen.dart';
 
@@ -160,6 +162,27 @@ class SettingsScreen extends StatelessWidget {
                   onTap: () => _push(context, (_) => AdminScreen(state: state)),
                 ),
               ],
+              ListTile(
+                leading: const Icon(Icons.block),
+                title: const Text('차단한 사람'),
+                onTap: () => _push(context, (_) => BlockedScreen(state: state)),
+              ),
+              const _Header('정보'),
+              ListTile(
+                leading: const Icon(Icons.description_outlined),
+                title: const Text('이용약관'),
+                onTap: () => openPage('terms.html'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.privacy_tip_outlined),
+                title: const Text('개인정보 처리방침'),
+                onTap: () => openPage('privacy.html'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.mail_outline),
+                title: const Text('문의하기'),
+                onTap: () => openPage('support.html'),
+              ),
               const Divider(height: 32),
               ListTile(leading: const Icon(Icons.logout), title: const Text('로그아웃'), onTap: () => _signOut(context)),
               ListTile(

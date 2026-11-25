@@ -203,6 +203,7 @@ export class AuroraRepository implements Repository {
       const added = await this.query(
         `WITH target AS (
            SELECT id FROM posts WHERE id = :p::uuid AND status = 'published' AND author_id <> :u::uuid
+             AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = :u::uuid AND b.blocked_id = posts.author_id) OR (b.blocker_id = posts.author_id AND b.blocked_id = :u::uuid))
          ), ins AS (
            INSERT INTO empathies (post_id, user_id) SELECT id, :u::uuid FROM target
            ON CONFLICT DO NOTHING
@@ -224,6 +225,7 @@ export class AuroraRepository implements Repository {
               EXISTS (SELECT 1 FROM empathies e WHERE e.post_id = p.id AND e.user_id = :v::uuid) AS mine
        FROM posts p JOIN users u ON u.id = p.author_id
        WHERE p.status = 'published' AND u.suspended_at IS NULL
+         AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = :v::uuid AND b.blocked_id = p.author_id) OR (b.blocker_id = p.author_id AND b.blocked_id = :v::uuid))
          AND (CAST(:before AS text) IS NULL OR p.created_at < CAST(:before AS timestamptz))
          AND (NOT :following OR EXISTS (
                SELECT 1 FROM follows f
@@ -379,14 +381,15 @@ export class AuroraRepository implements Repository {
     return 'ok';
   }
 
-  async profile(userId: string, viewerId: string): Promise<(Profile & { followedByMe: boolean }) | null> {
+  async profile(userId: string, viewerId: string): Promise<(Profile & { followedByMe: boolean; blockedByMe?: boolean }) | null> {
     const rows = await this.query(
       `SELECT u.id::text, u.handle, u.display_name, u.bio, u.photo_key, u.locale, u.time_zone, u.follow_unlocked,
               coalesce(w.days, 0) AS days,
               (SELECT count(*) FROM follows f WHERE f.followee_id = u.id AND NOT f.hidden) AS followers,
               (SELECT count(*) FROM follows f WHERE f.follower_id = u.id AND NOT f.hidden) AS following,
               EXISTS (SELECT 1 FROM follows f
-                      WHERE f.follower_id = :v::uuid AND f.followee_id = u.id AND NOT f.hidden) AS mine
+                      WHERE f.follower_id = :v::uuid AND f.followee_id = u.id AND NOT f.hidden) AS mine,
+              EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = :v::uuid AND b.blocked_id = u.id) AS blocked
        FROM users u LEFT JOIN writing_days w ON w.author_id = u.id
        WHERE u.id = :u::uuid`,
       { u: userId, v: viewerId },
@@ -406,19 +409,23 @@ export class AuroraRepository implements Repository {
       followers: Number(r.followers),
       following: Number(r.following),
       followedByMe: Boolean(r.mine),
+      blockedByMe: Boolean(r.blocked),
     };
   }
 
   async follow(followerId: string, followeeId: string): Promise<FollowResult> {
     if (followerId === followeeId) return 'self';
     const rows = await this.query(
-      `SELECT id::text, follow_unlocked FROM users WHERE id IN (:a::uuid, :b::uuid)`,
+      `SELECT id::text, follow_unlocked,
+              EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = :a::uuid AND b.blocked_id = :b::uuid)
+                                              OR (b.blocker_id = :b::uuid AND b.blocked_id = :a::uuid)) AS blocked
+       FROM users WHERE id IN (:a::uuid, :b::uuid)`,
       { a: followerId, b: followeeId },
     );
     const followee = rows.find((r) => r.id === followeeId);
     const follower = rows.find((r) => r.id === followerId);
     if (!followee) return 'not_found';
-    if (!follower?.follow_unlocked || !followee.follow_unlocked) return 'not_allowed';
+    if (!follower?.follow_unlocked || !followee.follow_unlocked || followee.blocked) return 'not_allowed';
     await this.query(
       `INSERT INTO follows (follower_id, followee_id) VALUES (:a::uuid, :b::uuid) ON CONFLICT DO NOTHING`,
       { a: followerId, b: followeeId },

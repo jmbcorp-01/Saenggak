@@ -193,7 +193,7 @@ export interface Repository {
 
   /** Creates or updates the signed-in user's profile. */
   saveProfile(userId: string, input: ProfileInput): Promise<'ok' | 'handle_taken'>;
-  profile(userId: string, viewerId: string): Promise<(Profile & { followedByMe: boolean }) | null>;
+  profile(userId: string, viewerId: string): Promise<(Profile & { followedByMe: boolean; blockedByMe?: boolean }) | null>;
 
   /** Both people need follow permission. */
   follow(followerId: string, followeeId: string): Promise<FollowResult>;
@@ -211,6 +211,7 @@ export interface AdminStats {
   /** Blocked posts no admin has looked at yet. */
   pendingReview: number;
   suspended: number;
+  openReports: number;
 }
 
 export interface ReviewItem {
@@ -243,7 +244,7 @@ export interface AdminUser {
 export type ReviewDecision = 'publish' | 'keep_blocked';
 
 /** What the admin pages read and change. Every change is logged with the admin's id. */
-export interface AdminRepository {
+export interface AdminRepository extends ReportAdmin {
   stats(): Promise<AdminStats>;
   /** Blocked posts not yet reviewed, newest first. */
   reviewQueue(limit: number, before?: string): Promise<ReviewItem[]>;
@@ -256,4 +257,64 @@ export interface AdminRepository {
   setSuspended(userId: string, adminId: string, suspended: boolean, reason: string): Promise<boolean>;
   /** Clears the profile photo and returns its key, or false if there is no such user. */
   removePhoto(userId: string, adminId: string): Promise<{ previous: string | null } | false>;
+}
+
+export const REPORT_REASONS = ['ai_or_copied', 'abuse', 'sexual', 'spam', 'self_harm', 'impersonation', 'other'] as const;
+export type ReportReason = (typeof REPORT_REASONS)[number];
+
+export interface NewReport {
+  userId: string;
+  postId?: string;
+  reason: ReportReason;
+  note: string;
+}
+
+export interface Notification {
+  kind: 'empathy' | 'follow';
+  at: string;
+  actorId: string;
+  actorHandle: string;
+  actorName: string;
+  actorPhotoKey: string | null;
+  postId: string | null;
+  /** The start of the post that got 공감. */
+  excerpt: string | null;
+}
+
+export interface BlockedUser {
+  id: string;
+  handle: string;
+  displayName: string;
+}
+
+export interface OpenReport {
+  id: string;
+  reason: string;
+  note: string;
+  createdAt: string;
+  reporterHandle: string;
+  userId: string;
+  userHandle: string;
+  userName: string;
+  postId: string | null;
+  postBody: string | null;
+  /** Open reports about the same person, this one included. */
+  reportsOnUser: number;
+}
+
+/** Reports, blocks and notifications. */
+export interface SocialRepository {
+  /** 'not_found' when the person or post does not exist; 'self' for one's own. */
+  report(reporterId: string, report: NewReport): Promise<'ok' | 'not_found' | 'self'>;
+  /** Also ends follows both ways. */
+  block(blockerId: string, blockedId: string): Promise<'ok' | 'not_found' | 'self'>;
+  unblock(blockerId: string, blockedId: string): Promise<void>;
+  blocked(userId: string): Promise<BlockedUser[]>;
+  notifications(userId: string, limit: number, before?: string): Promise<{ items: Notification[]; unread: number }>;
+  markNotificationsSeen(userId: string): Promise<void>;
+}
+
+export interface ReportAdmin {
+  openReports(limit: number): Promise<OpenReport[]>;
+  resolveReport(reportId: string, adminId: string, note: string): Promise<boolean>;
 }

@@ -4,6 +4,7 @@ import '../api/backend.dart';
 import '../data/app_state.dart';
 import '../models/admin.dart';
 import '../models/post.dart' show avatarPalette, timeAgo;
+import '../models/social.dart' show reportReasons;
 import '../theme/tokens.dart';
 import '../widgets/post_tile.dart' show Avatar;
 
@@ -18,13 +19,14 @@ class AdminScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('관리자'),
           bottom: const TabBar(
             tabs: [
               Tab(text: '검토 대기'),
+              Tab(text: '신고'),
               Tab(text: '사람'),
               Tab(text: '통계'),
             ],
@@ -33,6 +35,7 @@ class AdminScreen extends StatelessWidget {
         body: TabBarView(
           children: [
             _ReviewTab(backend: state.backend),
+            _ReportsTab(backend: state.backend),
             _UsersTab(backend: state.backend, myId: state.me?.id),
             _StatsTab(backend: state.backend),
           ],
@@ -161,6 +164,127 @@ class _ReviewTabState extends State<_ReviewTab> {
                             OutlinedButton(onPressed: () => _decide(item, false), child: const Text('차단 유지')),
                             const SizedBox(width: 8),
                             FilledButton(onPressed: () => _decide(item, true), child: const Text('피드에 올리기')),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+    );
+  }
+}
+
+class _ReportsTab extends StatefulWidget {
+  const _ReportsTab({required this.backend});
+
+  final Backend backend;
+
+  @override
+  State<_ReportsTab> createState() => _ReportsTabState();
+}
+
+class _ReportsTabState extends State<_ReportsTab> {
+  List<OpenReport>? _items;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final items = await widget.backend.openReports();
+      if (mounted) setState(() => (_items = items, _error = null));
+    } catch (e) {
+      if (mounted) setState(() => _error = _failure(e));
+    }
+  }
+
+  /// Takes the chosen action, then closes the report.
+  Future<void> _handle(OpenReport r, String action) async {
+    final b = widget.backend;
+    try {
+      switch (action) {
+        case 'remove':
+          final note = await askNote(context, title: '이 글을 내릴까요?', action: '내리기');
+          if (note == null) return;
+          await b.removePost(r.postId!, note: note);
+          await b.resolveReport(r.id, note: 'removed: $note');
+        case 'suspend':
+          final note = await askNote(context, title: '@${r.userHandle} 정지', action: '정지');
+          if (note == null) return;
+          await b.setSuspended(r.userId, suspended: true, reason: note);
+          await b.resolveReport(r.id, note: 'suspended: $note');
+        default:
+          await b.resolveReport(r.id, note: 'no action');
+      }
+      if (!mounted) return;
+      setState(() => _items = _items?.where((i) => i.id != r.id).toList());
+      _toast(context, '신고를 처리했어요.');
+    } catch (e) {
+      if (mounted) _toast(context, _failure(e));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = _items;
+    if (items == null) {
+      return Center(child: _error == null ? const CircularProgressIndicator() : Text(_error!, style: SgText.small));
+    }
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: items.isEmpty
+          ? ListView(
+              children: const [
+                SizedBox(height: 120),
+                Center(child: Text('처리할 신고가 없어요.', style: SgText.small)),
+              ],
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: items.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
+              itemBuilder: (context, i) {
+                final r = items[i];
+                return Card(
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '@${r.reporterHandle} → ${r.userName} @${r.userHandle} · ${timeAgo(r.createdAt, DateTime.now())}',
+                          style: SgText.meta,
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6,
+                          children: [
+                            Chip(label: Text(reportReasons[r.reason] ?? r.reason)),
+                            if (r.reportsOnUser > 1) Chip(label: Text('이 사람 신고 ${r.reportsOnUser}건')),
+                          ],
+                        ),
+                        if (r.note.isNotEmpty) Text('메모: ${r.note}', style: SgText.small),
+                        if (r.postBody != null) ...[
+                          const SizedBox(height: 8),
+                          Text(r.postBody!, style: const TextStyle(fontSize: 15, height: 1.5)),
+                        ],
+                        const SizedBox(height: 12),
+                        Wrap(
+                          alignment: WrapAlignment.end,
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            OutlinedButton(onPressed: () => _handle(r, 'dismiss'), child: const Text('문제 없음')),
+                            if (r.postId != null)
+                              OutlinedButton(onPressed: () => _handle(r, 'remove'), child: const Text('글 내리기')),
+                            FilledButton(onPressed: () => _handle(r, 'suspend'), child: const Text('정지')),
                           ],
                         ),
                       ],
@@ -336,6 +460,7 @@ class _StatsTabState extends State<_StatsTab> {
       ('가입한 사람', '${s.users}', '오늘 ${s.usersToday}'),
       ('올라온 글', '${s.posts}', '오늘 ${s.postsToday}'),
       ('검토 대기', '${s.pendingReview}', '필터가 막았거나 판단을 보류한 글'),
+      ('처리할 신고', '${s.openReports}', ''),
       ('정지된 사람', '${s.suspended}', ''),
     ];
     return RefreshIndicator(

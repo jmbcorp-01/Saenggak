@@ -1,16 +1,33 @@
 import { isLang, translateFeed } from '../posts/feed.js';
 import { deletePost } from '../posts/publish.js';
 import { DAYS_TO_FOLLOW } from '../rules/follow.js';
-import type { PhotoStore, Repository, Translator, UserDirectory } from '../services/ports.js';
+import {
+  REPORT_REASONS,
+  type PhotoStore,
+  type ReportReason,
+  type Repository,
+  type SocialRepository,
+  type Translator,
+  type UserDirectory,
+} from '../services/ports.js';
 import { AuroraRepository } from '../services/repository.js';
+import { AuroraSocialRepository } from '../services/socialRepository.js';
 import { photoUrl, S3PhotoStore } from '../services/photos.js';
 import { CognitoUserDirectory } from '../services/users.js';
 import { AwsTranslator } from '../services/translator.js';
 import { isAdmin } from './admin.js';
-import { isUuid, json, safely, userId, type Event } from './http.js';
+import { isUuid, json, parseBody, safely, userId, type Event } from './http.js';
 
 const PAGE_SIZE = 30;
-type Deps = { repo: Repository; translator: Translator; photoStore: PhotoStore; users: UserDirectory };
+type Deps = {
+  repo: Repository;
+  social: SocialRepository;
+  translator: Translator;
+  photoStore: PhotoStore;
+  users: UserDirectory;
+};
+
+const isReason = (v: unknown): v is ReportReason => REPORT_REASONS.includes(v as ReportReason);
 
 /**
  * Everything except writing posts:
@@ -21,11 +38,14 @@ type Deps = { repo: Repository; translator: Translator; photoStore: PhotoStore; 
  *   DELETE /me                  erases the account and everything in it
  *   GET    /users/{id}
  *   PUT    /users/{id}/follow    DELETE /users/{id}/follow
+ *   POST   /posts/{id}/report    POST /users/{id}/report    { reason, note }
+ *   PUT    /users/{id}/block     DELETE /users/{id}/block   GET /me/blocks
+ *   GET    /notifications?before=<at>    POST /notifications/seen
  */
 export const apiHandler = (deps: Deps) => safely(async (event: Event) => {
   const me = userId(event);
   const id = event.pathParameters?.id;
-  const { repo } = deps;
+  const { repo, social } = deps;
 
   switch (event.routeKey) {
     case 'GET /feed': {
@@ -77,6 +97,54 @@ export const apiHandler = (deps: Deps) => safely(async (event: Event) => {
       return json(204, null);
     }
 
+    case 'POST /posts/{id}/report':
+    case 'POST /users/{id}/report': {
+      const b = parseBody(event);
+      if (!isUuid(id) || !isReason(b?.reason)) return json(400, { error: 'bad_request' });
+      const onPost = event.routeKey === 'POST /posts/{id}/report';
+      const post = onPost ? await repo.postState(id) : null;
+      if (onPost && !post) return json(404, { error: 'not_found' });
+      const result = await social.report(me, {
+        userId: post ? post.authorId : id,
+        postId: onPost ? id : undefined,
+        reason: b.reason,
+        note: typeof b.note === 'string' ? b.note.trim().slice(0, 500) : '',
+      });
+      if (result === 'self') return json(400, { error: 'self' });
+      return result === 'ok' ? json(204, null) : json(404, { error: 'not_found' });
+    }
+
+    case 'PUT /users/{id}/block': {
+      if (!isUuid(id)) return json(400, { error: 'bad_request' });
+      const result = await social.block(me, id);
+      if (result === 'self') return json(400, { error: 'self' });
+      return result === 'ok' ? json(200, { blocked: true }) : json(404, { error: 'not_found' });
+    }
+
+    case 'DELETE /users/{id}/block': {
+      if (!isUuid(id)) return json(400, { error: 'bad_request' });
+      await social.unblock(me, id);
+      return json(200, { blocked: false });
+    }
+
+    case 'GET /me/blocks':
+      return json(200, { items: await social.blocked(me) });
+
+    case 'GET /notifications': {
+      const before = event.queryStringParameters?.before;
+      const page = await social.notifications(me, PAGE_SIZE, before && !Number.isNaN(Date.parse(before)) ? before : undefined);
+      const last = page.items.at(-1);
+      return json(200, {
+        items: page.items.map(({ actorPhotoKey, ...n }) => ({ ...n, actorPhotoUrl: photoUrl(actorPhotoKey) })),
+        unread: page.unread,
+        next: page.items.length === PAGE_SIZE && last ? last.at : null,
+      });
+    }
+
+    case 'POST /notifications/seen':
+      await social.markNotificationsSeen(me);
+      return json(204, null);
+
     case 'PUT /users/{id}/follow': {
       if (!isUuid(id)) return json(400, { error: 'bad_request' });
       const result = await repo.follow(me, id);
@@ -99,6 +167,7 @@ export const handler = (event: Event) =>
   apiHandler(
     (live ??= {
       repo: new AuroraRepository(),
+      social: new AuroraSocialRepository(),
       translator: new AwsTranslator(),
       photoStore: new S3PhotoStore(),
       users: new CognitoUserDirectory(),

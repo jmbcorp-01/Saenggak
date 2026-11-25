@@ -129,6 +129,8 @@ class PostTile extends StatefulWidget {
     this.onEdit,
     this.onDelete,
     this.onAdminRemove,
+    this.onReport,
+    this.onBlock,
   });
 
   final Post post;
@@ -147,6 +149,10 @@ class PostTile extends StatefulWidget {
   /// Shown to admins on other people's posts.
   final VoidCallback? onAdminRemove;
 
+  /// Shown on other people's posts.
+  final VoidCallback? onReport;
+  final VoidCallback? onBlock;
+
   @override
   State<PostTile> createState() => _PostTileState();
 }
@@ -164,6 +170,8 @@ class _PostTileState extends State<PostTile> {
     final canEdit = post.editable && widget.onEdit != null;
     final canDelete = post.isMine && widget.onDelete != null;
     final canRemove = !post.isMine && widget.onAdminRemove != null;
+    final canReport = !post.isMine && widget.onReport != null;
+    final canBlock = !post.isMine && widget.onBlock != null;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
@@ -219,7 +227,7 @@ class _PostTileState extends State<PostTile> {
                         ),
                       ),
                     ),
-                    if (canEdit || canDelete || canRemove)
+                    if (canEdit || canDelete || canRemove || canReport || canBlock)
                       PopupMenuButton<String>(
                         key: ValueKey('menu-${post.id}'),
                         tooltip: '더보기',
@@ -228,9 +236,13 @@ class _PostTileState extends State<PostTile> {
                         onSelected: (v) => switch (v) {
                           'edit' => widget.onEdit!(),
                           'delete' => widget.onDelete!(),
+                          'report' => widget.onReport!(),
+                          'block' => widget.onBlock!(),
                           _ => widget.onAdminRemove!(),
                         },
                         itemBuilder: (_) => [
+                          if (canReport) const PopupMenuItem(value: 'report', child: Text('신고')),
+                          if (canBlock) PopupMenuItem(value: 'block', child: Text('@${post.authorHandle} 차단')),
                           if (canRemove)
                             const PopupMenuItem(
                               value: 'admin-remove',

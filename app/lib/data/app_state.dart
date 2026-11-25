@@ -8,6 +8,7 @@ import '../core/typing_session.dart';
 import '../models/post.dart';
 import '../models/profile.dart';
 import '../models/publish_outcome.dart';
+import '../models/social.dart';
 
 /// The signed-in user's profile and the lists the screens show, kept in step
 /// with the server after each change.
@@ -36,6 +37,10 @@ class AppState extends ChangeNotifier {
   List<Post> mine = const [];
   String? _feedNext;
   bool loading = false;
+
+  /// The notifications tab: newest first, and how many arrived since last read.
+  List<AppNotification> notifications = const [];
+  int unreadNotifications = 0;
   String? error;
 
   /// Feed translations go into the reader's language.
@@ -46,7 +51,7 @@ class AppState extends ChangeNotifier {
   Future<void> start() async {
     me = await backend.me();
     notifyListeners();
-    await refresh();
+    await Future.wait([refresh(), if (me != null) loadNotifications()]);
   }
 
   Future<void> refresh() async {
@@ -183,6 +188,41 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> loadNotifications() async {
+    try {
+      final page = await backend.notifications();
+      notifications = page.items;
+      unreadNotifications = page.unread;
+      notifyListeners();
+    } catch (_) {
+      // The tab keeps what it had; the next open tries again.
+    }
+  }
+
+  /// Called when the notifications tab is opened.
+  Future<void> markNotificationsSeen() async {
+    if (unreadNotifications == 0) return;
+    unreadNotifications = 0;
+    notifyListeners();
+    try {
+      await backend.markNotificationsSeen();
+    } catch (_) {}
+  }
+
+  /// Hides the person's posts at once; the server also ends follows both ways.
+  Future<void> block(String userId) async {
+    await backend.block(userId);
+    feed = feed.where((p) => p.authorId != userId).toList();
+    following = following.where((p) => p.authorId != userId).toList();
+    notifications = notifications.where((n) => n.actorId != userId).toList();
+    notifyListeners();
+  }
+
+  Future<void> unblock(String userId) async {
+    await backend.unblock(userId);
+    await refresh();
+  }
+
   /// Admins only: takes someone's post out of every list.
   Future<void> adminRemove(Post post, String note) async {
     await backend.removePost(post.id, note: note);
@@ -196,6 +236,8 @@ class AppState extends ChangeNotifier {
     await backend.signOut();
     me = null;
     feed = following = mine = const [];
+    notifications = const [];
+    unreadNotifications = 0;
     _feedNext = null;
     error = null;
     notifyListeners();

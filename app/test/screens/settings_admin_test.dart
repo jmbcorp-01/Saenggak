@@ -4,6 +4,7 @@ import 'package:saenggak/api/demo_backend.dart';
 import 'package:saenggak/data/app_state.dart';
 import 'package:saenggak/main.dart';
 import 'package:saenggak/models/admin.dart';
+import 'package:saenggak/models/social.dart';
 
 Future<AppState> openSettings(WidgetTester tester, {DemoBackend? backend}) async {
   // Tall enough that the whole settings list is built.
@@ -103,5 +104,73 @@ void main() {
     await tester.tap(find.text('통계'));
     await tester.pumpAndSettle();
     expect(find.text('정지된 사람'), findsOneWidget);
+  });
+
+  testWidgets('a post can be reported, its author blocked, and the report handled by an admin', (tester) async {
+    final backend = DemoBackend();
+    final state = await openSettings(tester, backend: backend);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('홈').last);
+    await tester.pumpAndSettle();
+
+    final author = state.feed.firstWhere((p) => !p.isMine);
+    await tester.tap(find.byKey(ValueKey('menu-${author.id}')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('신고'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(reportReasons['spam']!));
+    await tester.pumpAndSettle();
+    expect(find.text('신고했어요'), findsOneWidget);
+    await tester.tap(find.text('차단하기'));
+    await tester.pumpAndSettle();
+    expect(state.feed.any((p) => p.authorId == author.authorId), isFalse);
+    expect((await backend.blockedUsers()).single.id, author.authorId);
+
+    final reports = await backend.openReports();
+    expect(reports.single.reason, 'spam');
+    expect(reports.single.postId, author.id);
+  });
+
+  testWidgets('the notifications tab shows 공감 and follows and clears the badge', (tester) async {
+    final backend = DemoBackend()
+      ..notificationItems.add(
+        AppNotification(
+          kind: 'empathy',
+          at: DateTime.now(),
+          actorId: 'u-9',
+          actorHandle: 'haneul',
+          actorName: '하늘',
+          excerpt: '비가 오면',
+        ),
+      );
+    final state = AppState(backend: backend);
+    await tester.pumpWidget(SaenggakApp(state: state));
+    await tester.tap(find.text('로그인'));
+    await tester.pumpAndSettle();
+    expect(state.unreadNotifications, 1);
+    expect(find.text('1'), findsOneWidget);
+
+    await tester.tap(find.text('알림').last);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('님이 내 생각에 공감했어요.'), findsOneWidget);
+    expect(state.unreadNotifications, 0);
+  });
+
+  testWidgets('admins see open reports and can dismiss one', (tester) async {
+    final backend = DemoBackend();
+    final state = AppState(backend: backend);
+    await state.start();
+    final post = state.feed.firstWhere((p) => !p.isMine);
+    await backend.report(postId: post.id, reason: 'abuse');
+    await openSettings(tester, backend: backend);
+    await tester.tap(find.text('관리자 페이지'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('신고').first);
+    await tester.pumpAndSettle();
+    expect(find.text(reportReasons['abuse']!), findsOneWidget);
+    await tester.tap(find.text('문제 없음'));
+    await tester.pumpAndSettle();
+    expect(find.text('처리할 신고가 없어요.'), findsOneWidget);
   });
 }

@@ -8,6 +8,7 @@ import '../models/admin.dart';
 import '../models/post.dart';
 import '../models/profile.dart';
 import '../models/publish_outcome.dart';
+import '../models/social.dart';
 import 'backend.dart';
 import 'cognito_auth.dart';
 
@@ -95,6 +96,50 @@ class HttpBackend implements Backend {
     _ok(await _send('DELETE', 'me'));
     await auth.signOut();
   }
+
+  @override
+  Future<void> report({String? postId, String? userId, required String reason, String note = ''}) async => _ok(
+    await _send(
+      'POST',
+      postId != null ? 'posts/$postId/report' : 'users/$userId/report',
+      body: {'reason': reason, 'note': note},
+    ),
+  );
+
+  @override
+  Future<void> block(String userId) async => _ok(await _send('PUT', 'users/$userId/block'));
+
+  @override
+  Future<void> unblock(String userId) async => _ok(await _send('DELETE', 'users/$userId/block'));
+
+  @override
+  Future<List<BlockedUser>> blockedUsers() async => (_ok(await _send('GET', 'me/blocks'))['items'] as List)
+      .cast<Map<String, dynamic>>()
+      .map(BlockedUser.fromJson)
+      .toList();
+
+  @override
+  Future<NotificationsPage> notifications({String? before}) async {
+    final j = _ok(await _send('GET', 'notifications', query: {'before': ?before}));
+    return NotificationsPage(
+      (j['items'] as List).cast<Map<String, dynamic>>().map(AppNotification.fromJson).toList(),
+      (j['unread'] as num? ?? 0).toInt(),
+      j['next'] as String?,
+    );
+  }
+
+  @override
+  Future<void> markNotificationsSeen() async => _ok(await _send('POST', 'notifications/seen'));
+
+  @override
+  Future<List<OpenReport>> openReports() async => (_ok(await _send('GET', 'admin/reports'))['items'] as List)
+      .cast<Map<String, dynamic>>()
+      .map(OpenReport.fromJson)
+      .toList();
+
+  @override
+  Future<void> resolveReport(String reportId, {String note = ''}) async =>
+      _ok(await _send('POST', 'admin/reports/$reportId/resolve', body: {'note': note}));
 
   @override
   Future<AdminStats> adminStats() async => AdminStats.fromJson(_ok(await _send('GET', 'admin/stats')));

@@ -5,6 +5,7 @@ import '../models/admin.dart';
 import '../models/post.dart';
 import '../models/profile.dart';
 import '../models/publish_outcome.dart';
+import '../models/social.dart';
 
 /// Everything the app asks of the server. [HttpBackend] talks to the AWS API;
 /// [DemoBackend] keeps sample data in memory for development and tests.
@@ -36,6 +37,19 @@ abstract class Backend {
 
   /// Erases the account, its posts and photo, and the sign-in. Cannot be undone.
   Future<void> deleteAccount();
+
+  /// Reports a post (its author is reported with it) or, without [postId], a person.
+  Future<void> report({String? postId, String? userId, required String reason, String note = ''});
+  Future<void> block(String userId);
+  Future<void> unblock(String userId);
+  Future<List<BlockedUser>> blockedUsers();
+
+  /// 공감 on the reader's posts and new followers, newest first.
+  Future<NotificationsPage> notifications({String? before});
+  Future<void> markNotificationsSeen();
+
+  Future<List<OpenReport>> openReports();
+  Future<void> resolveReport(String reportId, {String note = ''});
 
   /// Admin pages; the server answers 403 to anyone outside the admins group.
   Future<AdminStats> adminStats();

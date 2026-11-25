@@ -7,6 +7,7 @@ import '../screens/compose_screen.dart';
 import '../screens/profile_screen.dart';
 import '../theme/tokens.dart';
 import 'post_tile.dart';
+import 'report_sheet.dart';
 
 /// A [PostTile] wired to the app: 공감, the author's profile, edit and delete.
 class ConnectedPostTile extends StatelessWidget {
@@ -42,6 +43,8 @@ class ConnectedPostTile extends StatelessWidget {
       ),
       onDelete: () => confirmDelete(context, state, post),
       onAdminRemove: (state.me?.isAdmin ?? false) ? () => _adminRemove(context) : null,
+      onReport: () => reportFlow(context, state, userId: post.authorId, handle: post.authorHandle, postId: post.id),
+      onBlock: () => blockFlow(context, state, userId: post.authorId, handle: post.authorHandle),
     );
   }
 

@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../api/cognito_auth.dart';
+import '../core/links.dart';
 import '../theme/tokens.dart';
 import '../widgets/symbol_mark.dart';
 import 'reset_password_screen.dart';
@@ -142,6 +143,30 @@ class _AuthScreenState extends State<AuthScreen> {
                     )
                   : Text(_needsCode ? '인증하기' : (_signUp ? '다음' : '로그인')),
             ),
+            if (_signUp && !_needsCode)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Text('가입하면 ', style: SgText.small),
+                    InkWell(
+                      onTap: () => openPage('terms.html'),
+                      child: const Text('이용약관', style: TextStyle(fontSize: 13, decoration: TextDecoration.underline)),
+                    ),
+                    const Text('과 ', style: SgText.small),
+                    InkWell(
+                      onTap: () => openPage('privacy.html'),
+                      child: const Text(
+                        '개인정보 처리방침',
+                        style: TextStyle(fontSize: 13, decoration: TextDecoration.underline),
+                      ),
+                    ),
+                    const Text('에 동의하게 돼요. 만 14세 이상만 가입할 수 있어요.', style: SgText.small),
+                  ],
+                ),
+              ),
             const SizedBox(height: 8),
             if (_needsCode)
               TextButton(
