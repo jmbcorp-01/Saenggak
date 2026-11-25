@@ -9,11 +9,7 @@ import 'typing_session.dart';
 /// and Chinese input methods send one composed character at a time, so the
 /// limit leaves them room while stopping a pasted sentence.
 class HumanInputFormatter extends TextInputFormatter {
-  HumanInputFormatter({
-    required this.session,
-    required this.isVoiceActive,
-    this.onRejected,
-  });
+  HumanInputFormatter({required this.session, required this.isVoiceActive, this.onRejected});
 
   static const int maxKeyboardChunk = 4;
 
@@ -22,10 +18,7 @@ class HumanInputFormatter extends TextInputFormatter {
   final void Function()? onRejected;
 
   @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
     final change = diff(oldValue.text, newValue.text);
     final voice = isVoiceActive();
 

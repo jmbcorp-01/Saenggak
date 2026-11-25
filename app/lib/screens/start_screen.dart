@@ -5,7 +5,10 @@ import '../widgets/symbol_mark.dart';
 
 /// First screen: what the app is, and the way in.
 class StartScreen extends StatelessWidget {
-  const StartScreen({super.key});
+  const StartScreen({super.key, required this.onSignUp, required this.onSignIn});
+
+  final VoidCallback onSignUp;
+  final VoidCallback onSignIn;
 
   @override
   Widget build(BuildContext context) {
@@ -36,14 +39,13 @@ class StartScreen extends StatelessWidget {
               ),
               const Spacer(),
               FilledButton(
-                onPressed: () => Navigator.of(context).pushReplacementNamed('/home'),
+                onPressed: onSignUp,
                 style: FilledButton.styleFrom(
                   backgroundColor: SgColors.ink,
                   foregroundColor: Colors.white,
                   minimumSize: const Size.fromHeight(50),
                   shape: pill,
-                  textStyle:
-                      const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  textStyle: SgText.label(size: 16, weight: FontWeight.w700),
                 ),
                 child: const Text('계정 만들기'),
               ),
@@ -60,14 +62,13 @@ class StartScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               OutlinedButton(
-                onPressed: () => Navigator.of(context).pushReplacementNamed('/home'),
+                onPressed: onSignIn,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: SgColors.accentText,
                   side: const BorderSide(color: SgColors.outline),
                   minimumSize: const Size.fromHeight(50),
                   shape: pill,
-                  textStyle:
-                      const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  textStyle: SgText.label(size: 16, weight: FontWeight.w700),
                 ),
                 child: const Text('로그인'),
               ),
@@ -78,8 +79,7 @@ class StartScreen extends StatelessWidget {
                   TextButton(
                     onPressed: () {},
                     style: TextButton.styleFrom(foregroundColor: SgColors.ink),
-                    child: const Text('한국어',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
+                    child: const Text('한국어', style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
                   TextButton(
                     onPressed: () {},

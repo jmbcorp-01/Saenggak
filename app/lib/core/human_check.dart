@@ -43,13 +43,10 @@ class HumanCheck {
 
   static HumanCheckResult evaluate(TypingSession session) {
     final issues = <HumanCheckIssue>[];
-    final keyboardEvents =
-        session.events.where((e) => e.source == InputSource.keyboard).toList();
-    final keyboardChars =
-        keyboardEvents.fold<int>(0, (sum, e) => sum + e.inserted);
+    final keyboardEvents = session.events.where((e) => e.source == InputSource.keyboard).toList();
+    final keyboardChars = keyboardEvents.fold<int>(0, (sum, e) => sum + e.inserted);
 
-    if (keyboardChars > 0 &&
-        keyboardEvents.length * 10 / keyboardChars < minEventsPer10Chars) {
+    if (keyboardChars > 0 && keyboardEvents.length * 10 / keyboardChars < minEventsPer10Chars) {
       issues.add(HumanCheckIssue.tooFewEvents);
     }
 
@@ -64,10 +61,7 @@ class HumanCheck {
     final intervals = session.keyboardIntervals();
     if (intervals.length >= minIntervalsForRhythm) {
       final mean = intervals.reduce((a, b) => a + b) / intervals.length;
-      final variance = intervals
-              .map((x) => (x - mean) * (x - mean))
-              .reduce((a, b) => a + b) /
-          intervals.length;
+      final variance = intervals.map((x) => (x - mean) * (x - mean)).reduce((a, b) => a + b) / intervals.length;
       final cv = mean == 0 ? 0 : math.sqrt(variance) / mean;
       if (cv < minIntervalVariation) issues.add(HumanCheckIssue.tooRegular);
     }

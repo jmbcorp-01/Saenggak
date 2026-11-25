@@ -14,11 +14,7 @@ void main() {
     session = TypingSession();
     voice = false;
     rejected = 0;
-    f = HumanInputFormatter(
-      session: session,
-      isVoiceActive: () => voice,
-      onRejected: () => rejected++,
-    );
+    f = HumanInputFormatter(session: session, isVoiceActive: () => voice, onRejected: () => rejected++);
   });
 
   test('accepts single typed characters and records them', () {

@@ -1,6 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../data/post_store.dart';
+import '../data/app_state.dart';
 import '../theme/tokens.dart';
 import 'compose_screen.dart';
 import 'feed_screen.dart';
@@ -8,9 +8,9 @@ import 'profile_screen.dart';
 
 /// Bottom menu (home, notifications, profile) and the write button.
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key, required this.store});
+  const HomeShell({super.key, required this.state});
 
-  final PostStore store;
+  final AppState state;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -20,10 +20,8 @@ class _HomeShellState extends State<HomeShell> {
   int _tab = 0;
 
   void _compose() {
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      fullscreenDialog: true,
-      builder: (_) => ComposeScreen(store: widget.store),
-    ));
+    Navigator.of(context)
+        .push(MaterialPageRoute<void>(fullscreenDialog: true, builder: (_) => ComposeScreen(state: widget.state)));
   }
 
   @override
@@ -34,12 +32,9 @@ class _HomeShellState extends State<HomeShell> {
         child: IndexedStack(
           index: _tab,
           children: [
-            FeedScreen(
-              store: widget.store,
-              onOpenProfile: () => setState(() => _tab = 2),
-            ),
+            FeedScreen(state: widget.state, onOpenProfile: () => setState(() => _tab = 2)),
             const Center(child: Text('아직 알림이 없어요.', style: SgText.small)),
-            ProfileScreen(store: widget.store, onEdit: _compose),
+            ProfileScreen(state: widget.state),
           ],
         ),
       ),
@@ -59,18 +54,13 @@ class _HomeShellState extends State<HomeShell> {
         selectedIndex: _tab,
         onDestinationSelected: (i) => setState(() => _tab = i),
         destinations: const [
+          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: '홈'),
           NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home),
-              label: '홈'),
-          NavigationDestination(
-              icon: Icon(Icons.notifications_none),
-              selectedIcon: Icon(Icons.notifications),
-              label: '알림'),
-          NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person),
-              label: '프로필'),
+            icon: Icon(Icons.notifications_none),
+            selectedIcon: Icon(Icons.notifications),
+            label: '알림',
+          ),
+          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: '프로필'),
         ],
       ),
     );

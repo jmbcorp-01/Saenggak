@@ -22,15 +22,18 @@ class SgColors {
 class SgFonts {
   SgFonts._();
 
-  /// Body and interface. Bundled font files are a follow-up; until then the
-  /// platform's Korean sans-serif is used as the fallback.
+  /// Body and interface. Bundled in assets/fonts with Hangul and Latin; other
+  /// scripts (for example Han characters) fall back to the platform font.
   static const sans = 'Noto Sans KR';
 
   /// Typing time and timer.
   static const mono = 'IBM Plex Mono';
 
   static const sansFallback = ['Apple SD Gothic Neo', 'Roboto', 'sans-serif'];
-  static const monoFallback = ['Menlo', 'Roboto Mono', 'monospace'];
+
+  /// Plex Mono has no Hangul, so "2분 18초" takes its Hangul from Noto Sans KR
+  /// on every platform instead of whatever the system picks.
+  static const monoFallback = [sans, 'Menlo', 'Roboto Mono', 'monospace'];
 }
 
 class SgText {
@@ -66,6 +69,11 @@ class SgText {
     color: SgColors.muted,
   );
 
+  /// Button labels. Buttons do not inherit the theme font when given their own
+  /// text style, so every button uses this.
+  static TextStyle label({double size = 15, FontWeight weight = FontWeight.w700}) =>
+      TextStyle(fontFamily: SgFonts.sans, fontFamilyFallback: SgFonts.sansFallback, fontSize: size, fontWeight: weight);
+
   static const mono = TextStyle(
     fontFamily: SgFonts.mono,
     fontFamilyFallback: SgFonts.monoFallback,
@@ -80,12 +88,31 @@ ThemeData buildTheme() {
     scaffoldBackgroundColor: SgColors.surface,
     fontFamily: SgFonts.sans,
     fontFamilyFallback: SgFonts.sansFallback,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: SgColors.accent,
-      primary: SgColors.ink,
-      surface: SgColors.surface,
-    ),
+    colorScheme: ColorScheme.fromSeed(seedColor: SgColors.accent, primary: SgColors.ink, surface: SgColors.surface),
     dividerColor: SgColors.line,
+    dividerTheme: const DividerThemeData(color: SgColors.line, thickness: 1, space: 1),
     splashFactory: NoSplash.splashFactory,
+    navigationBarTheme: NavigationBarThemeData(
+      iconTheme: WidgetStateProperty.resolveWith(
+        (states) =>
+            IconThemeData(size: 26, color: states.contains(WidgetState.selected) ? SgColors.ink : SgColors.muted),
+      ),
+    ),
+    // Buttons resolve their own text style, so the font is set here too.
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(textStyle: SgText.label(weight: FontWeight.w500)),
+    ),
+    filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(textStyle: SgText.label())),
+    outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(textStyle: SgText.label())),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: SgColors.surface,
+      surfaceTintColor: Colors.transparent,
+      foregroundColor: SgColors.ink,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+    ),
+    tooltipTheme: const TooltipThemeData(
+      textStyle: TextStyle(fontFamily: SgFonts.sans, color: Colors.white, fontSize: 13),
+    ),
   );
 }

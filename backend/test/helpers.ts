@@ -1,5 +1,13 @@
 import type { Phrase } from '../src/rules/phrases.js';
-import type { FeedPost, NewPost, Repository } from '../src/services/ports.js';
+import type {
+  FeedPost,
+  FollowResult,
+  NewPost,
+  PostUpdate,
+  Profile,
+  ProfileInput,
+  Repository,
+} from '../src/services/ports.js';
 
 /** One keystroke per character at uneven, human-like intervals. */
 export function humanSession(text: string) {
@@ -13,6 +21,12 @@ export function humanSession(text: string) {
   return { events, rejectedPastes: 0 };
 }
 
+/** Deletes [oldText] then types [newText], as an edit that rewrites the post. */
+export function editSession(oldText: string, newText: string) {
+  const typed = humanSession(newText);
+  return { ...typed, events: [{ t: 0, i: 0, d: [...oldText].length, s: 'keyboard' }, ...typed.events] };
+}
+
 /** Fake repository kept in memory. */
 export class MemoryRepo implements Repository {
   posts: (NewPost & { id: string })[] = [];
@@ -22,6 +36,29 @@ export class MemoryRepo implements Repository {
   translations = new Map<string, string>();
   feedPosts: FeedPost[] = [];
   empathies = new Set<string>();
+  users = new Map<string, ProfileInput>();
+  follows = new Set<string>();
+  /** The writer's day the server would work out from their time zone. */
+  today = '2026-11-25';
+  /** When true, writers without a saved profile are refused, as in the database. */
+  requireProfile = false;
+  writes = new Map<string, number>();
+  /** Published posts the app is pretended to hold besides these ones. */
+  otherPublished = 1_000_000;
+
+  async hasPublished(n: number) {
+    return this.otherPublished + this.posts.filter((p) => p.status === 'published').length >= n;
+  }
+
+  async localDate(a: string) {
+    return this.requireProfile && !this.users.has(a) ? null : this.today;
+  }
+  async recordWrite(a: string, limit: number) {
+    const n = this.writes.get(a) ?? 0;
+    if (n >= limit) return false;
+    this.writes.set(a, n + 1);
+    return true;
+  }
 
   async insertPost(p: NewPost) {
     const id = `00000000-0000-4000-8000-${String(this.posts.length + 1).padStart(12, '0')}`;
@@ -42,13 +79,60 @@ export class MemoryRepo implements Repository {
     return new Set(this.posts.filter((p) => p.authorId === a && p.status === 'published').map((p) => p.localDate)).size;
   }
   async recentBlocks(a: string) {
-    return this.posts.filter((p) => p.authorId === a && p.status === 'blocked').length;
+    return this.posts.filter((p) => p.authorId === a && p.status === 'blocked' && p.blockedReason !== 'classifier_declined')
+      .length;
   }
   async writingDaysSinceLoss() {
     return null;
   }
   async setFollowUnlocked(a: string, u: boolean) {
     this.unlocked.set(a, u);
+  }
+  async postState(postId: string) {
+    const p = this.posts.find((x) => x.id === postId);
+    if (!p) return null;
+    const empathyCount = [...this.empathies].filter((e) => e.startsWith(`${postId}:`)).length;
+    return { authorId: p.authorId, body: p.body, status: p.status, empathyCount };
+  }
+  async updatePost(postId: string, authorId: string, u: PostUpdate) {
+    const p = this.posts.find((x) => x.id === postId && x.authorId === authorId && x.status === 'published');
+    if (!p || [...this.empathies].some((e) => e.startsWith(`${postId}:`))) return false;
+    Object.assign(p, { body: u.body, lang: u.lang, typingMs: p.typingMs + u.typingMs, embedding: u.embedding, session: u.session });
+    for (const [k, v] of this.firsts) if (v === postId) this.firsts.delete(k);
+    return true;
+  }
+  async deletePost(postId: string, authorId: string) {
+    const i = this.posts.findIndex((x) => x.id === postId && x.authorId === authorId && x.status === 'published');
+    if (i < 0) return false;
+    this.posts.splice(i, 1);
+    for (const [k, v] of this.firsts) if (v === postId) this.firsts.delete(k);
+    return true;
+  }
+  async saveProfile(userId: string, input: ProfileInput) {
+    for (const [id, u] of this.users) if (id !== userId && u.handle === input.handle) return 'handle_taken' as const;
+    this.users.set(userId, input);
+    return 'ok' as const;
+  }
+  async profile(userId: string, viewerId: string): Promise<(Profile & { followedByMe: boolean }) | null> {
+    const u = this.users.get(userId);
+    if (!u) return null;
+    const count = (side: 0 | 1) => [...this.follows].filter((f) => f.split('>')[side] === userId).length;
+    return {
+      id: userId, handle: u.handle, displayName: u.displayName, bio: u.bio, photoKey: null,
+      locale: u.locale, timeZone: u.timeZone, writingDays: await this.writingDays(userId),
+      followUnlocked: this.unlocked.get(userId) ?? false, followers: count(1), following: count(0),
+      followedByMe: this.follows.has(`${viewerId}>${userId}`),
+    };
+  }
+  async follow(a: string, b: string): Promise<FollowResult> {
+    if (a === b) return 'self';
+    if (!this.users.has(b)) return 'not_found';
+    if (!this.unlocked.get(a) || !this.unlocked.get(b)) return 'not_allowed';
+    this.follows.add(`${a}>${b}`);
+    return 'ok';
+  }
+  async unfollow(a: string, b: string) {
+    this.follows.delete(`${a}>${b}`);
   }
   async toggleEmpathy(postId: string, userId: string) {
     const post = this.posts.find((p) => p.id === postId && p.status === 'published');

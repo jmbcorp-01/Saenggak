@@ -18,7 +18,7 @@ const handlerPath = (name: string) => path.join(here, '..', 'src', 'handlers', `
 /**
  * Everything the MVP needs: sign-in (Cognito), the database (Aurora
  * Serverless v2 PostgreSQL with pgvector, reached through the Data API so the
- * Lambdas need no VPC), three Lambdas behind an HTTP API with a JWT check.
+ * Lambdas need no VPC), two Lambdas behind an HTTP API with a JWT check.
  */
 export class SaenggakStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
@@ -34,7 +34,7 @@ export class SaenggakStack extends Stack {
       removalPolicy: RemovalPolicy.RETAIN,
     });
     const appClient = users.addClient('App', {
-      authFlows: { userSrp: true },
+      authFlows: { userSrp: true, userPassword: true },
       preventUserExistenceErrors: true,
     });
 
@@ -76,12 +76,11 @@ export class SaenggakStack extends Stack {
       return f;
     };
 
-    // Posting waits on moderation and embedding, so it gets a longer timeout.
-    const createPost = fn('createPost', 30);
-    const feed = fn('feed', 15);
-    const empathy = fn('empathy');
+    // Writing waits on moderation and embedding, so it gets a longer timeout.
+    const write = fn('write', 30);
+    const api = fn('api', 15);
 
-    createPost.addToRolePolicy(
+    write.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['bedrock:InvokeModel'],
         resources: [`arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v2:0`],
@@ -89,28 +88,49 @@ export class SaenggakStack extends Stack {
     );
     // Claude on Bedrock is called through the bedrock-mantle endpoint (SigV4 service "bedrock-mantle").
     // Narrow this to the exact actions and model once the account's Bedrock access is set up.
-    createPost.addToRolePolicy(new iam.PolicyStatement({ actions: ['bedrock-mantle:*'], resources: ['*'] }));
-    feed.addToRolePolicy(new iam.PolicyStatement({ actions: ['translate:TranslateText'], resources: ['*'] }));
+    write.addToRolePolicy(new iam.PolicyStatement({ actions: ['bedrock-mantle:*'], resources: ['*'] }));
+    api.addToRolePolicy(new iam.PolicyStatement({ actions: ['translate:TranslateText'], resources: ['*'] }));
 
-    const api = new apigw.HttpApi(this, 'Api', {
+    const http = new apigw.HttpApi(this, 'Api', {
       defaultAuthorizer: new HttpJwtAuthorizer('Jwt', users.userPoolProviderUrl, {
         jwtAudience: [appClient.userPoolClientId],
       }),
       corsPreflight: {
         allowOrigins: ['*'],
-        allowMethods: [apigw.CorsHttpMethod.GET, apigw.CorsHttpMethod.POST],
+        allowMethods: [
+          apigw.CorsHttpMethod.GET,
+          apigw.CorsHttpMethod.POST,
+          apigw.CorsHttpMethod.PUT,
+          apigw.CorsHttpMethod.PATCH,
+          apigw.CorsHttpMethod.DELETE,
+        ],
         allowHeaders: ['authorization', 'content-type'],
       },
     });
-    api.addRoutes({ path: '/posts', methods: [apigw.HttpMethod.POST], integration: new HttpLambdaIntegration('CreatePost', createPost) });
-    api.addRoutes({ path: '/feed', methods: [apigw.HttpMethod.GET], integration: new HttpLambdaIntegration('Feed', feed) });
-    api.addRoutes({ path: '/posts/{id}/empathy', methods: [apigw.HttpMethod.POST], integration: new HttpLambdaIntegration('Empathy', empathy) });
+    const M = apigw.HttpMethod;
+    const writeIntegration = new HttpLambdaIntegration('Write', write);
+    const apiIntegration = new HttpLambdaIntegration('ApiFn', api);
+    const routes: [string, apigw.HttpMethod, HttpLambdaIntegration][] = [
+      ['/posts', M.POST, writeIntegration],
+      ['/posts/{id}', M.PATCH, writeIntegration],
+      ['/posts/{id}', M.DELETE, apiIntegration],
+      ['/posts/{id}/empathy', M.POST, apiIntegration],
+      ['/feed', M.GET, apiIntegration],
+      ['/me', M.GET, apiIntegration],
+      ['/me', M.PUT, writeIntegration],
+      ['/users/{id}', M.GET, apiIntegration],
+      ['/users/{id}/follow', M.PUT, apiIntegration],
+      ['/users/{id}/follow', M.DELETE, apiIntegration],
+    ];
+    for (const [path, method, integration] of routes) http.addRoutes({ path, methods: [method], integration });
 
-    // Rate limits on the default stage slow down scraping; WAF and CloudFront come before launch.
-    const stage = api.defaultStage?.node.defaultChild as apigw.CfnStage | undefined;
-    stage?.addPropertyOverride('DefaultRouteSettings', { ThrottlingRateLimit: 20, ThrottlingBurstLimit: 40 });
+    // These limits are shared by every user of the API, so they only guard the
+    // account against floods. Per-person limits are the hourly write limit in
+    // the database and, before launch, per-IP rate rules in WAF.
+    const stage = http.defaultStage?.node.defaultChild as apigw.CfnStage | undefined;
+    stage?.addPropertyOverride('DefaultRouteSettings', { ThrottlingRateLimit: 500, ThrottlingBurstLimit: 1000 });
 
-    new CfnOutput(this, 'ApiUrl', { value: api.apiEndpoint });
+    new CfnOutput(this, 'ApiUrl', { value: http.apiEndpoint });
     new CfnOutput(this, 'UserPoolId', { value: users.userPoolId });
     new CfnOutput(this, 'UserPoolClientId', { value: appClient.userPoolClientId });
     new CfnOutput(this, 'DbClusterArn', { value: db.clusterArn });

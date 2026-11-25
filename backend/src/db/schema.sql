@@ -73,6 +73,14 @@ CREATE TABLE follow_losses (
 );
 CREATE INDEX follow_losses_author_idx ON follow_losses (author_id, lost_at DESC);
 
+-- One row per write attempt (post, edit, profile), for the hourly limit that
+-- keeps moderation costs bounded. Rows older than a day can be pruned.
+CREATE TABLE write_log (
+  author_id uuid NOT NULL,
+  at        timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX write_log_author_idx ON write_log (author_id, at DESC);
+
 CREATE TABLE translations (
   post_id     uuid NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   target_lang text NOT NULL,
