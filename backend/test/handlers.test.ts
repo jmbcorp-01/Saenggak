@@ -28,9 +28,23 @@ const EDITED = 'Some evenings the city sounds like the sea, and I let myself bel
 const post = (text: string) => JSON.stringify({ text, session: humanSession(text) });
 const edit = (from: string, to: string) => JSON.stringify({ text: to, session: editSession(from, to) });
 
+/** A JPEG header followed by a marker the fake checker reads. */
+const jpeg = (marker: string) => Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.from(marker)]).toString('base64');
+
 function setup() {
   const repo = new MemoryRepo();
+  const stored = new Set<string>();
   const write = writeHandler({
+    photoChecker: {
+      check: async (b: Uint8Array) => {
+        const marker = Buffer.from(b.subarray(4)).toString();
+        return marker === 'face' ? { ok: true } : { ok: false, problem: marker as 'no_face' };
+      },
+    },
+    photoStore: {
+      put: async (key: string) => void stored.add(key),
+      remove: async (key: string) => void stored.delete(key),
+    },
     repo,
     filter: {
       moderate: async (t: string) => (t.includes('BAD') ? { allowed: false, reason: 'spam' } : { allowed: true }),
@@ -39,7 +53,7 @@ function setup() {
     embedder: { embed: async () => [0.1] },
   });
   const api = apiHandler({ repo, translator: { translate: async (t: string) => `번역: ${t}` } });
-  return { repo, write, api };
+  return { repo, write, api, stored };
 }
 
 describe('POST /posts', () => {
@@ -190,6 +204,37 @@ describe('profile and follow', () => {
 
     await api(event('DELETE /users/{id}/follow', { pathParameters: { id: U2 } }));
     expect(repo.follows.size).toBe(0);
+  });
+});
+
+describe('PUT /me/photo', () => {
+  const profile = JSON.stringify({ handle: 'abc', displayName: 'Name', bio: '', locale: 'ko', timeZone: 'Asia/Seoul' });
+
+  it('saves a checked face photo and replaces the old one', async () => {
+    process.env.PHOTO_BASE_URL = 'https://cdn.example';
+    const { write, stored } = setup();
+    await write(event('PUT /me', { body: profile }));
+    const first = parse(await write(event('PUT /me/photo', { body: JSON.stringify({ jpeg: jpeg('face') }) })));
+    expect(first.status).toBe(200);
+    expect(first.body.photoUrl).toMatch(/^https:\/\/cdn\.example\/photos\/.+\.jpg$/);
+    await write(event('PUT /me/photo', { body: JSON.stringify({ jpeg: jpeg('face') }) }));
+    expect(stored.size).toBe(1);
+    delete process.env.PHOTO_BASE_URL;
+  });
+
+  it('says why a photo was refused', async () => {
+    const { write, stored } = setup();
+    await write(event('PUT /me', { body: profile }));
+    const r = parse(await write(event('PUT /me/photo', { body: JSON.stringify({ jpeg: jpeg('many_faces') }) })));
+    expect(r).toEqual({ status: 422, body: { error: 'photo_refused', problem: 'many_faces' } });
+    expect(stored.size).toBe(0);
+  });
+
+  it('rejects files that are not JPEG, and writers without a profile', async () => {
+    const { write } = setup();
+    const png = Buffer.from('\x89PNG....').toString('base64');
+    expect(parse(await write(event('PUT /me/photo', { body: JSON.stringify({ jpeg: png }) }))).status).toBe(400);
+    expect(parse(await write(event('PUT /me/photo', { body: JSON.stringify({ jpeg: jpeg('face') }) }))).status).toBe(409);
   });
 });
 

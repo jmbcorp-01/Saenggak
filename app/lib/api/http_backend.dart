@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -73,6 +74,17 @@ class HttpBackend implements Backend {
       ),
     ),
   );
+
+  @override
+  Future<Profile> setPhoto(Uint8List jpeg) async {
+    final res = await _send('PUT', 'me/photo', body: {'jpeg': base64Encode(jpeg)});
+    final j = _json(res);
+    if (res.statusCode >= 300) {
+      final code = j['error'] == 'photo_refused' ? j['problem'] : j['error'];
+      throw ApiException(res.statusCode, code as String? ?? 'unknown');
+    }
+    return Profile.fromJson(j);
+  }
 
   @override
   Future<Profile> user(String id) async => Profile.fromJson(_ok(await _send('GET', 'users/$id')));

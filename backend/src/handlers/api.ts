@@ -3,6 +3,7 @@ import { deletePost } from '../posts/publish.js';
 import { DAYS_TO_FOLLOW } from '../rules/follow.js';
 import type { Repository, Translator } from '../services/ports.js';
 import { AuroraRepository } from '../services/repository.js';
+import { photoUrl } from '../services/photos.js';
 import { AwsTranslator } from '../services/translator.js';
 import { isUuid, json, safely, userId, type Event } from './http.js';
 
@@ -32,7 +33,9 @@ export const apiHandler = (deps: Deps) => safely(async (event: Event) => {
       const posts = await repo.feed(me, { following: q.tab === 'following', authorId: q.author, before, limit: PAGE_SIZE });
       const items = await translateFeed(deps, posts, lang);
       const last = items.at(-1);
-      return json(200, { items, next: items.length === PAGE_SIZE && last ? last.createdAt : null });
+      return json(200, {
+        items: items.map((p) => ({ ...p, photoUrl: photoUrl(p.photoKey) })),
+        next: items.length === PAGE_SIZE && last ? last.createdAt : null });
     }
 
     case 'POST /posts/{id}/empathy': {
@@ -52,7 +55,7 @@ export const apiHandler = (deps: Deps) => safely(async (event: Event) => {
       if (!isUuid(target)) return json(400, { error: 'bad_request' });
       const profile = await repo.profile(target, me);
       if (!profile) return json(404, { error: 'not_found' });
-      return json(200, { ...profile, daysToFollow: DAYS_TO_FOLLOW, isMe: target === me });
+      return json(200, { ...profile, photoUrl: photoUrl(profile.photoKey), daysToFollow: DAYS_TO_FOLLOW, isMe: target === me });
     }
 
     case 'PUT /users/{id}/follow': {

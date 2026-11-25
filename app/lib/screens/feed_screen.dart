@@ -43,6 +43,7 @@ class FeedScreen extends StatelessWidget {
                                 initial: state.me?.initial ?? '?',
                                 color: avatarPalette[(state.me?.id.hashCode ?? 0).abs() % avatarPalette.length],
                                 size: 32,
+                                photoUrl: state.me?.photoUrl,
                               ),
                             ),
                           ),

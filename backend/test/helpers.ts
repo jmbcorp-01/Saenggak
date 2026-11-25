@@ -43,6 +43,14 @@ export class MemoryRepo implements Repository {
   /** When true, writers without a saved profile are refused, as in the database. */
   requireProfile = false;
   writes = new Map<string, number>();
+  photos = new Map<string, string>();
+
+  async setPhoto(userId: string, key: string) {
+    if (!this.users.has(userId)) return null;
+    const previous = this.photos.get(userId) ?? null;
+    this.photos.set(userId, key);
+    return { previous };
+  }
   /** Published posts the app is pretended to hold besides these ones. */
   otherPublished = 1_000_000;
 
@@ -118,7 +126,7 @@ export class MemoryRepo implements Repository {
     if (!u) return null;
     const count = (side: 0 | 1) => [...this.follows].filter((f) => f.split('>')[side] === userId).length;
     return {
-      id: userId, handle: u.handle, displayName: u.displayName, bio: u.bio, photoKey: null,
+      id: userId, handle: u.handle, displayName: u.displayName, bio: u.bio, photoKey: this.photos.get(userId) ?? null,
       locale: u.locale, timeZone: u.timeZone, writingDays: await this.writingDays(userId),
       followUnlocked: this.unlocked.get(userId) ?? false, followers: count(1), following: count(0),
       followedByMe: this.follows.has(`${viewerId}>${userId}`),

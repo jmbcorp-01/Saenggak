@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import '../core/typing_session.dart';
 import '../models/post.dart';
 import '../models/profile.dart';
@@ -55,6 +58,28 @@ class DemoBackend implements Backend {
       writingDays: _me.writingDays,
       followUnlocked: _me.followUnlocked,
       isMe: true,
+      photoUrl: _me.photoUrl,
+    );
+    return _me;
+  }
+
+  /// No face check here; the photo is kept as a data URL.
+  @override
+  Future<Profile> setPhoto(Uint8List jpeg) async {
+    if (jpeg.length < 3 || jpeg[0] != 0xFF || jpeg[1] != 0xD8 || jpeg[2] != 0xFF) {
+      throw const ApiException(400, 'bad_image');
+    }
+    _me = Profile(
+      id: _me.id,
+      handle: _me.handle,
+      displayName: _me.displayName,
+      bio: _me.bio,
+      locale: _me.locale,
+      timeZone: _me.timeZone,
+      writingDays: _me.writingDays,
+      followUnlocked: _me.followUnlocked,
+      isMe: true,
+      photoUrl: 'data:image/jpeg;base64,${base64Encode(jpeg)}',
     );
     return _me;
   }

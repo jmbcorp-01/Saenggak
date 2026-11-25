@@ -164,6 +164,13 @@ describe.skipIf(!url)('AuroraRepository on Postgres', () => {
     expect(await repo.feed(A, { following: true, limit: 30 })).toEqual([]);
   });
 
+  it('swaps the profile photo and returns the old key', async () => {
+    expect(await repo.setPhoto(A, 'photos/a/1.jpg')).toEqual({ previous: null });
+    expect(await repo.setPhoto(A, 'photos/a/2.jpg')).toEqual({ previous: 'photos/a/1.jpg' });
+    expect((await repo.profile(A, B))?.photoKey).toBe('photos/a/2.jpg');
+    expect(await repo.setPhoto('dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'x')).toBeNull();
+  });
+
   it('counts published posts up to a limit', async () => {
     expect(await repo.hasPublished(1)).toBe(true);
     expect(await repo.hasPublished(1_000_000)).toBe(false);

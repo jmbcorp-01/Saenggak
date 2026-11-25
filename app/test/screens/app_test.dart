@@ -8,6 +8,7 @@ import 'package:saenggak/main.dart';
 import 'package:saenggak/models/profile.dart';
 import 'package:saenggak/models/publish_outcome.dart';
 import 'package:saenggak/screens/compose_screen.dart';
+import 'package:saenggak/screens/photo_capture_screen.dart';
 import 'package:saenggak/screens/publish_result_screen.dart';
 
 import '../helpers.dart';
@@ -233,5 +234,28 @@ void main() {
 
   test('local date is the writer\'s calendar day', () {
     expect(localDateOf(DateTime(2026, 1, 5, 23, 59)), '2026-01-05');
+  });
+
+  testWidgets('the photo screen only offers the camera, and says so when there is none', (tester) async {
+    final state = AppState(backend: DemoBackend());
+    await state.start();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PhotoCaptureScreen(state: state, cameras: () async => []),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('카메라를 찾지 못했어요'), findsOneWidget);
+    expect(find.textContaining('앨범'), findsOneWidget); // only in the explanation
+    expect(find.text('이 사진 쓰기'), findsNothing);
+  });
+
+  testWidgets('my profile has a camera button for the photo', (tester) async {
+    final state = AppState(backend: DemoBackend());
+    await openHome(tester, state);
+    await tester.tap(find.text('프로필').last);
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('프로필 사진 찍기'), findsOneWidget);
   });
 }

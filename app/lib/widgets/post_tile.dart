@@ -4,11 +4,13 @@ import '../core/typing_session.dart';
 import '../models/post.dart';
 import '../theme/tokens.dart';
 
-/// Round profile photo. Shows the author's initial until photos are wired up.
+/// Round profile photo. Shows the initial on a colored circle when there is
+/// no photo, or while it loads, or if it fails to load.
 class Avatar extends StatelessWidget {
-  const Avatar({super.key, required this.initial, required this.color, this.size = 40, this.label});
+  const Avatar({super.key, required this.initial, required this.color, this.size = 40, this.label, this.photoUrl});
 
   final String initial;
+  final String? photoUrl;
   final int color;
   final double size;
   final String? label;
@@ -17,6 +19,10 @@ class Avatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final bg = Color(color);
     final fg = bg.computeLuminance() > 0.4 ? SgColors.ink : Colors.white;
+    final letter = Text(
+      initial,
+      style: TextStyle(color: fg, fontSize: size * 0.38, fontWeight: FontWeight.w500),
+    );
     return Semantics(
       label: label,
       image: true,
@@ -25,16 +31,30 @@ class Avatar extends StatelessWidget {
         height: size,
         alignment: Alignment.center,
         decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+        clipBehavior: Clip.antiAlias,
         child: ExcludeSemantics(
-          child: Text(
-            initial,
-            style: TextStyle(color: fg, fontSize: size * 0.38, fontWeight: FontWeight.w500),
-          ),
+          child: photoUrl == null
+              ? letter
+              : Image(
+                  image: ResizeImage(
+                    _provider(photoUrl!),
+                    width: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+                  ),
+                  width: size,
+                  height: size,
+                  fit: BoxFit.cover,
+                  frameBuilder: (context, child, frame, sync) => frame == null && !sync ? letter : child,
+                  errorBuilder: (context, error, stack) => letter,
+                ),
         ),
       ),
     );
   }
 }
+
+/// Photos from the server are URLs; the demo backend keeps them as data URLs.
+ImageProvider _provider(String url) =>
+    url.startsWith('data:') ? MemoryImage(UriData.parse(url).contentAsBytes()) : NetworkImage(url);
 
 /// Two overlapping circles. The overlap fills in when the reader empathized.
 class EmpathyIcon extends StatelessWidget {
@@ -155,7 +175,7 @@ class _PostTileState extends State<PostTile> {
               onTap: widget.onOpenAuthor,
               child: Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Avatar(initial: post.authorInitial, color: post.avatarColor),
+                child: Avatar(initial: post.authorInitial, color: post.avatarColor, photoUrl: post.authorPhotoUrl),
               ),
             ),
           ),

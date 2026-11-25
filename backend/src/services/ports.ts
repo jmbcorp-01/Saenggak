@@ -30,6 +30,20 @@ export class FilterUnavailableError extends Error {
   }
 }
 
+/** Why a profile photo was refused. */
+export type PhotoProblem = 'no_face' | 'many_faces' | 'unclear' | 'inappropriate';
+export type PhotoVerdict = { ok: true } | { ok: false; problem: PhotoProblem };
+
+/** Checks that a photo shows one real, clear human face and nothing inappropriate. */
+export interface PhotoChecker {
+  check(jpeg: Uint8Array): Promise<PhotoVerdict>;
+}
+
+export interface PhotoStore {
+  put(key: string, jpeg: Uint8Array): Promise<void>;
+  remove(key: string): Promise<void>;
+}
+
 export interface Embedder {
   embed(text: string): Promise<number[]>;
 }
@@ -158,6 +172,9 @@ export interface Repository {
   updatePost(postId: string, authorId: string, update: PostUpdate): Promise<boolean>;
   /** Removes a published post with its 공감, translations and phrases. */
   deletePost(postId: string, authorId: string): Promise<boolean>;
+
+  /** Sets the profile photo and returns the key of the one it replaced. */
+  setPhoto(userId: string, photoKey: string): Promise<{ previous: string | null } | null>;
 
   /** Creates or updates the signed-in user's profile. */
   saveProfile(userId: string, input: ProfileInput): Promise<'ok' | 'handle_taken'>;

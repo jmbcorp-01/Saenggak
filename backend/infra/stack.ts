@@ -164,6 +164,7 @@ export class SaenggakStack extends Stack {
       ['/feed', M.GET, apiIntegration],
       ['/me', M.GET, apiIntegration],
       ['/me', M.PUT, writeIntegration],
+      ['/me/photo', M.PUT, writeIntegration],
       ['/users/{id}', M.GET, apiIntegration],
       ['/users/{id}/follow', M.PUT, apiIntegration],
       ['/users/{id}/follow', M.DELETE, apiIntegration],
@@ -193,6 +194,29 @@ export class SaenggakStack extends Stack {
       defaultRootObject: 'index.html',
       priceClass: cloudfront.PriceClass.PRICE_CLASS_200,
     });
+    // Profile photos: private bucket, served read-only through the same CDN at /photos/*.
+    // Only the write function stores them, after the face and moderation checks.
+    const photos = new s3.Bucket(this, 'Photos', {
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      removalPolicy: RemovalPolicy.RETAIN,
+    });
+    cdn.addBehavior('/photos/*', origins.S3BucketOrigin.withOriginAccessControl(photos), {
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+    });
+    photos.grantPut(write);
+    photos.grantDelete(write);
+    write.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['rekognition:DetectFaces', 'rekognition:DetectModerationLabels'],
+        resources: ['*'],
+      }),
+    );
+    write.addEnvironment('PHOTO_BUCKET', photos.bucketName);
+    for (const f of [write, api]) f.addEnvironment('PHOTO_BASE_URL', `https://${cdn.distributionDomainName}`);
+
     const config = {
       apiUrl: http.apiEndpoint,
       cognitoRegion: this.region,
