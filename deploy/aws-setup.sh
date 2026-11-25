@@ -14,6 +14,10 @@
 set -euo pipefail
 
 REPO="${REPO:-jmbcorp-01/Saenggak}"
+# GitHub now puts the owner's and repository's numeric ids in the token's
+# subject ("repo:owner@123/name@456:..."), so a renamed or re-created
+# repository with the same name cannot use the role.
+REPO_WITH_IDS="${REPO_WITH_IDS:-jmbcorp-01@146903547/Saenggak@1467445621}"
 ROLE_NAME="${ROLE_NAME:-saenggak-github-deploy}"
 REGION="${AWS_REGION:-$(aws configure get region || echo us-east-1)}"
 ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
@@ -43,8 +47,8 @@ TRUST=$(cat <<JSON
       "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
       "StringLike": {
         "token.actions.githubusercontent.com:sub": [
-          "repo:$REPO:ref:refs/heads/main",
-          "repo:$REPO:environment:production"
+          "repo:$REPO_WITH_IDS:ref:refs/heads/main",
+          "repo:$REPO_WITH_IDS:environment:production"
         ]
       }
     }
