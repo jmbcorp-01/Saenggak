@@ -22,10 +22,23 @@ describe('SaenggakStack', () => {
     template.allResourcesProperties('AWS::ApiGatewayV2::Route', { AuthorizationType: 'JWT' });
   });
 
-  it('runs two Node 22 Lambdas outside the VPC', () => {
+  it('runs the Node 22 Lambdas outside the VPC', () => {
     const fns = template.findResources('AWS::Lambda::Function', { Properties: { Runtime: 'nodejs22.x' } });
-    expect(Object.keys(fns)).toHaveLength(2);
+    // write, api and migrate
+    expect(Object.keys(fns)).toHaveLength(3);
     for (const f of Object.values(fns)) expect(f.Properties.VpcConfig).toBeUndefined();
+  });
+
+  it('migrates the database after it is created', () => {
+    template.resourceCountIs('Custom::Trigger', 1);
+  });
+
+  it('serves the web app from a private bucket with its API settings', () => {
+    template.hasResourceProperties('AWS::S3::Bucket', {
+      PublicAccessBlockConfiguration: Match.objectLike({ BlockPublicAcls: true, RestrictPublicBuckets: true }),
+    });
+    template.resourceCountIs('AWS::CloudFront::Distribution', 1);
+    template.resourceCountIs('Custom::CDKBucketDeployment', 1);
   });
 
   it('throttles the API', () => {

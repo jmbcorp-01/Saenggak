@@ -1,7 +1,10 @@
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CfnOutput, Duration, RemovalPolicy, Stack, type StackProps } from 'aws-cdk-lib';
 import * as apigw from 'aws-cdk-lib/aws-apigatewayv2';
+import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
+import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import { HttpJwtAuthorizer } from 'aws-cdk-lib/aws-apigatewayv2-authorizers';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
@@ -10,10 +13,16 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as rds from 'aws-cdk-lib/aws-rds';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
+import * as triggers from 'aws-cdk-lib/triggers';
 import type { Construct } from 'constructs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const handlerPath = (name: string) => path.join(here, '..', 'src', 'handlers', `${name}.ts`);
+const migrationsDir = path.join(here, '..', 'src', 'db', 'migrations');
+/** The Flutter web build. Deployed when present; build it first with `flutter build web`. */
+const webBuild = path.join(here, '..', '..', 'app', 'build', 'web');
 
 /**
  * Everything the MVP needs: sign-in (Cognito), the database (Aurora
@@ -76,6 +85,30 @@ export class SaenggakStack extends Stack {
       return f;
     };
 
+    // Brings the schema up to date after every deploy, once the database exists.
+    const migrateFn = new NodejsFunction(this, 'migrate', {
+      entry: handlerPath('migrate'),
+      runtime: lambda.Runtime.NODEJS_22_X,
+      architecture: lambda.Architecture.ARM_64,
+      timeout: Duration.minutes(5),
+      environment,
+      bundling: {
+        minify: true,
+        commandHooks: {
+          beforeBundling: () => [],
+          beforeInstall: () => [],
+          afterBundling: (_input: string, output: string) => [`cp -r "${migrationsDir}" "${output}/migrations"`],
+        },
+      },
+    });
+    db.grantDataApiAccess(migrateFn);
+    new triggers.Trigger(this, 'Migrate', {
+      handler: migrateFn,
+      executeAfter: [db],
+      executeOnHandlerChange: true,
+      timeout: Duration.minutes(5),
+    });
+
     // Writing waits on moderation and embedding, so it gets a longer timeout.
     const write = fn('write', 30);
     const api = fn('api', 15);
@@ -130,6 +163,41 @@ export class SaenggakStack extends Stack {
     const stage = http.defaultStage?.node.defaultChild as apigw.CfnStage | undefined;
     stage?.addPropertyOverride('DefaultRouteSettings', { ThrottlingRateLimit: 500, ThrottlingBurstLimit: 1000 });
 
+    // The web app: a private bucket behind CloudFront. config.json tells the
+    // built app where the API is, so the same build works for any deploy.
+    const site = new s3.Bucket(this, 'Web', {
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
+      removalPolicy: RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+    });
+    const cdn = new cloudfront.Distribution(this, 'Cdn', {
+      defaultBehavior: {
+        origin: origins.S3BucketOrigin.withOriginAccessControl(site),
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        responseHeadersPolicy: cloudfront.ResponseHeadersPolicy.SECURITY_HEADERS,
+      },
+      defaultRootObject: 'index.html',
+      priceClass: cloudfront.PriceClass.PRICE_CLASS_200,
+    });
+    const config = {
+      apiUrl: http.apiEndpoint,
+      cognitoRegion: this.region,
+      cognitoClientId: appClient.userPoolClientId,
+    };
+    new s3deploy.BucketDeployment(this, 'WebFiles', {
+      destinationBucket: site,
+      sources: [
+        ...(existsSync(webBuild) ? [s3deploy.Source.asset(webBuild)] : []),
+        s3deploy.Source.jsonData('config.json', config),
+      ],
+      distribution: cdn,
+      memoryLimit: 512,
+      // Revalidate on each load so a new deploy shows up at once; unchanged files answer 304.
+      cacheControl: [s3deploy.CacheControl.fromString('no-cache')],
+    });
+
+    new CfnOutput(this, 'WebUrl', { value: `https://${cdn.distributionDomainName}` });
     new CfnOutput(this, 'ApiUrl', { value: http.apiEndpoint });
     new CfnOutput(this, 'UserPoolId', { value: users.userPoolId });
     new CfnOutput(this, 'UserPoolClientId', { value: appClient.userPoolClientId });

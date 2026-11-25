@@ -1,5 +1,6 @@
--- Saenggak database schema (Aurora PostgreSQL with pgvector).
--- Apply once per environment; later changes go in numbered migrations.
+-- Saenggak database schema (Aurora PostgreSQL with pgvector), migration 001.
+-- Applied by the migrate Lambda on deploy. Later changes go in 002_*.sql and up;
+-- never edit a migration that has been deployed.
 
 CREATE EXTENSION IF NOT EXISTS vector;
 
