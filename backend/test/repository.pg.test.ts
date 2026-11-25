@@ -45,6 +45,8 @@ describe.skipIf(!url)('AuroraRepository on Postgres', () => {
   const input = (authorId: string, text = TEXT) => ({ authorId, text, session: humanSession(text) });
 
   beforeAll(async () => {
+    // A handful of posts here, so show first phrases from the first one.
+    process.env.FIRST_PHRASES_MIN_POSTS = '1';
     client = new pg.Client({ connectionString: url });
     await client.connect();
     const schema = `t_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
@@ -57,7 +59,10 @@ describe.skipIf(!url)('AuroraRepository on Postgres', () => {
       expect(saved).toBe('ok');
     }
   });
-  afterAll(async () => client?.end());
+  afterAll(async () => {
+    delete process.env.FIRST_PHRASES_MIN_POSTS;
+    await client?.end();
+  });
 
   it('rejects a taken handle regardless of case', async () => {
     const saved = await repo.saveProfile(C, { handle: 'AA', displayName: 'x', bio: '', locale: 'ko', timeZone: 'Asia/Seoul' });
@@ -147,6 +152,11 @@ describe.skipIf(!url)('AuroraRepository on Postgres', () => {
 
     await repo.unfollow(A, B);
     expect(await repo.feed(A, { following: true, limit: 30 })).toEqual([]);
+  });
+
+  it('counts published posts up to a limit', async () => {
+    expect(await repo.hasPublished(1)).toBe(true);
+    expect(await repo.hasPublished(1_000_000)).toBe(false);
   });
 
   it('works out the writer day from their time zone', async () => {

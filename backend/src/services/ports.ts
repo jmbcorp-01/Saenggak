@@ -136,6 +136,9 @@ export interface Repository {
    */
   recordWrite(authorId: string, limit: number): Promise<boolean>;
 
+  /** Whether the app holds at least [n] published posts. Reads at most n rows. */
+  hasPublished(n: number): Promise<boolean>;
+
   writingDays(authorId: string): Promise<number>;
   /** Blocked posts in the window, not counting ones the filter declined to judge. */
   recentBlocks(authorId: string, windowDays: number): Promise<number>;

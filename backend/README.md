@@ -22,6 +22,7 @@ Rules the server enforces on its own, whatever the app sends:
 - Each person gets 20 writes an hour (posts, edits and name or bio changes), counted before the content filter is called. Over that returns 429 `rate_limited`.
 - If the content filter is down, the write is refused with 503 `filter_unavailable`; nothing is let through unchecked.
 - A post the filter declines to judge is kept for human review and does not count toward losing follow permission.
+- First-used phrases are recorded from the first post but returned only once the app holds 10,000 published posts (`FIRST_PHRASES_MIN_POSTS`). Before that almost every phrase is new.
 - Any other failure returns 500 `{"error":"internal"}` and is logged.
 
 ## Pieces

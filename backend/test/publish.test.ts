@@ -39,6 +39,15 @@ describe('publishPost', () => {
     expect(second.kind === 'published' && second.firstPhrases).toEqual([]);
   });
 
+  it('keeps first phrases hidden until the app holds enough posts', async () => {
+    const { repo, deps } = setup();
+    repo.otherPublished = 0;
+    const early = await publishPost(deps, { authorId: 'u1', text: TEXT, session: humanSession(TEXT) });
+    expect(early.kind === 'published' && early.firstPhrases).toEqual([]);
+    // They were still recorded, so this writer keeps them once the label is shown.
+    expect(repo.firsts.size).toBeGreaterThan(0);
+  });
+
   it('rejects length before calling any service', async () => {
     const { repo, deps } = setup();
     const r = await publishPost(deps, { authorId: 'u1', text: '짧다', session: humanSession('짧다') });

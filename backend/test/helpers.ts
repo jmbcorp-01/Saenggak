@@ -43,6 +43,12 @@ export class MemoryRepo implements Repository {
   /** When true, writers without a saved profile are refused, as in the database. */
   requireProfile = false;
   writes = new Map<string, number>();
+  /** Published posts the app is pretended to hold besides these ones. */
+  otherPublished = 1_000_000;
+
+  async hasPublished(n: number) {
+    return this.otherPublished + this.posts.filter((p) => p.status === 'published').length >= n;
+  }
 
   async localDate(a: string) {
     return this.requireProfile && !this.users.has(a) ? null : this.today;

@@ -142,6 +142,14 @@ export class AuroraRepository implements Repository {
     return phrases.filter((p) => won.has(p.key));
   }
 
+  async hasPublished(n: number): Promise<boolean> {
+    const rows = await this.query(
+      `SELECT count(*) AS c FROM (SELECT 1 FROM posts WHERE status = 'published' LIMIT :n) x`,
+      { n },
+    );
+    return Number(rows[0]?.c ?? 0) >= n;
+  }
+
   async writingDays(authorId: string): Promise<number> {
     const rows = await this.query(`SELECT days FROM writing_days WHERE author_id = :a::uuid`, { a: authorId });
     return Number(rows[0]?.days ?? 0);

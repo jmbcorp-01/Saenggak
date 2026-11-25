@@ -8,6 +8,13 @@ import type { ContentFilter, Embedder, ModerationReason, Repository } from '../s
 /** Posts, edits and profile changes a writer can send per hour. Each one costs a filter call. */
 export const WRITES_PER_HOUR = 20;
 
+/**
+ * First-used phrases are recorded from the first post but shown only once the
+ * app holds this many posts. Before that almost every phrase is new, so the
+ * label would mean nothing. Set FIRST_PHRASES_MIN_POSTS to change it.
+ */
+export const firstPhrasesMinPosts = () => Number(process.env.FIRST_PHRASES_MIN_POSTS ?? 10_000);
+
 export interface PublishDeps {
   repo: Repository;
   filter: ContentFilter;
@@ -125,9 +132,10 @@ async function moderate(deps: PublishDeps, input: PublishInput, s: Screened): Pr
 
 /** Similar thoughts, first-used phrases and follow status for a stored post. */
 async function extras(repo: Repository, postId: string, authorId: string, s: Screened, embedding: number[]): Promise<Published> {
-  const [people, firsts, writingDays, unlocked] = await Promise.all([
+  const [people, firsts, showFirsts, writingDays, unlocked] = await Promise.all([
     repo.countSimilarAuthors(postId, embedding, MAX_COSINE_DISTANCE),
     repo.claimPhrases(postId, authorId, extractPhrases(s.body)),
+    repo.hasPublished(firstPhrasesMinPosts()),
     repo.writingDays(authorId),
     refreshFollow(repo, authorId),
   ]);
@@ -136,7 +144,7 @@ async function extras(repo: Repository, postId: string, authorId: string, s: Scr
     postId,
     typingMs: s.session.activeMs,
     similar: summarizeSimilar(people),
-    firstPhrases: pickFirstPhrases(firsts),
+    firstPhrases: showFirsts ? pickFirstPhrases(firsts) : [],
     writingDays,
     followUnlocked: unlocked,
   };
