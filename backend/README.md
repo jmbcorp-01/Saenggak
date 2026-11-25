@@ -34,8 +34,8 @@ Rules the server enforces on its own, whatever the app sends:
   - Titan Text Embeddings v2 for similar thoughts.
   - Claude on Amazon Bedrock for the content filter. If the filter declines to review a post, the post is held as blocked for human review.
   - Amazon Translate.
-- `src/db/schema.sql`: tables, including `pgvector` embeddings and the first-use phrase table.
-- `infra/stack.ts`: Cognito, Aurora Serverless v2 (Data API on, isolated subnets), two Lambdas, the HTTP API with throttling.
+- `src/db/migrations/`: the schema as numbered SQL files, applied after each deploy by the `migrate` Lambda.
+- `infra/stack.ts`: Cognito, Aurora Serverless v2 (Data API on, isolated subnets), the write, api and migrate Lambdas, the HTTP API with throttling, and the web app on S3 and CloudFront.
 
 ## Commands
 
@@ -50,7 +50,7 @@ TEST_DATABASE_URL=postgresql://localhost/saenggak_test npm test
 npm run deploy    # needs AWS credentials
 ```
 
-After the first deploy, apply `src/db/schema.sql` once, for example with the RDS query editor or `aws rds-data execute-statement`. Enable model access for Titan Text Embeddings v2 and Claude in the Bedrock console of the deploy region.
+Deploys run from GitHub Actions; see `../deploy/README.md`. The schema is applied automatically after each deploy.
 
 ## Before launch
 

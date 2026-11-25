@@ -1,7 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import type { RDSDataClient } from '@aws-sdk/client-rds-data';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { loadMigrations, migrate, type MigrationDb } from '../src/db/migrate.js';
 import { deletePost, editPost, publishPost } from '../src/posts/publish.js';
 import { MAX_COSINE_DISTANCE } from '../src/rules/similar.js';
 import { AuroraRepository } from '../src/services/repository.js';
@@ -52,7 +53,16 @@ describe.skipIf(!url)('AuroraRepository on Postgres', () => {
     const schema = `t_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
     await client.query(`CREATE SCHEMA ${schema}`);
     await client.query(`SET search_path TO ${schema}, public`);
-    await client.query(readFileSync(new URL('../src/db/schema.sql', import.meta.url), 'utf8'));
+    // The same migrations and statement splitting the deploy uses.
+    const db: MigrationDb = {
+      begin: async () => (await client.query('BEGIN'), 'tx'),
+      exec: async (sql) => (await client.query({ text: sql, rowMode: 'array' })).rows,
+      commit: async () => void (await client.query('COMMIT')),
+      rollback: async () => void (await client.query('ROLLBACK')),
+    };
+    const migrations = loadMigrations(fileURLToPath(new URL('../src/db/migrations', import.meta.url)));
+    expect(await migrate(db, migrations)).toEqual(migrations.map((m) => m.id));
+    expect(await migrate(db, migrations)).toEqual([]);
     repo = new AuroraRepository('arn:cluster', 'arn:secret', 'test', new PgDataApi(client) as unknown as RDSDataClient);
     for (const [id, handle] of [[A, 'aa'], [B, 'bb'], [C, 'cc']] as const) {
       const saved = await repo.saveProfile(id, { handle, displayName: handle, bio: '', locale: 'ko', timeZone: 'Asia/Seoul' });

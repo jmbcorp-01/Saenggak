@@ -11,8 +11,9 @@ import 'screens/profile_setup_screen.dart';
 import 'screens/start_screen.dart';
 import 'theme/tokens.dart';
 
-void main() {
-  const config = ApiConfig.fromEnvironment;
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final config = await ApiConfig.load();
   if (config.isDemo) {
     runApp(SaenggakApp(state: AppState(backend: DemoBackend())));
     return;

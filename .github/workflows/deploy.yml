@@ -1,0 +1,76 @@
+name: Deploy
+
+# Deploys the server and the web app to AWS on every push to main, and on
+# demand. Does nothing until the AWS_DEPLOY_ROLE_ARN variable is set; see
+# deploy/README.md for the one-time setup.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # lets GitHub sign in to AWS without stored keys
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: vars.AWS_DEPLOY_ROLE_ARN != ''
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.50.1
+          channel: stable
+          cache: true
+      - name: Build the web app
+        working-directory: app
+        # No --dart-define: the deployed app reads its settings from config.json.
+        run: flutter pub get && flutter build web --release
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+        working-directory: backend
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy
+        working-directory: backend
+        env:
+          CDK_DEFAULT_REGION: ${{ env.AWS_REGION }}
+          MODERATION_MODEL: ${{ vars.MODERATION_MODEL }}
+        run: npx cdk deploy --require-approval never --outputs-file outputs.json
+
+      - name: Summary
+        working-directory: backend
+        run: |
+          node -e '
+            const o = Object.values(require("./outputs.json"))[0];
+            const lines = [
+              "## Deployed",
+              "",
+              `- Web app: ${o.WebUrl}`,
+              `- API: ${o.ApiUrl}`,
+              "",
+              "Mobile builds:",
+              "```",
+              `flutter build apk --dart-define=API_URL=${o.ApiUrl} --dart-define=COGNITO_REGION=${process.env.AWS_REGION} --dart-define=COGNITO_CLIENT_ID=${o.UserPoolClientId}`,
+              "```",
+            ];
+            require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+          '

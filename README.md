@@ -13,6 +13,8 @@ photos except a profile picture. Web, iOS and Android from one Flutter app.
 | `app/lib/screens/` | Start, sign-in, profile setup, feed, compose, post result and profile screens |
 | `app/lib/theme/` | Colors and type from the approved design |
 | `backend/` | AWS server: Lambdas, Aurora PostgreSQL with pgvector, CDK stack. See `backend/README.md`. |
+| `deploy/` | One-time AWS setup and how deploys work. See `deploy/README.md`. |
+| `.github/workflows/` | Tests on every pull request; deploy to AWS on every push to `main`. |
 
 ## Rules the app enforces
 
@@ -38,7 +40,8 @@ flutter test
 flutter run -d chrome          # offline demo data, no sign-in
 ```
 
-To use a deployed backend, pass the CDK stack outputs:
+The deployed web app finds its server through `config.json`. To run locally
+against a deployed backend, pass the stack outputs:
 
 ```sh
 flutter run -d chrome \
