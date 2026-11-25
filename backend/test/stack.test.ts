@@ -30,7 +30,7 @@ describe('SaenggakStack', () => {
 
   it('throttles the API', () => {
     template.hasResourceProperties('AWS::ApiGatewayV2::Stage', {
-      DefaultRouteSettings: Match.objectLike({ ThrottlingRateLimit: 20 }),
+      DefaultRouteSettings: Match.objectLike({ ThrottlingRateLimit: 500 }),
     });
   });
 });

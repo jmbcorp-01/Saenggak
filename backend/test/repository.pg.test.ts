@@ -38,15 +38,11 @@ describe.skipIf(!url)('AuroraRepository on Postgres', () => {
     filter: {
       moderate: async (t: string) =>
         t.includes('BAD') ? { allowed: false as const, reason: 'spam' as const } : { allowed: true as const },
+      moderateProfile: async () => true,
     },
     embedder: { embed: async () => nextVec },
   });
-  const input = (authorId: string, text = TEXT, localDate = '2026-11-25') => ({
-    authorId,
-    text,
-    session: humanSession(text),
-    localDate,
-  });
+  const input = (authorId: string, text = TEXT) => ({ authorId, text, session: humanSession(text) });
 
   beforeAll(async () => {
     client = new pg.Client({ connectionString: url });
@@ -123,15 +119,24 @@ describe.skipIf(!url)('AuroraRepository on Postgres', () => {
   });
 
   it('follows with permission and hides follows after 3 blocks', async () => {
-    for (let d = 1; d <= 10; d++) {
-      for (const who of [A, B]) await publishPost(deps(), input(who, TEXT, `2026-10-${String(d).padStart(2, '0')}`));
+    // Writing days come from the server clock, so earlier days are seeded directly.
+    for (let d = 1; d <= 9; d++) {
+      for (const who of [A, B]) {
+        await client.query(
+          `INSERT INTO posts (author_id, body, lang, typing_ms, local_date, created_at)
+           VALUES ($1, 'seed', 'ko', 1000, $2::date, now() - make_interval(days => $3))`,
+          [who, `2026-10-${String(d).padStart(2, '0')}`, 40 - d],
+        );
+      }
     }
+    for (const who of [A, B]) await publishPost(deps(), input(who));
     expect((await repo.profile(A, A))?.followUnlocked).toBe(true);
     expect(await repo.follow(A, C)).toBe('not_allowed');
     expect(await repo.follow(A, B)).toBe('ok');
     expect((await repo.feed(A, { following: true, limit: 30 })).length).toBeGreaterThan(0);
     expect(await repo.profile(B, A)).toMatchObject({ followers: 1, followedByMe: true });
 
+    await client.query(`DELETE FROM write_log`);
     for (let k = 0; k < 3; k++) {
       expect((await publishPost(deps(), input(B, `${TEXT} BAD`))).kind).toBe('blocked');
     }
@@ -142,5 +147,37 @@ describe.skipIf(!url)('AuroraRepository on Postgres', () => {
 
     await repo.unfollow(A, B);
     expect(await repo.feed(A, { following: true, limit: 30 })).toEqual([]);
+  });
+
+  it('works out the writer day from their time zone', async () => {
+    const today = (tz: string) =>
+      client.query(`SELECT to_char(now() AT TIME ZONE $1, 'YYYY-MM-DD') AS d`, [tz]).then((r) => r.rows[0].d);
+    expect(await repo.localDate(A)).toBe(await today('Asia/Seoul'));
+    expect(await repo.localDate('dddddddd-dddd-4ddd-8ddd-dddddddddddd')).toBeNull();
+  });
+
+  it('limits writes per hour and does not count declined reviews', async () => {
+    await client.query(`DELETE FROM write_log`);
+    for (let k = 0; k < 3; k++) expect(await repo.recordWrite(C, 3)).toBe(true);
+    expect(await repo.recordWrite(C, 3)).toBe(false);
+
+    const before = await repo.recentBlocks(C, 30);
+    await repo.insertPost({
+      authorId: C, body: TEXT, lang: 'ko', typingMs: 1, localDate: '2026-11-25', status: 'blocked',
+      blockedReason: 'classifier_declined', session: humanSession(TEXT) as never, issues: [],
+    });
+    expect(await repo.recentBlocks(C, 30)).toBe(before);
+  });
+
+  it('keeps 공감 consistent when two taps arrive together', async () => {
+    const [post] = await repo.feed(B, { following: false, authorId: A, limit: 1 });
+    const id = post!.id;
+    await client.query(`DELETE FROM empathies WHERE post_id = $1`, [id]);
+    // Both deletes run before either insert, so the second insert meets the first one's row.
+    const results = await Promise.all([repo.toggleEmpathy(id, B), repo.toggleEmpathy(id, B)]);
+    expect(results).toEqual([
+      { empathized: true, count: 1 },
+      { empathized: true, count: 1 },
+    ]);
   });
 });

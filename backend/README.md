@@ -9,12 +9,20 @@ TypeScript Lambdas behind an HTTP API, deployed with CDK.
 | `DELETE /posts/{id}` | Deletes your post with its 공감, translations and first-used phrases. |
 | `GET /feed?tab=all\|following&author=&lang=ko\|en&before=` | Newest posts, with a cached Amazon Translate translation for posts in the other language. |
 | `POST /posts/{id}/empathy` | Toggles 공감. Not allowed on your own post. |
-| `GET /me`, `PUT /me` | Your profile with writing days and follow status. `PUT` creates it after sign-up (handle, name, bio, language, time zone). |
+| `GET /me`, `PUT /me` | Your profile with writing days and follow status. `PUT` creates it after sign-up (handle, name, bio, language, time zone); a changed name or bio goes through the content filter. |
 | `GET /users/{id}` | Someone's profile, with whether you follow them. |
 | `PUT /users/{id}/follow`, `DELETE /users/{id}/follow` | Follow and unfollow. Both people need follow permission. |
 
-Two Lambdas serve these: `write` (posting and editing, which call Bedrock) and `api` (everything else).
+Two Lambdas serve these: `write` (posting, editing and `PUT /me`, which call Bedrock) and `api` (everything else).
 Every route needs a Cognito access token; API Gateway checks it.
+
+Rules the server enforces on its own, whatever the app sends:
+
+- The writing day is today in the time zone saved on the profile, so writing days cannot be made up. Posting without a profile returns 409 `profile_required`.
+- Each person gets 20 writes an hour (posts, edits and name or bio changes), counted before the content filter is called. Over that returns 429 `rate_limited`.
+- If the content filter is down, the write is refused with 503 `filter_unavailable`; nothing is let through unchecked.
+- A post the filter declines to judge is kept for human review and does not count toward losing follow permission.
+- Any other failure returns 500 `{"error":"internal"}` and is logged.
 
 ## Pieces
 

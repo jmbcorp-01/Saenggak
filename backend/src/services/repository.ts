@@ -62,11 +62,18 @@ export class AuroraRepository implements Repository {
   }
 
   async insertPost(p: NewPost): Promise<string> {
+    // One statement, so a post never exists without its typing session.
     const rows = await this.query(
-      `INSERT INTO posts (author_id, body, lang, typing_ms, local_date, status, blocked_reason, embedding)
-       VALUES (:author::uuid, :body, :lang, :typing, :day::date, :status, :reason,
-               CAST(CAST(:emb AS text) AS vector))
-       RETURNING id::text`,
+      `WITH post AS (
+         INSERT INTO posts (author_id, body, lang, typing_ms, local_date, status, blocked_reason, embedding)
+         VALUES (:author::uuid, :body, :lang, :typing, :day::date, :status, :reason,
+                 CAST(CAST(:emb AS text) AS vector))
+         RETURNING id
+       ), s AS (
+         INSERT INTO typing_sessions (post_id, session, issues)
+         SELECT id, :session::jsonb, string_to_array(:issues, ',') FROM post
+       )
+       SELECT id::text FROM post`,
       {
         author: p.authorId,
         body: p.body,
@@ -76,15 +83,31 @@ export class AuroraRepository implements Repository {
         status: p.status,
         reason: p.blockedReason ?? null,
         emb: p.embedding ? JSON.stringify(p.embedding) : null,
+        session: JSON.stringify(p.session),
+        issues: p.issues.join(','),
       },
     );
-    const id = rows[0]?.id as string;
-    await this.query(
-      `INSERT INTO typing_sessions (post_id, session, issues)
-       VALUES (:id::uuid, :session::jsonb, string_to_array(:issues, ','))`,
-      { id, session: JSON.stringify(p.session), issues: p.issues.join(',') },
+    return rows[0]?.id as string;
+  }
+
+  async localDate(authorId: string): Promise<string | null> {
+    const rows = await this.query(
+      `SELECT to_char(now() AT TIME ZONE time_zone, 'YYYY-MM-DD') AS d FROM users WHERE id = :a::uuid`,
+      { a: authorId },
     );
-    return id;
+    return (rows[0]?.d as string | undefined) ?? null;
+  }
+
+  async recordWrite(authorId: string, limit: number): Promise<boolean> {
+    const rows = await this.query(
+      `INSERT INTO write_log (author_id)
+       SELECT :a::uuid
+       WHERE (SELECT count(*) FROM write_log
+              WHERE author_id = :a::uuid AND at > now() - interval '1 hour') < :lim
+       RETURNING 1 AS ok`,
+      { a: authorId, lim: limit },
+    );
+    return rows.length > 0;
   }
 
   async countSimilarAuthors(postId: string, embedding: number[], maxDistance: number): Promise<number> {
@@ -128,6 +151,7 @@ export class AuroraRepository implements Repository {
     const rows = await this.query(
       `SELECT count(*) AS n FROM posts
        WHERE author_id = :a::uuid AND status = 'blocked'
+         AND blocked_reason IS DISTINCT FROM 'classifier_declined'
          AND created_at > now() - make_interval(days => CAST(:d AS integer))`,
       { a: authorId, d: windowDays },
     );
@@ -167,11 +191,15 @@ export class AuroraRepository implements Repository {
       { p: postId, u: userId },
     );
     if (removed.length === 0) {
+      // ON CONFLICT: a double tap can send two requests at once; both end empathized.
       const added = await this.query(
-        `INSERT INTO empathies (post_id, user_id)
-         SELECT id, :u::uuid FROM posts
-         WHERE id = :p::uuid AND status = 'published' AND author_id <> :u::uuid
-         RETURNING post_id`,
+        `WITH target AS (
+           SELECT id FROM posts WHERE id = :p::uuid AND status = 'published' AND author_id <> :u::uuid
+         ), ins AS (
+           INSERT INTO empathies (post_id, user_id) SELECT id, :u::uuid FROM target
+           ON CONFLICT DO NOTHING
+         )
+         SELECT 1 AS ok FROM target`,
         { p: postId, u: userId },
       );
       if (added.length === 0) return null;

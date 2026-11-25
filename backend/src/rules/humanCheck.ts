@@ -34,7 +34,9 @@ export const MIN_INTERVAL_VARIATION = 0.15;
 export const MIN_INTERVALS_FOR_RHYTHM = 20;
 export const MAX_KEYBOARD_CHUNK = 4;
 export const IDLE_CUTOFF_MS = 30_000;
-const MAX_EVENTS = 20_000;
+// A 400-unit post typed with corrections stays well under this; the cap keeps
+// the stored session inside the Data API's request size.
+const MAX_EVENTS = 4_000;
 
 /** Parses untrusted JSON from the client into a session, or null. */
 export function parseSession(raw: unknown): TypingSession | null {

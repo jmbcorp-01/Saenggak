@@ -25,14 +25,17 @@ const parse = (r: unknown) => {
 
 const TEXT = 'I keep thinking about the quiet morning walks I took last spring, and how slow they felt.';
 const EDITED = 'Some evenings the city sounds like the sea, and I let myself believe it for a while.';
-const post = (text: string) => JSON.stringify({ text, session: humanSession(text), localDate: '2026-11-25' });
-const edit = (from: string, to: string) => JSON.stringify({ text: to, session: editSession(from, to), localDate: '2026-11-25' });
+const post = (text: string) => JSON.stringify({ text, session: humanSession(text) });
+const edit = (from: string, to: string) => JSON.stringify({ text: to, session: editSession(from, to) });
 
 function setup() {
   const repo = new MemoryRepo();
   const write = writeHandler({
     repo,
-    filter: { moderate: async (t: string) => (t.includes('BAD') ? { allowed: false, reason: 'spam' } : { allowed: true }) },
+    filter: {
+      moderate: async (t: string) => (t.includes('BAD') ? { allowed: false, reason: 'spam' } : { allowed: true }),
+      moderateProfile: async ({ bio }: { bio: string }) => !bio.includes('BAD'),
+    },
     embedder: { embed: async () => [0.1] },
   });
   const api = apiHandler({ repo, translator: { translate: async (t: string) => `번역: ${t}` } });
@@ -51,9 +54,37 @@ describe('POST /posts', () => {
   it('returns 400 for a bad body and 422 for pasted text', async () => {
     const { write } = setup();
     expect(parse(await write(event('POST /posts', { body: 'nope' }))).status).toBe(400);
-    const pasted = { text: TEXT, session: { events: [{ t: 0, i: TEXT.length, d: 0, s: 'keyboard' }] }, localDate: '2026-11-25' };
+    const pasted = { text: TEXT, session: { events: [{ t: 0, i: TEXT.length, d: 0, s: 'keyboard' }] } };
     const r = parse(await write(event('POST /posts', { body: JSON.stringify(pasted) })));
     expect(r).toMatchObject({ status: 422, body: { error: 'not_human' } });
+  });
+});
+
+describe('errors', () => {
+  it('maps limits and outages to plain answers', async () => {
+    const { repo, write } = setup();
+    repo.writes.set(U1, 1000);
+    expect(parse(await write(event('POST /posts', { body: post(TEXT) })))).toEqual({
+      status: 429,
+      body: { error: 'rate_limited' },
+    });
+    repo.requireProfile = true;
+    expect(parse(await write(event('POST /posts', { body: post(TEXT) }))).body).toEqual({ error: 'profile_required' });
+  });
+
+  it('answers 500 without details when something throws', async () => {
+    const repo = new MemoryRepo();
+    repo.feed = async () => {
+      throw new Error('db password is hunter2');
+    };
+    const api = apiHandler({ repo, translator: { translate: async (t: string) => t } });
+    const quiet = console.error;
+    console.error = () => {};
+    try {
+      expect(parse(await api(event('GET /feed')))).toEqual({ status: 500, body: { error: 'internal' } });
+    } finally {
+      console.error = quiet;
+    }
   });
 });
 
@@ -101,7 +132,7 @@ describe('editing in place', () => {
     const typed = humanSession(' Still.');
     const r = parse(await write(event('PATCH /posts/{id}', {
       pathParameters: { id },
-      body: JSON.stringify({ text: changed, session: typed, localDate: '2026-11-25' }),
+      body: JSON.stringify({ text: changed, session: typed }),
     })));
     expect(r.status).toBe(200);
     expect(repo.posts[0]!.typingMs).toBeGreaterThan(before);
@@ -127,19 +158,25 @@ describe('profile and follow', () => {
   const profile = (handle: string) => JSON.stringify({ handle, displayName: 'Name', bio: '', locale: 'en', timeZone: 'Asia/Seoul' });
 
   it('saves a profile and rejects a taken or invalid handle', async () => {
-    const { api } = setup();
-    const r = parse(await api(event('PUT /me', { body: profile('Yunseo_01') })));
+    const { api, write } = setup();
+    const r = parse(await write(event('PUT /me', { body: profile('Yunseo_01') })));
     expect(r.status).toBe(200);
     expect(r.body).toMatchObject({ handle: 'yunseo_01', writingDays: 0, daysToFollow: 10, isMe: true });
-    expect(parse(await api(event('PUT /me', { sub: U2, body: profile('yunseo_01') }))).status).toBe(409);
-    expect(parse(await api(event('PUT /me', { sub: U2, body: profile('a!') }))).status).toBe(400);
+    expect(parse(await write(event('PUT /me', { sub: U2, body: profile('yunseo_01') }))).status).toBe(409);
+    expect(parse(await write(event('PUT /me', { sub: U2, body: profile('a!') }))).status).toBe(400);
     expect(parse(await api(event('GET /me', { sub: U2 }))).status).toBe(404);
   });
 
+  it('blocks an abusive bio', async () => {
+    const { write } = setup();
+    const body = JSON.stringify({ handle: 'abc', displayName: 'Name', bio: 'BAD', locale: 'en', timeZone: 'Asia/Seoul' });
+    expect(parse(await write(event('PUT /me', { body })))).toEqual({ status: 422, body: { error: 'profile_blocked' } });
+  });
+
   it('follows only when both people have permission', async () => {
-    const { repo, api } = setup();
-    await api(event('PUT /me', { body: profile('one') }));
-    await api(event('PUT /me', { sub: U2, body: profile('two') }));
+    const { repo, api, write } = setup();
+    await write(event('PUT /me', { body: profile('one') }));
+    await write(event('PUT /me', { sub: U2, body: profile('two') }));
     const follow = () => api(event('PUT /users/{id}/follow', { pathParameters: { id: U2 } }));
 
     expect(parse(await follow())).toMatchObject({ status: 403, body: { error: 'not_allowed' } });

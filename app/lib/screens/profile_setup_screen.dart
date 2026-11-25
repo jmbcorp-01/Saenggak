@@ -53,7 +53,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       await widget.state.saveProfile(handle: handle, displayName: name, bio: _bio.text.trim());
       widget.onDone();
     } on ApiException catch (e) {
-      setState(() => _error = e.code == 'handle_taken' ? '이미 쓰고 있는 아이디예요.' : '저장하지 못했어요. 다시 시도해주세요.');
+      setState(
+        () => _error = switch (e.code) {
+          'handle_taken' => '이미 쓰고 있는 아이디예요.',
+          'profile_blocked' => '이름이나 소개에 쓸 수 없는 표현이 있어요.',
+          'rate_limited' => '잠시 후 다시 저장해주세요.',
+          _ => '저장하지 못했어요. 다시 시도해주세요.',
+        },
+      );
     } catch (_) {
       setState(() => _error = '저장하지 못했어요. 다시 시도해주세요.');
     } finally {

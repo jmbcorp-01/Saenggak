@@ -38,6 +38,21 @@ export class MemoryRepo implements Repository {
   empathies = new Set<string>();
   users = new Map<string, ProfileInput>();
   follows = new Set<string>();
+  /** The writer's day the server would work out from their time zone. */
+  today = '2026-11-25';
+  /** When true, writers without a saved profile are refused, as in the database. */
+  requireProfile = false;
+  writes = new Map<string, number>();
+
+  async localDate(a: string) {
+    return this.requireProfile && !this.users.has(a) ? null : this.today;
+  }
+  async recordWrite(a: string, limit: number) {
+    const n = this.writes.get(a) ?? 0;
+    if (n >= limit) return false;
+    this.writes.set(a, n + 1);
+    return true;
+  }
 
   async insertPost(p: NewPost) {
     const id = `00000000-0000-4000-8000-${String(this.posts.length + 1).padStart(12, '0')}`;
@@ -58,7 +73,8 @@ export class MemoryRepo implements Repository {
     return new Set(this.posts.filter((p) => p.authorId === a && p.status === 'published').map((p) => p.localDate)).size;
   }
   async recentBlocks(a: string) {
-    return this.posts.filter((p) => p.authorId === a && p.status === 'blocked').length;
+    return this.posts.filter((p) => p.authorId === a && p.status === 'blocked' && p.blockedReason !== 'classifier_declined')
+      .length;
   }
   async writingDaysSinceLoss() {
     return null;

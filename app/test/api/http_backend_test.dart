@@ -72,14 +72,16 @@ void main() {
 
   test('publishes with the session and parses the extras', () async {
     api = (_) => http.Response.bytes(
-      utf8.encode(jsonEncode({
-        'id': 'p1',
-        'typingMs': 61000,
-        'similar': {'people': 12, 'show': true},
-        'firstPhrases': ['기대고 싶었던 날'],
-        'writingDays': 4,
-        'followUnlocked': false,
-      })),
+      utf8.encode(
+        jsonEncode({
+          'id': 'p1',
+          'typingMs': 61000,
+          'similar': {'people': 12, 'show': true},
+          'firstPhrases': ['기대고 싶었던 날'],
+          'writingDays': 4,
+          'followUnlocked': false,
+        }),
+      ),
       201,
     );
     final session = TypingSession()..record(inserted: 1, deleted: 0);
@@ -104,6 +106,18 @@ void main() {
     api = (_) => http.Response(jsonEncode({'error': 'blocked', 'reason': 'profanity'}), 422);
     final out = await backend.publish(text: '글', session: TypingSession(), localDate: '2026-11-25');
     expect((out as Rejected).message, '욕설이나 비하 표현이 있어 올리지 않았어요.');
+  });
+
+  test('explains the hourly limit and a filter outage', () async {
+    for (final (status, code, reason) in [
+      (429, 'rate_limited', RejectReason.rateLimited),
+      (503, 'filter_unavailable', RejectReason.filterUnavailable),
+      (409, 'profile_required', RejectReason.profileRequired),
+    ]) {
+      api = (_) => http.Response(jsonEncode({'error': code}), status);
+      final out = await backend.publish(text: '글', session: TypingSession(), localDate: '2026-11-25');
+      expect((out as Rejected).reason, reason);
+    }
   });
 
   test('edit uses PATCH and reports a locked post', () async {

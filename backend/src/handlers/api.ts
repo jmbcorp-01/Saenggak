@@ -4,10 +4,9 @@ import { DAYS_TO_FOLLOW } from '../rules/follow.js';
 import type { Repository, Translator } from '../services/ports.js';
 import { AuroraRepository } from '../services/repository.js';
 import { AwsTranslator } from '../services/translator.js';
-import { isUuid, json, parseBody, userId, type Event } from './http.js';
+import { isUuid, json, safely, userId, type Event } from './http.js';
 
 const PAGE_SIZE = 30;
-const HANDLE = /^[a-z0-9_]{3,20}$/;
 type Deps = { repo: Repository; translator: Translator };
 
 /**
@@ -15,11 +14,11 @@ type Deps = { repo: Repository; translator: Translator };
  *   GET    /feed?tab=all|following&author=<id>&lang=ko|en&before=<createdAt>
  *   POST   /posts/{id}/empathy
  *   DELETE /posts/{id}
- *   GET    /me            PUT /me { handle, displayName, bio, locale, timeZone }
+ *   GET    /me
  *   GET    /users/{id}
  *   PUT    /users/{id}/follow    DELETE /users/{id}/follow
  */
-export const apiHandler = (deps: Deps) => async (event: Event) => {
+export const apiHandler = (deps: Deps) => safely(async (event: Event) => {
   const me = userId(event);
   const id = event.pathParameters?.id;
   const { repo } = deps;
@@ -56,21 +55,6 @@ export const apiHandler = (deps: Deps) => async (event: Event) => {
       return json(200, { ...profile, daysToFollow: DAYS_TO_FOLLOW, isMe: target === me });
     }
 
-    case 'PUT /me': {
-      const b = parseBody(event);
-      const handle = typeof b?.handle === 'string' ? b.handle.trim().toLowerCase() : '';
-      const displayName = typeof b?.displayName === 'string' ? b.displayName.trim() : '';
-      const bio = typeof b?.bio === 'string' ? b.bio.trim() : '';
-      const locale = isLang(b?.locale) ? b.locale : 'ko';
-      const timeZone = typeof b?.timeZone === 'string' && validTimeZone(b.timeZone) ? b.timeZone : 'Asia/Seoul';
-      if (!HANDLE.test(handle) || displayName.length === 0 || displayName.length > 30 || bio.length > 160) {
-        return json(400, { error: 'bad_request' });
-      }
-      const saved = await repo.saveProfile(me, { handle, displayName, bio, locale, timeZone });
-      if (saved === 'handle_taken') return json(409, { error: 'handle_taken' });
-      return json(200, { ...(await repo.profile(me, me)), daysToFollow: DAYS_TO_FOLLOW, isMe: true });
-    }
-
     case 'PUT /users/{id}/follow': {
       if (!isUuid(id)) return json(400, { error: 'bad_request' });
       const result = await repo.follow(me, id);
@@ -86,16 +70,7 @@ export const apiHandler = (deps: Deps) => async (event: Event) => {
     }
   }
   return json(404, { error: 'not_found' });
-};
-
-function validTimeZone(tz: string): boolean {
-  try {
-    new Intl.DateTimeFormat('en', { timeZone: tz });
-    return true;
-  } catch {
-    return false;
-  }
-}
+});
 
 let live: Deps | undefined;
 export const handler = (event: Event) =>

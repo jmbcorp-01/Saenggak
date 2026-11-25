@@ -5,6 +5,9 @@ import { MAX_COSINE_DISTANCE, summarizeSimilar, type SimilarSummary } from '../r
 import { BLOCK_WINDOW_DAYS, followUnlocked } from '../rules/follow.js';
 import type { ContentFilter, Embedder, ModerationReason, Repository } from '../services/ports.js';
 
+/** Posts, edits and profile changes a writer can send per hour. Each one costs a filter call. */
+export const WRITES_PER_HOUR = 20;
+
 export interface PublishDeps {
   repo: Repository;
   filter: ContentFilter;
@@ -16,8 +19,6 @@ export interface PublishInput {
   /** The text exactly as typed, before trimming. */
   text: string;
   session: unknown;
-  /** The writer's calendar day, YYYY-MM-DD, from their time zone. */
-  localDate: string;
 }
 
 export interface EditInput extends PublishInput {
@@ -27,7 +28,10 @@ export interface EditInput extends PublishInput {
 type Rejected =
   | { kind: 'invalid_length'; verdict: Exclude<LengthVerdict, 'ok'> }
   | { kind: 'not_human'; issues: HumanCheckIssue[] }
-  | { kind: 'blocked'; reason: ModerationReason; followUnlocked: boolean };
+  | { kind: 'blocked'; reason: ModerationReason; followUnlocked: boolean }
+  | { kind: 'profile_required' }
+  | { kind: 'rate_limited' }
+  | { kind: 'filter_unavailable' };
 
 export interface Published {
   kind: 'published';
@@ -47,12 +51,12 @@ export function detectLang(text: string): 'ko' | 'en' {
   return /[가-힣]/.test(text) ? 'ko' : 'en';
 }
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
-
 interface Screened {
   body: string;
   lang: 'ko' | 'en';
   session: TypingSession;
+  /** The writer's calendar day in their own time zone, worked out on the server. */
+  localDate: string;
 }
 
 /**
@@ -60,13 +64,13 @@ interface Screened {
  * [baseText] is the text the draft started from: empty for a new post, the
  * current text for an edit, so the session only has to account for the change.
  */
-function screen(input: PublishInput, baseText = ''): Screened | Rejected {
+function screen(input: PublishInput, baseText = ''): Omit<Screened, 'localDate'> | Rejected {
   const body = input.text.trim();
   const verdict = checkLength(body);
   if (verdict !== 'ok') return { kind: 'invalid_length', verdict };
 
   const session = parseSession(input.session);
-  if (!session || !DATE.test(input.localDate)) return { kind: 'not_human', issues: ['invalid_session'] };
+  if (!session) return { kind: 'not_human', issues: ['invalid_session'] };
   const issues = evaluate(session, [...input.text].length - [...baseText].length);
   if (issues.length > 0) return { kind: 'not_human', issues };
 
@@ -74,18 +78,42 @@ function screen(input: PublishInput, baseText = ''): Screened | Rejected {
 }
 
 /**
+ * After the free checks pass: the writer's local day (which also confirms the
+ * profile exists) and the hourly write limit, before any paid service is called.
+ * The day comes from the profile's time zone, never from the client, so
+ * writing days cannot be made up by sending other dates.
+ */
+async function prepare(
+  repo: Repository,
+  input: PublishInput,
+  screened: Omit<Screened, 'localDate'> | Rejected,
+): Promise<Screened | Rejected> {
+  if ('kind' in screened) return screened;
+  const localDate = await repo.localDate(input.authorId);
+  if (!localDate) return { kind: 'profile_required' };
+  if (!(await repo.recordWrite(input.authorId, WRITES_PER_HOUR))) return { kind: 'rate_limited' };
+  return { ...screened, localDate };
+}
+
+/**
  * Runs the content filter. A blocked text is stored as a blocked post, so
  * blocked edits count toward losing follow permission just like new posts.
  */
 async function moderate(deps: PublishDeps, input: PublishInput, s: Screened): Promise<Rejected | null> {
-  const verdict = await deps.filter.moderate(s.body);
+  let verdict;
+  try {
+    verdict = await deps.filter.moderate(s.body);
+  } catch (e) {
+    console.error('content filter failed', e);
+    return { kind: 'filter_unavailable' };
+  }
   if (verdict.allowed) return null;
   await deps.repo.insertPost({
     authorId: input.authorId,
     body: s.body,
     lang: s.lang,
     typingMs: s.session.activeMs,
-    localDate: input.localDate,
+    localDate: s.localDate,
     status: 'blocked',
     blockedReason: verdict.reason,
     session: s.session,
@@ -119,7 +147,7 @@ async function extras(repo: Repository, postId: string, authorId: string, s: Scr
  * after-posting extras (similar thoughts, first-used phrases, follow status).
  */
 export async function publishPost(deps: PublishDeps, input: PublishInput): Promise<PublishResult> {
-  const s = screen(input);
+  const s = await prepare(deps.repo, input, screen(input));
   if ('kind' in s) return s;
   const rejected = await moderate(deps, input, s);
   if (rejected) return rejected;
@@ -130,7 +158,7 @@ export async function publishPost(deps: PublishDeps, input: PublishInput): Promi
     body: s.body,
     lang: s.lang,
     typingMs: s.session.activeMs,
-    localDate: input.localDate,
+    localDate: s.localDate,
     status: 'published',
     embedding,
     session: s.session,
@@ -151,7 +179,7 @@ export async function editPost(deps: PublishDeps, input: EditInput): Promise<Edi
   if (current.empathyCount > 0) return { kind: 'locked' };
 
   // The app opens the editor with the current text, so the session records only the change.
-  const s = screen(input, current.body);
+  const s = await prepare(deps.repo, input, screen(input, current.body));
   if ('kind' in s) return s;
 
   const rejected = await moderate(deps, input, s);

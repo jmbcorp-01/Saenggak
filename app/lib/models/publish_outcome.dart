@@ -43,7 +43,18 @@ class Published extends PublishOutcome {
   final bool followUnlocked;
 }
 
-enum RejectReason { tooShort, tooLong, notHuman, blocked, locked, notFound, network }
+enum RejectReason {
+  tooShort,
+  tooLong,
+  notHuman,
+  blocked,
+  locked,
+  notFound,
+  rateLimited,
+  filterUnavailable,
+  profileRequired,
+  network,
+}
 
 class Rejected extends PublishOutcome {
   const Rejected(this.reason, {this.blockedFor});
@@ -61,6 +72,12 @@ class Rejected extends PublishOutcome {
         return const Rejected(RejectReason.locked);
       case 'not_found':
         return const Rejected(RejectReason.notFound);
+      case 'rate_limited':
+        return const Rejected(RejectReason.rateLimited);
+      case 'filter_unavailable':
+        return const Rejected(RejectReason.filterUnavailable);
+      case 'profile_required':
+        return const Rejected(RejectReason.profileRequired);
     }
     return const Rejected(RejectReason.network);
   }
@@ -77,6 +94,9 @@ class Rejected extends PublishOutcome {
     RejectReason.notHuman => '사람이 직접 입력한 기록으로 확인되지 않았어요. 다시 써주세요.',
     RejectReason.locked => '공감을 받은 글은 수정할 수 없어요.',
     RejectReason.notFound => '글을 찾을 수 없어요. 이미 삭제됐을 수 있어요.',
+    RejectReason.rateLimited => '한 시간에 올릴 수 있는 만큼 썼어요. 조금 쉬었다가 다시 올려주세요.',
+    RejectReason.filterUnavailable => '지금은 글을 확인할 수 없어요. 잠시 후 다시 올려주세요.',
+    RejectReason.profileRequired => '프로필을 먼저 만들어주세요.',
     RejectReason.network => '연결이 불안정해요. 잠시 후 다시 시도해주세요.',
     RejectReason.blocked => switch (blockedFor) {
       'profanity' => '욕설이나 비하 표현이 있어 올리지 않았어요.',

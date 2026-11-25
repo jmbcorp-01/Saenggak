@@ -117,16 +117,18 @@ export class SaenggakStack extends Stack {
       ['/posts/{id}/empathy', M.POST, apiIntegration],
       ['/feed', M.GET, apiIntegration],
       ['/me', M.GET, apiIntegration],
-      ['/me', M.PUT, apiIntegration],
+      ['/me', M.PUT, writeIntegration],
       ['/users/{id}', M.GET, apiIntegration],
       ['/users/{id}/follow', M.PUT, apiIntegration],
       ['/users/{id}/follow', M.DELETE, apiIntegration],
     ];
     for (const [path, method, integration] of routes) http.addRoutes({ path, methods: [method], integration });
 
-    // Rate limits on the default stage slow down scraping; WAF and CloudFront come before launch.
+    // These limits are shared by every user of the API, so they only guard the
+    // account against floods. Per-person limits are the hourly write limit in
+    // the database and, before launch, per-IP rate rules in WAF.
     const stage = http.defaultStage?.node.defaultChild as apigw.CfnStage | undefined;
-    stage?.addPropertyOverride('DefaultRouteSettings', { ThrottlingRateLimit: 20, ThrottlingBurstLimit: 40 });
+    stage?.addPropertyOverride('DefaultRouteSettings', { ThrottlingRateLimit: 500, ThrottlingBurstLimit: 1000 });
 
     new CfnOutput(this, 'ApiUrl', { value: http.apiEndpoint });
     new CfnOutput(this, 'UserPoolId', { value: users.userPoolId });

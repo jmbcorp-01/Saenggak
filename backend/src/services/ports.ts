@@ -19,6 +19,15 @@ export type ModerationReason =
 
 export interface ContentFilter {
   moderate(text: string): Promise<ModerationVerdict>;
+  /** Name and bio: only abuse is blocked, since they need not be thoughts. */
+  moderateProfile(profile: { name: string; bio: string }): Promise<boolean>;
+}
+
+/** The filter service failed; the write is refused rather than let through. */
+export class FilterUnavailableError extends Error {
+  constructor(cause: unknown) {
+    super('content filter unavailable', { cause });
+  }
 }
 
 export interface Embedder {
@@ -118,7 +127,17 @@ export interface Repository {
    */
   claimPhrases(postId: string, authorId: string, phrases: Phrase[]): Promise<Phrase[]>;
 
+  /** Today's date in the writer's own time zone, or null without a profile. */
+  localDate(authorId: string): Promise<string | null>;
+
+  /**
+   * Records one write attempt (post, edit or profile change) unless the writer
+   * already made [limit] in the last hour. False when over the limit.
+   */
+  recordWrite(authorId: string, limit: number): Promise<boolean>;
+
   writingDays(authorId: string): Promise<number>;
+  /** Blocked posts in the window, not counting ones the filter declined to judge. */
   recentBlocks(authorId: string, windowDays: number): Promise<number>;
   writingDaysSinceLoss(authorId: string): Promise<number | null>;
   setFollowUnlocked(authorId: string, unlocked: boolean): Promise<void>;
