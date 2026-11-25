@@ -1,13 +1,38 @@
+import Anthropic from '@anthropic-ai/sdk';
 import { AnthropicBedrockMantle } from '@anthropic-ai/bedrock-sdk';
+import { GetSecretValueCommand, SecretsManagerClient } from '@aws-sdk/client-secrets-manager';
 import { FilterUnavailableError, type ContentFilter, type ModerationReason, type ModerationVerdict } from './ports.js';
 
 /**
- * Content filter on Claude through Amazon Bedrock. Allows personal thoughts,
+ * Content filter on Claude, through Amazon Bedrock or the Claude API. Allows personal thoughts,
  * feelings and reflection; blocks profanity, sexual content, crime, spam and
  * text that is not a thought at all.
  */
-// Haiku: a short classification on every write, so speed and cost matter most.
-export const MODERATION_MODEL = process.env.MODERATION_MODEL ?? 'anthropic.claude-haiku-5-5';
+/**
+ * MODERATION_PROVIDER picks the route: "bedrock" (default) or "anthropic",
+ * the Claude API with a key kept in Secrets Manager. Haiku by default: a short
+ * classification on every write, so speed and cost matter most.
+ */
+export const MODERATION_PROVIDER = process.env.MODERATION_PROVIDER === 'anthropic' ? 'anthropic' : 'bedrock';
+export const MODERATION_MODEL =
+  process.env.MODERATION_MODEL || (MODERATION_PROVIDER === 'anthropic' ? 'claude-haiku-5-5' : 'anthropic.claude-haiku-5-5');
+
+type MessagesClient = Pick<Anthropic, 'messages'>;
+
+/** The Claude API client, with its key read once per Lambda from Secrets Manager. */
+async function anthropicClient(): Promise<MessagesClient> {
+  const secretId = process.env.ANTHROPIC_KEY_SECRET_ARN;
+  if (!secretId) throw new Error('ANTHROPIC_KEY_SECRET_ARN is not set');
+  const out = await new SecretsManagerClient({}).send(new GetSecretValueCommand({ SecretId: secretId }));
+  const apiKey = out.SecretString?.trim();
+  if (!apiKey || !apiKey.startsWith('sk-')) throw new Error('the Claude API key secret is empty');
+  return new Anthropic({ apiKey, maxRetries: 2, timeout: 20_000 });
+}
+
+function defaultClient(): Promise<MessagesClient> {
+  if (MODERATION_PROVIDER === 'anthropic') return anthropicClient();
+  return Promise.resolve(new AnthropicBedrockMantle() as unknown as MessagesClient);
+}
 
 const SYSTEM = `You review posts for Saenggak, an app where people share their own thoughts and feelings in 40 to 200 Korean characters or 15 to 70 English words.
 
@@ -51,11 +76,20 @@ const SCHEMA = {
 } as const;
 
 export class ClaudeContentFilter implements ContentFilter {
-  constructor(private readonly client = new AnthropicBedrockMantle()) {}
+  private client: Promise<MessagesClient> | undefined;
+
+  constructor(client?: MessagesClient) {
+    if (client) this.client = Promise.resolve(client);
+  }
 
   private async ask(system: string, schema: Record<string, unknown>, input: object) {
     try {
-      return await this.client.messages.create({
+      // A failed key lookup is retried on the next write rather than cached.
+      const client = await (this.client ??= defaultClient().catch((e) => {
+        this.client = undefined;
+        throw e;
+      }));
+      return await client.messages.create({
         model: MODERATION_MODEL,
         max_tokens: 1024,
         system,

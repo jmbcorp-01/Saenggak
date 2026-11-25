@@ -14,6 +14,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as rds from 'aws-cdk-lib/aws-rds';
 import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as triggers from 'aws-cdk-lib/triggers';
 import type { Construct } from 'constructs';
@@ -70,9 +71,10 @@ export class SaenggakStack extends Stack {
       DB_CLUSTER_ARN: db.clusterArn,
       DB_SECRET_ARN: db.secret!.secretArn,
       DB_NAME: 'saenggak',
-      // The Claude model for the content filter. Set the MODERATION_MODEL
-      // variable in GitHub to change it without a code change.
-      MODERATION_MODEL: process.env.MODERATION_MODEL || 'anthropic.claude-haiku-5-5',
+      // The content filter's route ("bedrock" or "anthropic") and model, from
+      // the MODERATION_PROVIDER and MODERATION_MODEL variables in GitHub.
+      MODERATION_PROVIDER: process.env.MODERATION_PROVIDER || 'bedrock',
+      ...(process.env.MODERATION_MODEL ? { MODERATION_MODEL: process.env.MODERATION_MODEL } : {}),
     };
     const fn = (name: string, timeout = 10) => {
       const f = new NodejsFunction(this, name, {
@@ -125,6 +127,13 @@ export class SaenggakStack extends Stack {
     // Claude on Bedrock is called through the bedrock-mantle endpoint (SigV4 service "bedrock-mantle").
     // Narrow this to the exact actions and model once the account's Bedrock access is set up.
     write.addToRolePolicy(new iam.PolicyStatement({ actions: ['bedrock-mantle:*'], resources: ['*'] }));
+    // The Claude API key, for MODERATION_PROVIDER=anthropic. The deploy creates
+    // it with a random placeholder; paste the real key in the Secrets Manager console.
+    const claudeKey = new secretsmanager.Secret(this, 'ClaudeApiKey', {
+      description: 'Claude API key for the Saenggak content filter (console.anthropic.com)',
+    });
+    claudeKey.grantRead(write);
+    write.addEnvironment('ANTHROPIC_KEY_SECRET_ARN', claudeKey.secretArn);
     api.addToRolePolicy(new iam.PolicyStatement({ actions: ['translate:TranslateText'], resources: ['*'] }));
 
     const http = new apigw.HttpApi(this, 'Api', {
@@ -200,6 +209,7 @@ export class SaenggakStack extends Stack {
       cacheControl: [s3deploy.CacheControl.fromString('no-cache')],
     });
 
+    new CfnOutput(this, 'ClaudeApiKeySecret', { value: claudeKey.secretName });
     new CfnOutput(this, 'WebUrl', { value: `https://${cdn.distributionDomainName}` });
     new CfnOutput(this, 'ApiUrl', { value: http.apiEndpoint });
     new CfnOutput(this, 'UserPoolId', { value: users.userPoolId });

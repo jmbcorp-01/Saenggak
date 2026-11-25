@@ -17,12 +17,19 @@ setup below is done.
    stored keys. It prints two values.
 3. **Add them in GitHub** under Settings > Secrets and variables > Actions >
    Variables: `AWS_DEPLOY_ROLE_ARN` and `AWS_REGION`.
-4. **Bedrock.** In the Bedrock console of that region, open the model catalog
-   and make sure Titan Text Embeddings v2 and Claude Haiku 5.5 can be used
-   (try them in the playground). Anthropic models ask for a short use-case
-   form the first time. To use another Claude model for the content filter,
-   set a `MODERATION_MODEL` variable in GitHub, such as
-   `anthropic.claude-sonnet-5-5`.
+4. **Claude for the content filter.** Two routes; pick one with the
+   `MODERATION_PROVIDER` variable in GitHub:
+   - `bedrock` (default): Claude on Amazon Bedrock. In the Bedrock console,
+     submit the Anthropic use-case form, then check that Claude Haiku 5.5
+     answers in the playground. Some new accounts are blocked from Anthropic
+     models until AWS support lifts it.
+   - `anthropic`: the Claude API. Create a key at console.anthropic.com,
+     then after the first deploy paste it as the value of the
+     `ClaudeApiKeySecret` secret (named in the deploy summary) in the AWS
+     Secrets Manager console. No redeploy is needed.
+
+   Titan Text Embeddings v2 on Bedrock is used either way and needs no form.
+   `MODERATION_MODEL` overrides the model id.
 5. **Run the deploy**: Actions > Deploy > Run workflow, or push to `main`.
    The first run takes about 20 minutes, mostly for the database and
    CloudFront. The job summary shows the web address and the API address.

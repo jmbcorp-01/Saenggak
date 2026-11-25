@@ -53,6 +53,7 @@ jobs:
         working-directory: backend
         env:
           CDK_DEFAULT_REGION: ${{ env.AWS_REGION }}
+          MODERATION_PROVIDER: ${{ vars.MODERATION_PROVIDER }}
           MODERATION_MODEL: ${{ vars.MODERATION_MODEL }}
         run: npx cdk deploy --require-approval never --outputs-file outputs.json
 
@@ -66,6 +67,7 @@ jobs:
               "",
               `- Web app: ${o.WebUrl}`,
               `- API: ${o.ApiUrl}`,
+              `- Claude API key secret (for MODERATION_PROVIDER=anthropic): ${o.ClaudeApiKeySecret}`,
               "",
               "Mobile builds:",
               "```",
