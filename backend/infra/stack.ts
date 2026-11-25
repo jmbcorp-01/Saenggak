@@ -70,6 +70,9 @@ export class SaenggakStack extends Stack {
       DB_CLUSTER_ARN: db.clusterArn,
       DB_SECRET_ARN: db.secret!.secretArn,
       DB_NAME: 'saenggak',
+      // The Claude model for the content filter. Set the MODERATION_MODEL
+      // variable in GitHub to change it without a code change.
+      MODERATION_MODEL: process.env.MODERATION_MODEL || 'anthropic.claude-haiku-5-5',
     };
     const fn = (name: string, timeout = 10) => {
       const f = new NodejsFunction(this, name, {

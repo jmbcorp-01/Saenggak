@@ -6,7 +6,8 @@ import { FilterUnavailableError, type ContentFilter, type ModerationReason, type
  * feelings and reflection; blocks profanity, sexual content, crime, spam and
  * text that is not a thought at all.
  */
-export const MODERATION_MODEL = process.env.MODERATION_MODEL ?? 'anthropic.claude-opus-5-5';
+// Haiku: a short classification on every write, so speed and cost matter most.
+export const MODERATION_MODEL = process.env.MODERATION_MODEL ?? 'anthropic.claude-haiku-5-5';
 
 const SYSTEM = `You review posts for Saenggak, an app where people share their own thoughts and feelings in 40 to 200 Korean characters or 15 to 70 English words.
 

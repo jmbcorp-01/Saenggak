@@ -53,6 +53,7 @@ jobs:
         working-directory: backend
         env:
           CDK_DEFAULT_REGION: ${{ env.AWS_REGION }}
+          MODERATION_MODEL: ${{ vars.MODERATION_MODEL }}
         run: npx cdk deploy --require-approval never --outputs-file outputs.json
 
       - name: Summary

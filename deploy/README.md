@@ -18,9 +18,11 @@ setup below is done.
 3. **Add them in GitHub** under Settings > Secrets and variables > Actions >
    Variables: `AWS_DEPLOY_ROLE_ARN` and `AWS_REGION`.
 4. **Bedrock.** In the Bedrock console of that region, open the model catalog
-   and make sure Titan Text Embeddings v2 and the Claude model in
-   `MODERATION_MODEL` can be used. Anthropic models ask for a short use-case
-   form the first time.
+   and make sure Titan Text Embeddings v2 and Claude Haiku 5.5 can be used
+   (try them in the playground). Anthropic models ask for a short use-case
+   form the first time. To use another Claude model for the content filter,
+   set a `MODERATION_MODEL` variable in GitHub, such as
+   `anthropic.claude-sonnet-5-5`.
 5. **Run the deploy**: Actions > Deploy > Run workflow, or push to `main`.
    The first run takes about 20 minutes, mostly for the database and
    CloudFront. The job summary shows the web address and the API address.
