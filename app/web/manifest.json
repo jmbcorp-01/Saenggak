@@ -1,11 +1,11 @@
 {
-    "name": "saenggak",
-    "short_name": "saenggak",
+    "name": "생각 Saenggak",
+    "short_name": "생각",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "Saenggak: a place for thoughts people typed themselves.",
+    "background_color": "#F3EFE9",
+    "theme_color": "#D2452C",
+    "description": "사람이 직접 쓴 생각만 있는 곳. A place for thoughts people typed themselves.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
