@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import '../core/typing_session.dart';
+import '../models/admin.dart';
 import '../models/post.dart';
 import '../models/profile.dart';
 import '../models/publish_outcome.dart';
@@ -85,6 +86,46 @@ class HttpBackend implements Backend {
     }
     return Profile.fromJson(j);
   }
+
+  @override
+  Future<void> signOut() => auth.signOut();
+
+  @override
+  Future<void> deleteAccount() async {
+    _ok(await _send('DELETE', 'me'));
+    await auth.signOut();
+  }
+
+  @override
+  Future<AdminStats> adminStats() async => AdminStats.fromJson(_ok(await _send('GET', 'admin/stats')));
+
+  @override
+  Future<List<ReviewItem>> reviewQueue() async => (_ok(await _send('GET', 'admin/review'))['items'] as List)
+      .cast<Map<String, dynamic>>()
+      .map(ReviewItem.fromJson)
+      .toList();
+
+  @override
+  Future<void> reviewPost(String postId, {required bool publish}) async =>
+      _ok(await _send('POST', 'admin/posts/$postId/review', body: {'decision': publish ? 'publish' : 'keep_blocked'}));
+
+  @override
+  Future<void> removePost(String postId, {String note = ''}) async =>
+      _ok(await _send('POST', 'admin/posts/$postId/remove', body: {'note': note}));
+
+  @override
+  Future<List<AdminUser>> searchUsers(String query) async =>
+      (_ok(await _send('GET', 'admin/users', query: {'q': query}))['items'] as List)
+          .cast<Map<String, dynamic>>()
+          .map(AdminUser.fromJson)
+          .toList();
+
+  @override
+  Future<void> setSuspended(String userId, {required bool suspended, String reason = ''}) async =>
+      _ok(await _send('PUT', 'admin/users/$userId/suspension', body: {'suspended': suspended, 'reason': reason}));
+
+  @override
+  Future<void> removePhoto(String userId) async => _ok(await _send('DELETE', 'admin/users/$userId/photo'));
 
   @override
   Future<Profile> user(String id) async => Profile.fromJson(_ok(await _send('GET', 'users/$id')));

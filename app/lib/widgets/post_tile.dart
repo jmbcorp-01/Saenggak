@@ -128,6 +128,7 @@ class PostTile extends StatefulWidget {
     this.onOpenAuthor,
     this.onEdit,
     this.onDelete,
+    this.onAdminRemove,
   });
 
   final Post post;
@@ -142,6 +143,9 @@ class PostTile extends StatefulWidget {
 
   /// Shown on the reader's own posts.
   final VoidCallback? onDelete;
+
+  /// Shown to admins on other people's posts.
+  final VoidCallback? onAdminRemove;
 
   @override
   State<PostTile> createState() => _PostTileState();
@@ -159,6 +163,7 @@ class _PostTileState extends State<PostTile> {
     final ago = timeAgo(post.createdAt, widget.now ?? DateTime.now());
     final canEdit = post.editable && widget.onEdit != null;
     final canDelete = post.isMine && widget.onDelete != null;
+    final canRemove = !post.isMine && widget.onAdminRemove != null;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
@@ -214,14 +219,23 @@ class _PostTileState extends State<PostTile> {
                         ),
                       ),
                     ),
-                    if (canEdit || canDelete)
+                    if (canEdit || canDelete || canRemove)
                       PopupMenuButton<String>(
                         key: ValueKey('menu-${post.id}'),
                         tooltip: '더보기',
                         iconSize: 18,
                         icon: const Icon(Icons.more_horiz, color: SgColors.muted),
-                        onSelected: (v) => v == 'edit' ? widget.onEdit!() : widget.onDelete!(),
+                        onSelected: (v) => switch (v) {
+                          'edit' => widget.onEdit!(),
+                          'delete' => widget.onDelete!(),
+                          _ => widget.onAdminRemove!(),
+                        },
                         itemBuilder: (_) => [
+                          if (canRemove)
+                            const PopupMenuItem(
+                              value: 'admin-remove',
+                              child: Text('관리자: 글 내리기', style: TextStyle(color: SgColors.accentText)),
+                            ),
                           if (canEdit) const PopupMenuItem(value: 'edit', child: Text('수정')),
                           if (canDelete)
                             const PopupMenuItem(

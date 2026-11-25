@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../api/backend.dart';
@@ -11,10 +12,23 @@ import '../models/publish_outcome.dart';
 /// The signed-in user's profile and the lists the screens show, kept in step
 /// with the server after each change.
 class AppState extends ChangeNotifier {
-  AppState({required this.backend, DateTime Function()? clock}) : clock = clock ?? DateTime.now;
+  AppState({required this.backend, DateTime Function()? clock, Future<String> Function()? deviceTimeZone})
+    : clock = clock ?? DateTime.now,
+      deviceTimeZone = deviceTimeZone ?? _deviceTimeZone;
 
   final Backend backend;
   final DateTime Function() clock;
+
+  /// The device's IANA time zone, used for a new profile's writing day.
+  final Future<String> Function() deviceTimeZone;
+
+  static Future<String> _deviceTimeZone() async {
+    try {
+      return (await FlutterTimezone.getLocalTimezone()).identifier;
+    } catch (_) {
+      return 'Asia/Seoul';
+    }
+  }
 
   Profile? me;
   List<Post> feed = const [];
@@ -129,20 +143,61 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// A new profile takes the device's language and time zone.
   Future<void> saveProfile({required String handle, required String displayName, String bio = ''}) async {
+    final current = me;
+    final deviceLang = WidgetsBinding.instance.platformDispatcher.locale.languageCode == 'ko' ? 'ko' : 'en';
     me = await backend.saveProfile(
       handle: handle,
       displayName: displayName,
       bio: bio,
-      locale: me?.locale ?? 'ko',
-      timeZone: me?.timeZone ?? 'Asia/Seoul',
+      locale: current?.locale ?? deviceLang,
+      timeZone: current?.timeZone ?? await deviceTimeZone(),
     );
     notifyListeners();
+  }
+
+  /// Changes the feed's language or the time zone that decides the writing day.
+  Future<void> saveSettings({String? locale, String? timeZone}) async {
+    final current = me!;
+    me = await backend.saveProfile(
+      handle: current.handle,
+      displayName: current.displayName,
+      bio: current.bio,
+      locale: locale ?? current.locale,
+      timeZone: timeZone ?? current.timeZone,
+    );
+    notifyListeners();
+    if (locale != null && locale != current.locale) await refresh();
+  }
+
+  /// Erases the account on the server and signs out.
+  Future<void> deleteAccount() async {
+    await backend.deleteAccount();
+    await signOut();
   }
 
   /// Throws [ApiException] with the reason when the server turns the photo down.
   Future<void> setPhoto(Uint8List jpeg) async {
     me = await backend.setPhoto(jpeg);
+    notifyListeners();
+  }
+
+  /// Admins only: takes someone's post out of every list.
+  Future<void> adminRemove(Post post, String note) async {
+    await backend.removePost(post.id, note: note);
+    feed = feed.where((p) => p.id != post.id).toList();
+    following = following.where((p) => p.id != post.id).toList();
+    notifyListeners();
+  }
+
+  /// Signs out and forgets everything shown, so the next person starts clean.
+  Future<void> signOut() async {
+    await backend.signOut();
+    me = null;
+    feed = following = mine = const [];
+    _feedNext = null;
+    error = null;
     notifyListeners();
   }
 

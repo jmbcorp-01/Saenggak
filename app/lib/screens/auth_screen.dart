@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../api/cognito_auth.dart';
 import '../theme/tokens.dart';
 import '../widgets/symbol_mark.dart';
+import 'reset_password_screen.dart';
 
 /// Email sign-up (with the emailed code) and sign-in.
 class AuthScreen extends StatefulWidget {
@@ -156,6 +157,18 @@ class _AuthScreenState extends State<AuthScreen> {
                 }),
                 style: TextButton.styleFrom(foregroundColor: SgColors.accentText),
                 child: Text(_signUp ? '이미 계정이 있어요' : '새 계정 만들기'),
+              ),
+            if (!_needsCode && !_signUp)
+              TextButton(
+                onPressed: _busy
+                    ? null
+                    : () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ResetPasswordScreen(auth: widget.auth, email: _email.text.trim()),
+                        ),
+                      ),
+                style: TextButton.styleFrom(foregroundColor: SgColors.muted),
+                child: const Text('비밀번호를 잊었어요'),
               ),
           ],
         ),

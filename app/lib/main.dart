@@ -4,6 +4,7 @@ import 'api/cognito_auth.dart';
 import 'api/config.dart';
 import 'api/demo_backend.dart';
 import 'api/http_backend.dart';
+import 'api/token_store.dart';
 import 'data/app_state.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_shell.dart';
@@ -18,23 +19,29 @@ Future<void> main() async {
     runApp(SaenggakApp(state: AppState(backend: DemoBackend())));
     return;
   }
-  final auth = CognitoAuth(config);
+  final auth = CognitoAuth(config, store: const SecureTokenStore());
+  // Someone who signed in before goes straight to their feed.
+  final resumed = await auth.restore();
   runApp(
     SaenggakApp(
       state: AppState(
         backend: HttpBackend(baseUrl: config.apiUrl, auth: auth),
       ),
       auth: auth,
+      resumed: resumed,
     ),
   );
 }
 
 /// Without [auth] the app runs on the demo backend and skips sign-in.
 class SaenggakApp extends StatelessWidget {
-  const SaenggakApp({super.key, required this.state, this.auth});
+  const SaenggakApp({super.key, required this.state, this.auth, this.resumed = false});
 
   final AppState state;
   final CognitoAuth? auth;
+
+  /// A saved session was restored, so the start screen is skipped.
+  final bool resumed;
 
   /// After sign-in: create the profile if this is a new account, then home.
   Future<void> _enter(NavigatorState nav) async {
@@ -78,14 +85,46 @@ class SaenggakApp extends StatelessWidget {
       title: '생각',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
-      initialRoute: '/',
+      initialRoute: resumed ? '/resume' : '/',
       routes: {
         '/': (context) => StartScreen(
           onSignUp: () => _openAuth(context, signUp: true),
           onSignIn: () => _openAuth(context, signUp: false),
         ),
         '/home': (_) => HomeShell(state: state),
+        '/resume': (context) => _Resume(
+          enter: () => _enter(Navigator.of(context)),
+          onFailed: () => Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false),
+        ),
       },
     );
   }
+}
+
+/// Loads a restored session's profile, then opens home (or profile setup).
+class _Resume extends StatefulWidget {
+  const _Resume({required this.enter, required this.onFailed});
+
+  final Future<void> Function() enter;
+  final VoidCallback onFailed;
+
+  @override
+  State<_Resume> createState() => _ResumeState();
+}
+
+class _ResumeState extends State<_Resume> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await widget.enter();
+      } catch (_) {
+        if (mounted) widget.onFailed();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator()));
 }

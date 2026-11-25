@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../data/app_state.dart';
 import '../models/post.dart';
+import '../screens/admin_screen.dart' show askNote;
 import '../screens/compose_screen.dart';
 import '../screens/profile_screen.dart';
 import '../theme/tokens.dart';
@@ -40,7 +41,21 @@ class ConnectedPostTile extends StatelessWidget {
         ),
       ),
       onDelete: () => confirmDelete(context, state, post),
+      onAdminRemove: (state.me?.isAdmin ?? false) ? () => _adminRemove(context) : null,
     );
+  }
+
+  Future<void> _adminRemove(BuildContext context) async {
+    final note = await askNote(context, title: '이 글을 내릴까요?', action: '내리기');
+    if (note == null || !context.mounted) return;
+    try {
+      await state.adminRemove(post, note);
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('글을 내렸어요.')));
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('글을 내리지 못했어요.')));
+      }
+    }
   }
 }
 

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import '../core/typing_session.dart';
+import '../models/admin.dart';
 import '../models/post.dart';
 import '../models/profile.dart';
 import '../models/publish_outcome.dart';
@@ -32,6 +33,7 @@ class DemoBackend implements Backend {
     bio: '조용한 날에 생각을 씁니다.',
     writingDays: 7,
     isMe: true,
+    isAdmin: true,
   );
 
   @override
@@ -58,6 +60,7 @@ class DemoBackend implements Backend {
       writingDays: _me.writingDays,
       followUnlocked: _me.followUnlocked,
       isMe: true,
+      isAdmin: _me.isAdmin,
       photoUrl: _me.photoUrl,
     );
     return _me;
@@ -79,10 +82,69 @@ class DemoBackend implements Backend {
       writingDays: _me.writingDays,
       followUnlocked: _me.followUnlocked,
       isMe: true,
+      isAdmin: _me.isAdmin,
       photoUrl: 'data:image/jpeg;base64,${base64Encode(jpeg)}',
     );
     return _me;
   }
+
+  @override
+  Future<void> signOut() async {}
+
+  @override
+  Future<void> deleteAccount() async {
+    _posts.removeWhere((p) => p.authorId == _me.id);
+  }
+
+  // The demo's sample person is an admin, so the admin pages can be tried offline.
+  final Set<String> _suspended = {};
+  final List<ReviewItem> _queue = [];
+
+  @override
+  Future<AdminStats> adminStats() async => AdminStats(
+    users: {..._posts.map((p) => p.authorId), _me.id}.length,
+    usersToday: 1,
+    posts: _posts.length,
+    postsToday: _posts.where((p) => _clock().difference(p.createdAt).inDays < 1).length,
+    pendingReview: _queue.length,
+    suspended: _suspended.length,
+  );
+
+  @override
+  Future<List<ReviewItem>> reviewQueue() async => List.of(_queue);
+
+  /// Adds a held post to the demo's review queue.
+  void hold(ReviewItem item) => _queue.add(item);
+
+  @override
+  Future<void> reviewPost(String postId, {required bool publish}) async => _queue.removeWhere((q) => q.id == postId);
+
+  @override
+  Future<void> removePost(String postId, {String note = ''}) async => _posts.removeWhere((p) => p.id == postId);
+
+  @override
+  Future<List<AdminUser>> searchUsers(String query) async {
+    final q = query.toLowerCase();
+    final seen = <String>{};
+    return [
+      for (final p in _posts)
+        if (seen.add(p.authorId) && (q.isEmpty || p.authorHandle.contains(q) || p.authorName.toLowerCase().contains(q)))
+          AdminUser(
+            id: p.authorId,
+            handle: p.authorHandle,
+            displayName: p.authorName,
+            posts: _posts.where((x) => x.authorId == p.authorId).length,
+            suspended: _suspended.contains(p.authorId),
+          ),
+    ];
+  }
+
+  @override
+  Future<void> setSuspended(String userId, {required bool suspended, String reason = ''}) async =>
+      suspended ? _suspended.add(userId) : _suspended.remove(userId);
+
+  @override
+  Future<void> removePhoto(String userId) async {}
 
   @override
   Future<Profile> user(String id) async {

@@ -10,6 +10,7 @@ import '../widgets/post_tile.dart';
 import '../widgets/symbol_mark.dart';
 import 'photo_capture_screen.dart';
 import 'profile_setup_screen.dart';
+import 'settings_screen.dart';
 
 /// A writer's profile: photo, counts, follow progress or button, and posts.
 /// Without [userId] (or with the reader's own id) it is the reader's own.
@@ -147,6 +148,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           constraints: const BoxConstraints.tightFor(width: 44, height: 44),
                           padding: EdgeInsets.zero,
                         ),
+                      ),
+                    ),
+                  if (_isMe)
+                    Positioned(
+                      right: 4,
+                      top: 4,
+                      child: IconButton(
+                        tooltip: '설정',
+                        icon: const Icon(Icons.settings_outlined, color: SgColors.ink),
+                        onPressed: () =>
+                            Navigator.of(context)
+                                .push(MaterialPageRoute<void>(builder: (_) => SettingsScreen(state: widget.state))),
                       ),
                     ),
                   Positioned(

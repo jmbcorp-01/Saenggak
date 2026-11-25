@@ -34,6 +34,21 @@ setup below is done.
    The first run takes about 20 minutes, mostly for the database and
    CloudFront. The job summary shows the web address and the API address.
 
+## Admins
+
+The admin pages (Settings > 관리자 페이지 in the app) are open to people in
+the Cognito `admins` group, which the stack creates. To add someone, run this
+in AWS CloudShell with the `UserPoolId` from the deploy summary and the email
+they signed up with:
+
+```sh
+aws cognito-idp admin-add-user-to-group --user-pool-id <UserPoolId> \
+  --username <email> --group-name admins
+```
+
+They then sign out and in again, so their sign-in carries the group. Every
+admin action is recorded in the `admin_actions` table.
+
 ## What a deploy does
 
 - Builds the Flutter web app and uploads it behind CloudFront, with a

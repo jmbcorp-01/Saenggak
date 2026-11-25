@@ -10,6 +10,8 @@ TypeScript Lambdas behind an HTTP API, deployed with CDK.
 | `GET /feed?tab=all\|following&author=&lang=ko\|en&before=` | Newest posts, with a cached Amazon Translate translation for posts in the other language. |
 | `POST /posts/{id}/empathy` | Toggles 공감. Not allowed on your own post. |
 | `GET /me`, `PUT /me` | Your profile with writing days and follow status. `PUT` creates it after sign-up (handle, name, bio, language, time zone); a changed name or bio goes through the content filter. |
+| `DELETE /me` | Erases the account: posts, 공감 given and received, follows, phrases, logs, the photo file and the Cognito account. Safe to repeat. |
+| `/admin/*` | Admin pages, for the Cognito `admins` group only: stats, the review queue of held posts (publish or keep blocked), removing posts and photos, searching people and suspending them. Suspended people can read but not write, and their posts leave the feed. |
 | `PUT /me/photo` | `{ jpeg: base64 }`, a square JPEG of at most 2 MB taken with the app's camera. Amazon Rekognition must find exactly one clear, frontal face and no explicit or violent content; otherwise `422 { error: 'photo_refused', problem }` with `no_face`, `many_faces`, `unclear` or `inappropriate`. Counts toward the hourly write limit. |
 | `GET /users/{id}` | Someone's profile, with whether you follow them. |
 | `PUT /users/{id}/follow`, `DELETE /users/{id}/follow` | Follow and unfollow. Both people need follow permission. |
