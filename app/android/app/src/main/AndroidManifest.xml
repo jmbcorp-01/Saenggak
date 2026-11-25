@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Release builds need these; debug builds get INTERNET from the debug manifest. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
-        android:label="saenggak"
+        android:label="생각"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

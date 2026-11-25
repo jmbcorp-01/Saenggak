@@ -1,0 +1,125 @@
+name: Mobile builds
+
+# Builds the iOS and Android apps with the production server settings in
+# app/config/production.json, and uploads them to TestFlight and the Play
+# Console's internal testing track when the store secrets are set.
+# Run it from Actions > Mobile builds > Run workflow. See deploy/STORES.md.
+on:
+  workflow_dispatch:
+    inputs:
+      make_android_key:
+        description: 'Only create a new Android upload key (first time only)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile
+  cancel-in-progress: false
+
+jobs:
+  android-key:
+    if: inputs.make_android_key
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create the upload key
+        run: |
+          PASSWORD=$(openssl rand -base64 24 | tr -d '/+=')
+          keytool -genkeypair -v -keystore upload.jks -storetype JKS -keyalg RSA -keysize 4096 -validity 10000 \
+            -alias upload -storepass "$PASSWORD" -keypass "$PASSWORD" \
+            -dname "CN=JMB Corporation, O=JMB Corporation, C=KR"
+          mkdir out
+          base64 -w0 upload.jks > out/ANDROID_KEYSTORE_BASE64.txt
+          printf '%s' "$PASSWORD" > out/ANDROID_KEYSTORE_PASSWORD.txt
+      # Download it once, put both values in the repository secrets, then delete the artifact.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-upload-key-DELETE-AFTER-SAVING
+          path: out/
+          retention-days: 1
+
+  android:
+    if: ${{ !inputs.make_android_key }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    env:
+      HAS_PLAY_KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.50.1
+          channel: stable
+          cache: true
+      - name: Signing key
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE" ]; then echo "::warning::ANDROID_KEYSTORE_BASE64 is not set; the bundle is signed with a debug key and cannot go to Play."; exit 0; fi
+          echo "$KEYSTORE" | base64 -d > android/upload.jks
+          printf 'storeFile=../upload.jks\nstorePassword=%s\nkeyAlias=upload\nkeyPassword=%s\n' "$PASSWORD" "$PASSWORD" > android/key.properties
+      - run: flutter pub get
+      - name: Build the app bundle
+        run: >-
+          flutter build appbundle --release
+          --dart-define-from-file=config/production.json
+          --build-number=${{ github.run_number }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-app-bundle
+          path: app/build/app/outputs/bundle/release/app-release.aab
+      - name: Upload to Play (internal testing)
+        if: env.HAS_PLAY_KEY == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: app.saenggak
+          releaseFiles: app/build/app/outputs/bundle/release/app-release.aab
+          track: internal
+          status: draft
+
+  ios:
+    if: ${{ !inputs.make_android_key }}
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: app
+    env:
+      TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+      ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.50.1
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Build without signing
+        run: >-
+          flutter build ios --release --no-codesign
+          --dart-define-from-file=config/production.json
+          --build-number=${{ github.run_number }}
+      - name: Sign and upload to TestFlight
+        if: env.ASC_KEY_ID != '' && env.TEAM_ID != ''
+        env:
+          ASC_KEY: ${{ secrets.APP_STORE_CONNECT_KEY }}
+        run: |
+          KEY="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
+          printf '%s' "$ASC_KEY" > "$KEY"
+          AUTH="-allowProvisioningUpdates -authenticationKeyPath $KEY -authenticationKeyID $ASC_KEY_ID -authenticationKeyIssuerID $ASC_ISSUER_ID"
+          xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Release \
+            -archivePath build/Runner.xcarchive -destination 'generic/platform=iOS' \
+            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic $AUTH archive
+          xcodebuild -exportArchive -archivePath build/Runner.xcarchive \
+            -exportOptionsPlist ios/ExportOptions.plist -exportPath build/ipa $AUTH
