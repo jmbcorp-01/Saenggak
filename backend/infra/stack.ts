@@ -28,7 +28,7 @@ const webBuild = path.join(here, '..', '..', 'app', 'build', 'web');
 /**
  * Everything the MVP needs: sign-in (Cognito), the database (Aurora
  * Serverless v2 PostgreSQL with pgvector, reached through the Data API so the
- * Lambdas need no VPC), two Lambdas behind an HTTP API with a JWT check.
+ * Lambdas need no VPC), three Lambdas (write, api, admin) behind an HTTP API with a JWT check.
  */
 export class SaenggakStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
@@ -46,6 +46,13 @@ export class SaenggakStack extends Stack {
     const appClient = users.addClient('App', {
       authFlows: { userSrp: true, userPassword: true },
       preventUserExistenceErrors: true,
+    });
+    // People in this group can use the admin pages. Add someone with
+    // aws cognito-idp admin-add-user-to-group (see deploy/README.md).
+    new cognito.CfnUserPoolGroup(this, 'Admins', {
+      userPoolId: users.userPoolId,
+      groupName: 'admins',
+      description: 'Saenggak admins: review held posts, suspend people, remove posts and photos',
     });
 
     // Database in isolated subnets; nothing in it is reachable from the internet.
@@ -118,6 +125,7 @@ export class SaenggakStack extends Stack {
     // Writing waits on moderation and embedding, so it gets a longer timeout.
     const write = fn('write', 30);
     const api = fn('api', 15);
+    const admin = fn('admin', 15);
 
     write.addToRolePolicy(
       new iam.PolicyStatement({
@@ -156,6 +164,7 @@ export class SaenggakStack extends Stack {
     const M = apigw.HttpMethod;
     const writeIntegration = new HttpLambdaIntegration('Write', write);
     const apiIntegration = new HttpLambdaIntegration('ApiFn', api);
+    const adminIntegration = new HttpLambdaIntegration('AdminFn', admin);
     const routes: [string, apigw.HttpMethod, HttpLambdaIntegration][] = [
       ['/posts', M.POST, writeIntegration],
       ['/posts/{id}', M.PATCH, writeIntegration],
@@ -164,10 +173,19 @@ export class SaenggakStack extends Stack {
       ['/feed', M.GET, apiIntegration],
       ['/me', M.GET, apiIntegration],
       ['/me', M.PUT, writeIntegration],
+      ['/me', M.DELETE, apiIntegration],
       ['/me/photo', M.PUT, writeIntegration],
       ['/users/{id}', M.GET, apiIntegration],
       ['/users/{id}/follow', M.PUT, apiIntegration],
       ['/users/{id}/follow', M.DELETE, apiIntegration],
+      // Admin pages. The admin function refuses anyone outside the admins group.
+      ['/admin/stats', M.GET, adminIntegration],
+      ['/admin/review', M.GET, adminIntegration],
+      ['/admin/posts/{id}/review', M.POST, adminIntegration],
+      ['/admin/posts/{id}/remove', M.POST, adminIntegration],
+      ['/admin/users', M.GET, adminIntegration],
+      ['/admin/users/{id}/suspension', M.PUT, adminIntegration],
+      ['/admin/users/{id}/photo', M.DELETE, adminIntegration],
     ];
     for (const [path, method, integration] of routes) http.addRoutes({ path, methods: [method], integration });
 
@@ -208,14 +226,19 @@ export class SaenggakStack extends Stack {
     });
     photos.grantPut(write);
     photos.grantDelete(write);
+    photos.grantDelete(admin);
+    photos.grantDelete(api);
+    // Account deletion removes the sign-in account as well.
+    api.addToRolePolicy(new iam.PolicyStatement({ actions: ['cognito-idp:AdminDeleteUser'], resources: [users.userPoolArn] }));
+    api.addEnvironment('USER_POOL_ID', users.userPoolId);
     write.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['rekognition:DetectFaces', 'rekognition:DetectModerationLabels'],
         resources: ['*'],
       }),
     );
-    write.addEnvironment('PHOTO_BUCKET', photos.bucketName);
-    for (const f of [write, api]) f.addEnvironment('PHOTO_BASE_URL', `https://${cdn.distributionDomainName}`);
+    for (const f of [write, api, admin]) f.addEnvironment('PHOTO_BUCKET', photos.bucketName);
+    for (const f of [write, api, admin]) f.addEnvironment('PHOTO_BASE_URL', `https://${cdn.distributionDomainName}`);
 
     const config = {
       apiUrl: http.apiEndpoint,

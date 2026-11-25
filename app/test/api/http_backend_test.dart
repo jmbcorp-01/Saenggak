@@ -8,6 +8,7 @@ import 'package:saenggak/api/backend.dart';
 import 'package:saenggak/api/cognito_auth.dart';
 import 'package:saenggak/api/config.dart';
 import 'package:saenggak/api/http_backend.dart';
+import 'package:saenggak/api/token_store.dart';
 import 'package:saenggak/core/typing_session.dart';
 import 'package:saenggak/models/publish_outcome.dart';
 
@@ -62,6 +63,45 @@ void main() {
 
   test('signs in and reads the user id from the token', () {
     expect(backend.myId, 'user-1');
+  });
+
+  test('keeps the refresh token so the next launch is still signed in, until sign-out', () async {
+    final store = MemoryTokenStore();
+    final client = MockClient((req) async => cognito.handle(req));
+    final first = CognitoAuth(config, client: client, store: store);
+    await first.signIn('a@b.c', 'secret-password');
+    expect(store.token, 'r');
+
+    final next = CognitoAuth(config, client: client, store: store);
+    expect(await next.restore(), isTrue);
+    expect(next.userId, 'user-1');
+
+    await next.signOut();
+    expect(store.token, isNull);
+    expect(next.signedIn, isFalse);
+    expect(await CognitoAuth(config, client: client, store: store).restore(), isFalse);
+  });
+
+  test('a refresh token Cognito no longer accepts is forgotten', () async {
+    final store = MemoryTokenStore()..token = 'revoked';
+    final client = MockClient(
+      (req) async => http.Response(jsonEncode({'__type': 'NotAuthorizedException', 'message': 'x'}), 400),
+    );
+    expect(await CognitoAuth(config, client: client, store: store).restore(), isFalse);
+    expect(store.token, isNull);
+  });
+
+  test('resets a password with the emailed code', () async {
+    final calls = <String>[];
+    final client = MockClient((req) async {
+      calls.add('${req.headers['x-amz-target']!.split('.').last} ${req.body}');
+      return http.Response('{}', 200);
+    });
+    final auth = CognitoAuth(config, client: client);
+    await auth.forgotPassword('a@b.c');
+    await auth.resetPassword('a@b.c', '123456', 'NewPassword1');
+    expect(calls[0], startsWith('ForgotPassword'));
+    expect(calls[1], contains('"ConfirmationCode":"123456"'));
   });
 
   test('maps Cognito errors to messages', () async {

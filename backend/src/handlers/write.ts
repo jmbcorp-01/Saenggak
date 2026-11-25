@@ -23,6 +23,8 @@ export type WriteDeps = PublishDeps & PhotoDeps;
 
 export const writeHandler = (deps: WriteDeps) =>
   safely(async (event: Event) => {
+    // Suspended people keep reading but cannot post, edit or change their profile.
+    if (await deps.repo.isSuspended(userId(event))) return json(403, { error: 'suspended' });
     if (event.routeKey === 'PUT /me') return saveProfile(deps, event);
     if (event.routeKey === 'PUT /me/photo') return putPhoto(deps, event);
 

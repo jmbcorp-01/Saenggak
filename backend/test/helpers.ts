@@ -44,6 +44,20 @@ export class MemoryRepo implements Repository {
   requireProfile = false;
   writes = new Map<string, number>();
   photos = new Map<string, string>();
+  suspended = new Set<string>();
+
+  async deleteAccount(userId: string) {
+    if (!this.users.has(userId)) return false as const;
+    const photoKey = this.photos.get(userId) ?? null;
+    this.users.delete(userId);
+    this.photos.delete(userId);
+    this.posts = this.posts.filter((p) => p.authorId !== userId);
+    return { photoKey };
+  }
+
+  async isSuspended(userId: string) {
+    return this.suspended.has(userId);
+  }
 
   async setPhoto(userId: string, key: string) {
     if (!this.users.has(userId)) return null;

@@ -1,14 +1,16 @@
 import { isLang, translateFeed } from '../posts/feed.js';
 import { deletePost } from '../posts/publish.js';
 import { DAYS_TO_FOLLOW } from '../rules/follow.js';
-import type { Repository, Translator } from '../services/ports.js';
+import type { PhotoStore, Repository, Translator, UserDirectory } from '../services/ports.js';
 import { AuroraRepository } from '../services/repository.js';
-import { photoUrl } from '../services/photos.js';
+import { photoUrl, S3PhotoStore } from '../services/photos.js';
+import { CognitoUserDirectory } from '../services/users.js';
 import { AwsTranslator } from '../services/translator.js';
+import { isAdmin } from './admin.js';
 import { isUuid, json, safely, userId, type Event } from './http.js';
 
 const PAGE_SIZE = 30;
-type Deps = { repo: Repository; translator: Translator };
+type Deps = { repo: Repository; translator: Translator; photoStore: PhotoStore; users: UserDirectory };
 
 /**
  * Everything except writing posts:
@@ -16,6 +18,7 @@ type Deps = { repo: Repository; translator: Translator };
  *   POST   /posts/{id}/empathy
  *   DELETE /posts/{id}
  *   GET    /me
+ *   DELETE /me                  erases the account and everything in it
  *   GET    /users/{id}
  *   PUT    /users/{id}/follow    DELETE /users/{id}/follow
  */
@@ -55,7 +58,23 @@ export const apiHandler = (deps: Deps) => safely(async (event: Event) => {
       if (!isUuid(target)) return json(400, { error: 'bad_request' });
       const profile = await repo.profile(target, me);
       if (!profile) return json(404, { error: 'not_found' });
-      return json(200, { ...profile, photoUrl: photoUrl(profile.photoKey), daysToFollow: DAYS_TO_FOLLOW, isMe: target === me });
+      return json(200, {
+        ...profile,
+        photoUrl: photoUrl(profile.photoKey),
+        daysToFollow: DAYS_TO_FOLLOW,
+        isMe: target === me,
+        // Only the reader learns this about themselves; it shows the admin pages' entry.
+        ...(target === me ? { isAdmin: isAdmin(event) } : {}),
+      });
+    }
+
+    case 'DELETE /me': {
+      // Data first, then the photo, then the sign-in account. If a later step
+      // fails, asking again finishes it: each step is safe to repeat.
+      const gone = await repo.deleteAccount(me);
+      if (gone && gone.photoKey) await deps.photoStore.remove(gone.photoKey);
+      await deps.users.deleteUser(me);
+      return json(204, null);
     }
 
     case 'PUT /users/{id}/follow': {
@@ -77,4 +96,11 @@ export const apiHandler = (deps: Deps) => safely(async (event: Event) => {
 
 let live: Deps | undefined;
 export const handler = (event: Event) =>
-  apiHandler((live ??= { repo: new AuroraRepository(), translator: new AwsTranslator() }))(event);
+  apiHandler(
+    (live ??= {
+      repo: new AuroraRepository(),
+      translator: new AwsTranslator(),
+      photoStore: new S3PhotoStore(),
+      users: new CognitoUserDirectory(),
+    }),
+  )(event);

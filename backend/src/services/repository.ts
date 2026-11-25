@@ -44,7 +44,7 @@ export class AuroraRepository implements Repository {
     private readonly client = new RDSDataClient({}),
   ) {}
 
-  private async query(sql: string, params: Record<string, Param> = {}): Promise<Record<string, unknown>[]> {
+  protected async query(sql: string, params: Record<string, Param> = {}): Promise<Record<string, unknown>[]> {
     const out = await this.client.send(
       new ExecuteStatementCommand({
         resourceArn: this.resourceArn,
@@ -223,7 +223,7 @@ export class AuroraRepository implements Repository {
               (SELECT count(*) FROM empathies e WHERE e.post_id = p.id) AS empathy_count,
               EXISTS (SELECT 1 FROM empathies e WHERE e.post_id = p.id AND e.user_id = :v::uuid) AS mine
        FROM posts p JOIN users u ON u.id = p.author_id
-       WHERE p.status = 'published'
+       WHERE p.status = 'published' AND u.suspended_at IS NULL
          AND (CAST(:before AS text) IS NULL OR p.created_at < CAST(:before AS timestamptz))
          AND (NOT :following OR EXISTS (
                SELECT 1 FROM follows f
@@ -317,6 +317,32 @@ export class AuroraRepository implements Repository {
       { p: postId, a: authorId },
     );
     return rows.length > 0;
+  }
+
+  async deleteAccount(userId: string): Promise<{ photoKey: string | null } | false> {
+    // One statement: foreign keys are checked at its end, after every row is gone.
+    const rows = await this.query(
+      `WITH me AS (SELECT id, photo_key FROM users WHERE id = :u::uuid FOR UPDATE),
+       mine AS (SELECT id FROM posts WHERE author_id IN (SELECT id FROM me)),
+       e AS (DELETE FROM empathies WHERE user_id IN (SELECT id FROM me) OR post_id IN (SELECT id FROM mine)),
+       f AS (DELETE FROM follows WHERE follower_id IN (SELECT id FROM me) OR followee_id IN (SELECT id FROM me)),
+       ph AS (DELETE FROM phrase_firsts WHERE author_id IN (SELECT id FROM me)),
+       t AS (DELETE FROM translations WHERE post_id IN (SELECT id FROM mine)),
+       s AS (DELETE FROM typing_sessions WHERE post_id IN (SELECT id FROM mine)),
+       l AS (DELETE FROM follow_losses WHERE author_id IN (SELECT id FROM me)),
+       w AS (DELETE FROM write_log WHERE author_id IN (SELECT id FROM me)),
+       p AS (DELETE FROM posts WHERE id IN (SELECT id FROM mine)),
+       u AS (DELETE FROM users WHERE id IN (SELECT id FROM me))
+       SELECT photo_key FROM me`,
+      { u: userId },
+    );
+    if (rows.length === 0) return false;
+    return { photoKey: (rows[0]!.photo_key as string | null) ?? null };
+  }
+
+  async isSuspended(userId: string): Promise<boolean> {
+    const rows = await this.query(`SELECT suspended_at IS NOT NULL AS s FROM users WHERE id = :u::uuid`, { u: userId });
+    return Boolean(rows[0]?.s);
   }
 
   async setPhoto(userId: string, photoKey: string): Promise<{ previous: string | null } | null> {

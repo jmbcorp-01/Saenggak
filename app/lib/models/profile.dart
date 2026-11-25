@@ -17,6 +17,7 @@ class Profile {
     this.followedByMe = false,
     this.isMe = false,
     this.photoUrl,
+    this.isAdmin = false,
   });
 
   factory Profile.fromJson(Map<String, dynamic> j) => Profile(
@@ -34,6 +35,7 @@ class Profile {
     followedByMe: j['followedByMe'] as bool? ?? false,
     isMe: j['isMe'] as bool? ?? false,
     photoUrl: j['photoUrl'] as String?,
+    isAdmin: j['isAdmin'] as bool? ?? false,
   );
 
   final String id;
@@ -52,6 +54,9 @@ class Profile {
 
   /// The profile photo, taken with the camera. Null until one is set.
   final String? photoUrl;
+
+  /// Only ever true on the reader's own profile, for the admin pages' entry.
+  final bool isAdmin;
 
   int get avatarColor => avatarPalette[id.hashCode.abs() % avatarPalette.length];
 
@@ -72,5 +77,6 @@ class Profile {
     followedByMe: followedByMe ?? this.followedByMe,
     isMe: isMe,
     photoUrl: photoUrl,
+    isAdmin: isAdmin,
   );
 }

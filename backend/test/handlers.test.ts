@@ -31,6 +31,12 @@ const edit = (from: string, to: string) => JSON.stringify({ text: to, session: e
 /** A JPEG header followed by a marker the fake checker reads. */
 const jpeg = (marker: string) => Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.from(marker)]).toString('base64');
 
+/** Photo and account stores for tests that do not touch them. */
+const noStores = {
+  photoStore: { put: async () => {}, remove: async () => {} },
+  users: { deleteUser: async () => {} },
+};
+
 function setup() {
   const repo = new MemoryRepo();
   const stored = new Set<string>();
@@ -52,8 +58,14 @@ function setup() {
     },
     embedder: { embed: async () => [0.1] },
   });
-  const api = apiHandler({ repo, translator: { translate: async (t: string) => `번역: ${t}` } });
-  return { repo, write, api, stored };
+  const deletedUsers: string[] = [];
+  const api = apiHandler({
+    repo,
+    translator: { translate: async (t: string) => `번역: ${t}` },
+    photoStore: { put: async () => {}, remove: async (key: string) => void stored.delete(key) },
+    users: { deleteUser: async (id: string) => void deletedUsers.push(id) },
+  });
+  return { repo, write, api, stored, deletedUsers };
 }
 
 describe('POST /posts', () => {
@@ -91,7 +103,7 @@ describe('errors', () => {
     repo.feed = async () => {
       throw new Error('db password is hunter2');
     };
-    const api = apiHandler({ repo, translator: { translate: async (t: string) => t } });
+    const api = apiHandler({ repo, translator: { translate: async (t: string) => t }, ...noStores });
     const quiet = console.error;
     console.error = () => {};
     try {
@@ -248,7 +260,7 @@ describe('GET /feed', () => {
     const { repo } = setup();
     repo.feedPosts = [item('p1', 'en'), item('p2', 'ko')];
     let calls = 0;
-    const api = apiHandler({ repo, translator: { translate: async (t: string) => (calls++, `번역: ${t}`) } });
+    const api = apiHandler({ repo, translator: { translate: async (t: string) => (calls++, `번역: ${t}`) }, ...noStores });
     const run = async () => parse(await api(event('GET /feed', { queryStringParameters: { lang: 'ko' } })));
     const r = await run();
     expect(r.body.items[0].translation).toEqual({ lang: 'ko', body: '번역: body p1' });
@@ -260,7 +272,7 @@ describe('GET /feed', () => {
   it('shows the original when translation fails', async () => {
     const { repo } = setup();
     repo.feedPosts = [item('p1', 'en')];
-    const api = apiHandler({ repo, translator: { translate: async () => { throw new Error('down'); } } });
+    const api = apiHandler({ repo, translator: { translate: async () => { throw new Error('down'); } }, ...noStores });
     const r = parse(await api(event('GET /feed', { queryStringParameters: { lang: 'ko' } })));
     expect(r.body.items[0].translation).toBeNull();
   });
@@ -280,5 +292,33 @@ describe('POST /posts/{id}/empathy', () => {
     expect(parse(await toggle()).body).toEqual({ empathized: false, count: 0 });
     expect(parse(await toggle(U2)).status).toBe(404);
     expect(parse(await toggle(U1, 'bad')).status).toBe(400);
+  });
+});
+
+describe('suspended people', () => {
+  it('cannot write, and GET /me says whether the reader is an admin', async () => {
+    const { repo, write, api } = setup();
+    repo.users.set(U1, { handle: 'one', displayName: 'One', bio: '', locale: 'ko', timeZone: 'Asia/Seoul' });
+    repo.suspended.add(U1);
+    const r = parse(await write(event('POST /posts', { body: post(TEXT) })));
+    expect(r).toEqual({ status: 403, body: { error: 'suspended' } });
+    expect(parse(await api(event('GET /me'))).body.isAdmin).toBe(false);
+    expect(parse(await api(event('GET /users/{id}', { pathParameters: { id: U1 }, sub: U2 }))).body.isAdmin).toBeUndefined();
+  });
+});
+
+describe('DELETE /me', () => {
+  it('erases the profile, the photo file and the sign-in account', async () => {
+    const { repo, write, api, stored, deletedUsers } = setup();
+    repo.users.set(U1, { handle: 'one', displayName: 'One', bio: '', locale: 'ko', timeZone: 'Asia/Seoul' });
+    expect(parse(await write(event('PUT /me/photo', { body: JSON.stringify({ jpeg: jpeg('face') }) }))).status).toBe(200);
+    expect(stored.size).toBe(1);
+
+    expect(parse(await api(event('DELETE /me'))).status).toBe(204);
+    expect(repo.users.has(U1)).toBe(false);
+    expect(stored.size).toBe(0);
+    expect(deletedUsers).toEqual([U1]);
+    // Asking again still succeeds, so a half-finished deletion can be completed.
+    expect(parse(await api(event('DELETE /me'))).status).toBe(204);
   });
 });

@@ -44,6 +44,11 @@ export interface PhotoStore {
   remove(key: string): Promise<void>;
 }
 
+/** The sign-in accounts (Cognito). */
+export interface UserDirectory {
+  deleteUser(userId: string): Promise<void>;
+}
+
 export interface Embedder {
   embed(text: string): Promise<number[]>;
 }
@@ -173,6 +178,16 @@ export interface Repository {
   /** Removes a published post with its 공감, translations and phrases. */
   deletePost(postId: string, authorId: string): Promise<boolean>;
 
+  /**
+   * Erases the person and everything they made: posts, 공감 given and
+   * received, follows, phrases and logs. Returns their photo key so the file
+   * can be removed too, or false if there was no such person.
+   */
+  deleteAccount(userId: string): Promise<{ photoKey: string | null } | false>;
+
+  /** Suspended people can read but not write. */
+  isSuspended(userId: string): Promise<boolean>;
+
   /** Sets the profile photo and returns the key of the one it replaced. */
   setPhoto(userId: string, photoKey: string): Promise<{ previous: string | null } | null>;
 
@@ -186,4 +201,59 @@ export interface Repository {
 
   cachedTranslation(postId: string, lang: string): Promise<string | null>;
   saveTranslation(postId: string, lang: string, body: string): Promise<void>;
+}
+
+export interface AdminStats {
+  users: number;
+  usersToday: number;
+  posts: number;
+  postsToday: number;
+  /** Blocked posts no admin has looked at yet. */
+  pendingReview: number;
+  suspended: number;
+}
+
+export interface ReviewItem {
+  id: string;
+  authorId: string;
+  authorHandle: string;
+  authorName: string;
+  body: string;
+  blockedReason: string | null;
+  /** What the typing check noticed, if anything. */
+  issues: string[];
+  typingMs: number;
+  createdAt: string;
+}
+
+export interface AdminUser {
+  id: string;
+  handle: string;
+  displayName: string;
+  bio: string;
+  photoKey: string | null;
+  createdAt: string;
+  posts: number;
+  /** Blocked posts in the last 30 days. */
+  recentBlocks: number;
+  suspendedAt: string | null;
+  suspendedReason: string | null;
+}
+
+export type ReviewDecision = 'publish' | 'keep_blocked';
+
+/** What the admin pages read and change. Every change is logged with the admin's id. */
+export interface AdminRepository {
+  stats(): Promise<AdminStats>;
+  /** Blocked posts not yet reviewed, newest first. */
+  reviewQueue(limit: number, before?: string): Promise<ReviewItem[]>;
+  /** False if the post is not a blocked post awaiting review. */
+  reviewPost(postId: string, adminId: string, decision: ReviewDecision): Promise<boolean>;
+  /** Takes a published post down. False if there is no such post. */
+  removePost(postId: string, adminId: string, note: string): Promise<boolean>;
+  /** Matches handle or name; empty [query] lists the newest people. */
+  searchUsers(query: string, limit: number): Promise<AdminUser[]>;
+  setSuspended(userId: string, adminId: string, suspended: boolean, reason: string): Promise<boolean>;
+  /** Clears the profile photo and returns its key, or false if there is no such user. */
+  removePhoto(userId: string, adminId: string): Promise<{ previous: string | null } | false>;
 }

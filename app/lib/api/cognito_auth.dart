@@ -3,15 +3,18 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'config.dart';
+import 'token_store.dart';
 
 /// Email sign-up and sign-in with Amazon Cognito, called directly over HTTPS.
 /// These Cognito operations are public, so no AWS signing is needed.
 class CognitoAuth {
-  CognitoAuth(this.config, {http.Client? client, DateTime Function()? clock})
+  CognitoAuth(this.config, {http.Client? client, DateTime Function()? clock, TokenStore? store})
     : _client = client ?? http.Client(),
-      _clock = clock ?? DateTime.now;
+      _clock = clock ?? DateTime.now,
+      _store = store ?? MemoryTokenStore();
 
   final ApiConfig config;
+  final TokenStore _store;
   final http.Client _client;
   final DateTime Function() _clock;
 
@@ -65,10 +68,53 @@ class CognitoAuth {
     _take(out);
   }
 
-  void signOut() {
+  /// Signs in again with the refresh token saved last time, so people stay
+  /// signed in across restarts. False when there is none or it no longer works.
+  Future<bool> restore() async {
+    final saved = await _store.read();
+    if (saved == null) return false;
+    _refreshToken = saved;
+    try {
+      await refresh();
+      return true;
+    } on AuthException {
+      await _forget();
+      return false;
+    } catch (_) {
+      // Offline: keep the saved token for next time, but start signed out.
+      _refreshToken = null;
+      return false;
+    }
+  }
+
+  /// Ends the session here and revokes the refresh token at Cognito.
+  Future<void> signOut() async {
+    final refresh = _refreshToken;
+    await _forget();
+    if (refresh == null) return;
+    try {
+      await _call('RevokeToken', {'ClientId': config.clientId, 'Token': refresh});
+    } catch (_) {
+      // Already signed out here; the token expires on its own.
+    }
+  }
+
+  Future<void> _forget() async {
     _accessToken = _refreshToken = _userId = null;
     _expiresAt = null;
+    await _store.delete();
   }
+
+  /// Emails a code for setting a new password.
+  Future<void> forgotPassword(String email) =>
+      _call('ForgotPassword', {'ClientId': config.clientId, 'Username': email});
+
+  Future<void> resetPassword(String email, String code, String newPassword) => _call('ConfirmForgotPassword', {
+    'ClientId': config.clientId,
+    'Username': email,
+    'ConfirmationCode': code,
+    'Password': newPassword,
+  });
 
   /// A valid access token, refreshed a minute before it expires.
   Future<String> accessToken() async {
@@ -98,6 +144,8 @@ class CognitoAuth {
     _refreshToken = result['RefreshToken'] as String? ?? _refreshToken;
     _expiresAt = _clock().add(Duration(seconds: (result['ExpiresIn'] as num? ?? 3600).toInt()));
     _userId = jwtSubject(_accessToken!);
+    final refresh = _refreshToken;
+    if (refresh != null && result['RefreshToken'] != null) _store.write(refresh);
   }
 }
 

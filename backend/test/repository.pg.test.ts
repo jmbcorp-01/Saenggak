@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { loadMigrations, migrate, type MigrationDb } from '../src/db/migrate.js';
 import { deletePost, editPost, publishPost } from '../src/posts/publish.js';
 import { MAX_COSINE_DISTANCE } from '../src/rules/similar.js';
+import { AuroraAdminRepository } from '../src/services/adminRepository.js';
 import { AuroraRepository } from '../src/services/repository.js';
 import { editSession, humanSession } from './helpers.js';
 import { PgDataApi } from './pgDataApi.js';
@@ -206,5 +207,69 @@ describe.skipIf(!url)('AuroraRepository on Postgres', () => {
       { empathized: true, count: 1 },
       { empathized: true, count: 1 },
     ]);
+  });
+
+  it('runs the admin pages: review, removal, search, suspension, photo, stats', async () => {
+    const admin = new AuroraAdminRepository('arn:cluster', 'arn:secret', 'test', new PgDataApi(client) as unknown as RDSDataClient);
+    const ADMIN = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+    const held = await repo.insertPost({
+      authorId: C, body: 'held for review', lang: 'ko', typingMs: 1, localDate: '2026-11-25', status: 'blocked',
+      blockedReason: 'classifier_declined', session: humanSession('x') as never, issues: ['fast'],
+    });
+    const queue = await admin.reviewQueue(30);
+    const item = queue.find((q) => q.id === held);
+    expect(item).toMatchObject({ authorHandle: 'cc', blockedReason: 'classifier_declined', issues: ['fast'] });
+    expect((await admin.stats()).pendingReview).toBeGreaterThan(0);
+
+    expect(await admin.reviewPost(held, ADMIN, 'publish')).toBe(true);
+    expect(await admin.reviewPost(held, ADMIN, 'publish')).toBe(false);
+    expect((await admin.reviewQueue(30)).some((q) => q.id === held)).toBe(false);
+    expect((await repo.feed(A, { following: false, authorId: C, limit: 30 })).some((p) => p.id === held)).toBe(true);
+
+    expect(await admin.removePost(held, ADMIN, 'spam')).toBe(true);
+    expect(await admin.removePost(held, ADMIN, 'spam')).toBe(false);
+    expect((await repo.feed(A, { following: false, authorId: C, limit: 30 })).some((p) => p.id === held)).toBe(false);
+
+    expect((await admin.searchUsers('A', 30)).map((u) => u.handle)).toEqual(['aa']);
+    expect((await admin.searchUsers('', 30)).length).toBeGreaterThanOrEqual(3);
+    expect(await admin.searchUsers('%', 30)).toEqual([]);
+
+    expect(await repo.isSuspended(B)).toBe(false);
+    expect(await admin.setSuspended(B, ADMIN, true, 'abuse')).toBe(true);
+    expect(await repo.isSuspended(B)).toBe(true);
+    expect((await repo.feed(A, { following: false, limit: 30 })).some((p) => p.authorId === B)).toBe(false);
+    expect((await admin.searchUsers('bb', 30))[0]).toMatchObject({ suspendedReason: 'abuse' });
+    expect(await admin.setSuspended(B, ADMIN, false, '')).toBe(true);
+    expect(await repo.isSuspended(B)).toBe(false);
+
+    await repo.setPhoto(C, 'photos/c/1.jpg');
+    expect(await admin.removePhoto(C, ADMIN)).toEqual({ previous: 'photos/c/1.jpg' });
+    expect((await repo.profile(C, C))?.photoKey).toBeNull();
+    expect(await admin.removePhoto('dddddddd-dddd-4ddd-8ddd-dddddddddddd', ADMIN)).toBe(false);
+
+    const log = await client.query(`SELECT action FROM admin_actions ORDER BY id`);
+    expect(log.rows.map((r) => r.action)).toEqual(['publish', 'remove_post', 'suspend', 'unsuspend', 'remove_photo']);
+  });
+
+  it('deletes an account with everything it made', async () => {
+    const D = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+    await repo.saveProfile(D, { handle: 'dd', displayName: 'dd', bio: '', locale: 'ko', timeZone: 'Asia/Seoul' });
+    await repo.setPhoto(D, 'photos/d/1.jpg');
+    nextVec = vec(1);
+    const mine = await publishPost(deps(), input(D, EDITED + ' 지운다'));
+    expect(mine.kind).toBe('published');
+    const [other] = await repo.feed(D, { following: false, authorId: A, limit: 1 });
+    await repo.toggleEmpathy(other!.id, D);
+    if (mine.kind === 'published') await repo.toggleEmpathy(mine.postId, A);
+
+    expect(await repo.deleteAccount(D)).toEqual({ photoKey: 'photos/d/1.jpg' });
+    expect(await repo.profile(D, D)).toBeNull();
+    const left = await client.query(
+      `SELECT (SELECT count(*) FROM posts WHERE author_id = $1) + (SELECT count(*) FROM empathies WHERE user_id = $1)
+              + (SELECT count(*) FROM phrase_firsts WHERE author_id = $1) AS n`,
+      [D],
+    );
+    expect(Number(left.rows[0].n)).toBe(0);
+    expect(await repo.deleteAccount(D)).toBe(false);
   });
 });

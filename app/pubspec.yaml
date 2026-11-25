@@ -38,6 +38,8 @@ dependencies:
   http: ^1.6.0
   camera: ^0.12.2
   image: ^4.13.1
+  flutter_secure_storage: ^11.2.0
+  flutter_timezone: ^5.1.1
 
 dev_dependencies:
   flutter_test:

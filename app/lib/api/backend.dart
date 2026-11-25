@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import '../core/typing_session.dart';
+import '../models/admin.dart';
 import '../models/post.dart';
 import '../models/profile.dart';
 import '../models/publish_outcome.dart';
@@ -29,6 +30,23 @@ abstract class Backend {
   Future<Profile> setPhoto(Uint8List jpeg);
 
   Future<Profile> user(String id);
+
+  /// Ends the session on this device.
+  Future<void> signOut();
+
+  /// Erases the account, its posts and photo, and the sign-in. Cannot be undone.
+  Future<void> deleteAccount();
+
+  /// Admin pages; the server answers 403 to anyone outside the admins group.
+  Future<AdminStats> adminStats();
+  Future<List<ReviewItem>> reviewQueue();
+
+  /// [publish] true puts the post in the feed; false keeps it blocked.
+  Future<void> reviewPost(String postId, {required bool publish});
+  Future<void> removePost(String postId, {String note = ''});
+  Future<List<AdminUser>> searchUsers(String query);
+  Future<void> setSuspended(String userId, {required bool suspended, String reason = ''});
+  Future<void> removePhoto(String userId);
 
   Future<FeedPage> feed({required String lang, bool following = false, String? authorId, String? before});
 
