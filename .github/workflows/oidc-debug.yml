@@ -1,0 +1,15 @@
+name: OIDC debug (temporary)
+on:
+  push:
+    branches: [claude/project-thread-tbenwb]
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  claims:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print the claims AWS sees (not the token)
+        run: |
+          tok=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r .value)
+          echo "$tok" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | jq '{sub, aud, iss, repository, ref, environment}'
