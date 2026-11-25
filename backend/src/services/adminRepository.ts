@@ -1,4 +1,4 @@
-import type { AdminRepository, AdminStats, AdminUser, ReviewDecision, ReviewItem } from './ports.js';
+import type { AdminRepository, AdminStats, AdminUser, OpenReport, ReviewDecision, ReviewItem } from './ports.js';
 import { AuroraRepository } from './repository.js';
 
 /**
@@ -13,7 +13,8 @@ export class AuroraAdminRepository extends AuroraRepository implements AdminRepo
               (SELECT count(*) FROM posts WHERE status = 'published') AS posts,
               (SELECT count(*) FROM posts WHERE status = 'published' AND created_at > now() - interval '1 day') AS posts_today,
               (SELECT count(*) FROM posts WHERE status = 'blocked' AND reviewed_at IS NULL) AS pending,
-              (SELECT count(*) FROM users WHERE suspended_at IS NOT NULL) AS suspended`,
+              (SELECT count(*) FROM users WHERE suspended_at IS NOT NULL) AS suspended,
+              (SELECT count(*) FROM reports WHERE resolved_at IS NULL) AS reports`,
     );
     return {
       users: Number(r?.users ?? 0),
@@ -22,6 +23,7 @@ export class AuroraAdminRepository extends AuroraRepository implements AdminRepo
       postsToday: Number(r?.posts_today ?? 0),
       pendingReview: Number(r?.pending ?? 0),
       suspended: Number(r?.suspended ?? 0),
+      openReports: Number(r?.reports ?? 0),
     };
   }
 
@@ -128,6 +130,51 @@ export class AuroraAdminRepository extends AuroraRepository implements AdminRepo
        )
        SELECT id::text FROM done`,
       { user: userId, admin: adminId, on: suspended, reason },
+    );
+    return rows.length > 0;
+  }
+
+  async openReports(limit: number): Promise<OpenReport[]> {
+    const rows = await this.query(
+      `SELECT r.id::text, r.reason, r.note, r.created_at::text, rep.handle AS reporter, u.id::text AS user_id,
+              u.handle, u.display_name, p.id::text AS post_id, p.body,
+              (SELECT count(*) FROM reports o WHERE o.user_id = r.user_id AND o.resolved_at IS NULL) AS on_user
+       FROM reports r
+       JOIN users u ON u.id = r.user_id
+       JOIN users rep ON rep.id = r.reporter_id
+       LEFT JOIN posts p ON p.id = r.post_id
+       WHERE r.resolved_at IS NULL
+       ORDER BY r.created_at DESC
+       LIMIT :limit`,
+      { limit },
+    );
+    return rows.map((r) => ({
+      id: r.id as string,
+      reason: r.reason as string,
+      note: r.note as string,
+      createdAt: r.created_at as string,
+      reporterHandle: r.reporter as string,
+      userId: r.user_id as string,
+      userHandle: r.handle as string,
+      userName: r.display_name as string,
+      postId: (r.post_id as string | null) ?? null,
+      postBody: (r.body as string | null) ?? null,
+      reportsOnUser: Number(r.on_user),
+    }));
+  }
+
+  async resolveReport(reportId: string, adminId: string, note: string): Promise<boolean> {
+    const rows = await this.query(
+      `WITH done AS (
+         UPDATE reports SET resolved_at = now(), resolved_by = :admin::uuid
+         WHERE id = CAST(:id AS bigint) AND resolved_at IS NULL
+         RETURNING id, user_id
+       ), logged AS (
+         INSERT INTO admin_actions (admin_id, action, target_id, note)
+         SELECT :admin::uuid, 'resolve_report', user_id, :note FROM done
+       )
+       SELECT id::text FROM done`,
+      { id: reportId, admin: adminId, note },
     );
     return rows.length > 0;
   }

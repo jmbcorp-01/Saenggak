@@ -18,14 +18,14 @@ describe('SaenggakStack', () => {
   });
 
   it('protects every route with the Cognito JWT authorizer', () => {
-    template.resourceCountIs('AWS::ApiGatewayV2::Route', 19);
+    template.resourceCountIs('AWS::ApiGatewayV2::Route', 28);
     template.allResourcesProperties('AWS::ApiGatewayV2::Route', { AuthorizationType: 'JWT' });
   });
 
   it('runs the Node 22 Lambdas outside the VPC', () => {
     const fns = template.findResources('AWS::Lambda::Function', { Properties: { Runtime: 'nodejs22.x' } });
-    // write, api, admin and migrate
-    expect(Object.keys(fns)).toHaveLength(4);
+    // write, api, admin, cleanup and migrate
+    expect(Object.keys(fns)).toHaveLength(5);
     for (const f of Object.values(fns)) expect(f.Properties.VpcConfig).toBeUndefined();
   });
 
@@ -54,6 +54,11 @@ describe('SaenggakStack', () => {
         ]),
       }),
     });
+  });
+
+  it('cleans up old rows daily and keeps logs three months', () => {
+    template.hasResourceProperties('AWS::Events::Rule', { ScheduleExpression: 'cron(30 18 * * ? *)' });
+    template.hasResourceProperties('AWS::Logs::LogGroup', { RetentionInDays: 90 });
   });
 
   it('has an admins group for the admin pages', () => {

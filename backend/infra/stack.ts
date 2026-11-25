@@ -10,7 +10,10 @@ import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as targets from 'aws-cdk-lib/aws-events-targets';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as rds from 'aws-cdk-lib/aws-rds';
 import * as s3 from 'aws-cdk-lib/aws-s3';
@@ -93,6 +96,11 @@ export class SaenggakStack extends Stack {
         timeout: Duration.seconds(timeout),
         environment,
         bundling: { minify: true, sourceMap: true },
+        // Access and error logs are kept three months, as the privacy policy says.
+        logGroup: new logs.LogGroup(this, `${name}Logs`, {
+          retention: logs.RetentionDays.THREE_MONTHS,
+          removalPolicy: RemovalPolicy.DESTROY,
+        }),
       });
       db.grantDataApiAccess(f);
       return f;
@@ -126,6 +134,11 @@ export class SaenggakStack extends Stack {
     const write = fn('write', 30);
     const api = fn('api', 15);
     const admin = fn('admin', 15);
+    // Deletes old rate-limit rows, admin logs and resolved reports each day.
+    new events.Rule(this, 'DailyCleanup', {
+      schedule: events.Schedule.cron({ hour: '18', minute: '30' }), // 03:30 in Korea
+      targets: [new targets.LambdaFunction(fn('cleanup', 60))],
+    });
 
     write.addToRolePolicy(
       new iam.PolicyStatement({
@@ -178,6 +191,13 @@ export class SaenggakStack extends Stack {
       ['/users/{id}', M.GET, apiIntegration],
       ['/users/{id}/follow', M.PUT, apiIntegration],
       ['/users/{id}/follow', M.DELETE, apiIntegration],
+      ['/users/{id}/block', M.PUT, apiIntegration],
+      ['/users/{id}/block', M.DELETE, apiIntegration],
+      ['/users/{id}/report', M.POST, apiIntegration],
+      ['/posts/{id}/report', M.POST, apiIntegration],
+      ['/me/blocks', M.GET, apiIntegration],
+      ['/notifications', M.GET, apiIntegration],
+      ['/notifications/seen', M.POST, apiIntegration],
       // Admin pages. The admin function refuses anyone outside the admins group.
       ['/admin/stats', M.GET, adminIntegration],
       ['/admin/review', M.GET, adminIntegration],
@@ -186,6 +206,8 @@ export class SaenggakStack extends Stack {
       ['/admin/users', M.GET, adminIntegration],
       ['/admin/users/{id}/suspension', M.PUT, adminIntegration],
       ['/admin/users/{id}/photo', M.DELETE, adminIntegration],
+      ['/admin/reports', M.GET, adminIntegration],
+      ['/admin/reports/{id}/resolve', M.POST, adminIntegration],
     ];
     for (const [path, method, integration] of routes) http.addRoutes({ path, methods: [method], integration });
 

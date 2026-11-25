@@ -3,10 +3,13 @@ import type {
   FeedPost,
   FollowResult,
   NewPost,
+  NewReport,
+  Notification,
   PostUpdate,
   Profile,
   ProfileInput,
   Repository,
+  SocialRepository,
 } from '../src/services/ports.js';
 
 /** One keystroke per character at uneven, human-like intervals. */
@@ -173,5 +176,36 @@ export class MemoryRepo implements Repository {
   }
   async saveTranslation(postId: string, lang: string, body: string) {
     this.translations.set(`${postId}:${lang}`, body);
+  }
+}
+
+/** Fake reports, blocks and notifications. */
+export class MemorySocial implements SocialRepository {
+  reports: (NewReport & { reporterId: string })[] = [];
+  blocks = new Set<string>();
+  seen = 0;
+  items: Notification[] = [];
+
+  async report(reporterId: string, r: NewReport) {
+    if (reporterId === r.userId) return 'self' as const;
+    this.reports.push({ ...r, reporterId });
+    return 'ok' as const;
+  }
+  async block(a: string, b: string) {
+    if (a === b) return 'self' as const;
+    this.blocks.add(`${a}>${b}`);
+    return 'ok' as const;
+  }
+  async unblock(a: string, b: string) {
+    this.blocks.delete(`${a}>${b}`);
+  }
+  async blocked(a: string) {
+    return [...this.blocks].filter((k) => k.startsWith(`${a}>`)).map((k) => ({ id: k.split('>')[1]!, handle: 'h', displayName: 'n' }));
+  }
+  async notifications() {
+    return { items: this.items, unread: this.items.length - this.seen };
+  }
+  async markNotificationsSeen() {
+    this.seen = this.items.length;
   }
 }

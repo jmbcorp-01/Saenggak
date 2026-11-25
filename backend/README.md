@@ -12,6 +12,9 @@ TypeScript Lambdas behind an HTTP API, deployed with CDK.
 | `GET /me`, `PUT /me` | Your profile with writing days and follow status. `PUT` creates it after sign-up (handle, name, bio, language, time zone); a changed name or bio goes through the content filter. |
 | `DELETE /me` | Erases the account: posts, 공감 given and received, follows, phrases, logs, the photo file and the Cognito account. Safe to repeat. |
 | `/admin/*` | Admin pages, for the Cognito `admins` group only: stats, the review queue of held posts (publish or keep blocked), removing posts and photos, searching people and suspending them. Suspended people can read but not write, and their posts leave the feed. |
+| `POST /posts/{id}/report`, `POST /users/{id}/report` | `{ reason, note }`, reason one of `ai_or_copied`, `abuse`, `sexual`, `spam`, `self_harm`, `impersonation`, `other`. A repeat of an open report is ignored. |
+| `PUT`/`DELETE /users/{id}/block`, `GET /me/blocks` | Blocking hides both people's posts from each other, ends follows both ways and stops 공감 and follow between them. |
+| `GET /notifications`, `POST /notifications/seen` | 공감 on your posts and new followers, newest first, with the unread count. |
 | `PUT /me/photo` | `{ jpeg: base64 }`, a square JPEG of at most 2 MB taken with the app's camera. Amazon Rekognition must find exactly one clear, frontal face and no explicit or violent content; otherwise `422 { error: 'photo_refused', problem }` with `no_face`, `many_faces`, `unclear` or `inappropriate`. Counts toward the hourly write limit. |
 | `GET /users/{id}` | Someone's profile, with whether you follow them. |
 | `PUT /users/{id}/follow`, `DELETE /users/{id}/follow` | Follow and unfollow. Both people need follow permission. |

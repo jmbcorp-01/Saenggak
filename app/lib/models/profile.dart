@@ -18,6 +18,7 @@ class Profile {
     this.isMe = false,
     this.photoUrl,
     this.isAdmin = false,
+    this.blockedByMe = false,
   });
 
   factory Profile.fromJson(Map<String, dynamic> j) => Profile(
@@ -36,6 +37,7 @@ class Profile {
     isMe: j['isMe'] as bool? ?? false,
     photoUrl: j['photoUrl'] as String?,
     isAdmin: j['isAdmin'] as bool? ?? false,
+    blockedByMe: j['blockedByMe'] as bool? ?? false,
   );
 
   final String id;
@@ -58,25 +60,30 @@ class Profile {
   /// Only ever true on the reader's own profile, for the admin pages' entry.
   final bool isAdmin;
 
+  /// The reader blocked this person.
+  final bool blockedByMe;
+
   int get avatarColor => avatarPalette[id.hashCode.abs() % avatarPalette.length];
 
   String get initial => displayName.isEmpty ? '?' : String.fromCharCode(displayName.runes.first).toUpperCase();
 
-  Profile copyWith({bool? followedByMe, int? followers, int? writingDays, bool? followUnlocked}) => Profile(
-    id: id,
-    handle: handle,
-    displayName: displayName,
-    bio: bio,
-    locale: locale,
-    timeZone: timeZone,
-    writingDays: writingDays ?? this.writingDays,
-    daysToFollow: daysToFollow,
-    followUnlocked: followUnlocked ?? this.followUnlocked,
-    followers: followers ?? this.followers,
-    following: following,
-    followedByMe: followedByMe ?? this.followedByMe,
-    isMe: isMe,
-    photoUrl: photoUrl,
-    isAdmin: isAdmin,
-  );
+  Profile copyWith({bool? blockedByMe, bool? followedByMe, int? followers, int? writingDays, bool? followUnlocked}) =>
+      Profile(
+        id: id,
+        handle: handle,
+        displayName: displayName,
+        bio: bio,
+        locale: locale,
+        timeZone: timeZone,
+        writingDays: writingDays ?? this.writingDays,
+        daysToFollow: daysToFollow,
+        followUnlocked: followUnlocked ?? this.followUnlocked,
+        followers: followers ?? this.followers,
+        following: following,
+        followedByMe: followedByMe ?? this.followedByMe,
+        isMe: isMe,
+        photoUrl: photoUrl,
+        isAdmin: isAdmin,
+        blockedByMe: blockedByMe ?? this.blockedByMe,
+      );
 }

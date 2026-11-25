@@ -3,7 +3,7 @@ import { apiHandler } from '../src/handlers/api.js';
 import type { Event } from '../src/handlers/http.js';
 import { writeHandler } from '../src/handlers/write.js';
 import type { FeedPost } from '../src/services/ports.js';
-import { editSession, humanSession, MemoryRepo } from './helpers.js';
+import { editSession, humanSession, MemoryRepo, MemorySocial } from './helpers.js';
 
 const U1 = '11111111-1111-4111-8111-111111111111';
 const U2 = '22222222-2222-4222-8222-222222222222';
@@ -33,6 +33,7 @@ const jpeg = (marker: string) => Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0
 
 /** Photo and account stores for tests that do not touch them. */
 const noStores = {
+  social: new MemorySocial(),
   photoStore: { put: async () => {}, remove: async () => {} },
   users: { deleteUser: async () => {} },
 };
@@ -59,13 +60,15 @@ function setup() {
     embedder: { embed: async () => [0.1] },
   });
   const deletedUsers: string[] = [];
+  const social = new MemorySocial();
   const api = apiHandler({
     repo,
+    social,
     translator: { translate: async (t: string) => `번역: ${t}` },
     photoStore: { put: async () => {}, remove: async (key: string) => void stored.delete(key) },
     users: { deleteUser: async (id: string) => void deletedUsers.push(id) },
   });
-  return { repo, write, api, stored, deletedUsers };
+  return { repo, write, api, stored, deletedUsers, social };
 }
 
 describe('POST /posts', () => {
@@ -320,5 +323,42 @@ describe('DELETE /me', () => {
     expect(deletedUsers).toEqual([U1]);
     // Asking again still succeeds, so a half-finished deletion can be completed.
     expect(parse(await api(event('DELETE /me'))).status).toBe(204);
+  });
+});
+
+describe('reports, blocks and notifications', () => {
+  it('reports a post against its author, with a known reason only', async () => {
+    const { repo, write, api, social } = setup();
+    repo.users.set(U2, { handle: 'two', displayName: 'Two', bio: '', locale: 'ko', timeZone: 'Asia/Seoul' });
+    const id = parse(await write(event('POST /posts', { body: post(TEXT), sub: U2 }))).body.id;
+    const report = (reason: string, sub = U1) =>
+      api(event('POST /posts/{id}/report', { pathParameters: { id }, body: JSON.stringify({ reason, note: ' copied ' }), sub }));
+
+    expect(parse(await report('ai_or_copied')).status).toBe(204);
+    expect(social.reports).toEqual([{ reporterId: U1, userId: U2, postId: id, reason: 'ai_or_copied', note: 'copied' }]);
+    expect(parse(await report('nonsense')).status).toBe(400);
+    expect(parse(await report('spam', U2)).body).toEqual({ error: 'self' });
+  });
+
+  it('blocks and unblocks, and lists the blocked', async () => {
+    const { api } = setup();
+    expect(parse(await api(event('PUT /users/{id}/block', { pathParameters: { id: U2 } }))).body).toEqual({ blocked: true });
+    expect(parse(await api(event('GET /me/blocks'))).body.items).toHaveLength(1);
+    await api(event('DELETE /users/{id}/block', { pathParameters: { id: U2 } }));
+    expect(parse(await api(event('GET /me/blocks'))).body.items).toHaveLength(0);
+    expect(parse(await api(event('PUT /users/{id}/block', { pathParameters: { id: U1 } }))).status).toBe(400);
+  });
+
+  it('lists notifications with photo URLs and marks them seen', async () => {
+    const { api, social } = setup();
+    social.items = [
+      { kind: 'follow', at: '2026-11-25 01:00:00+00', actorId: U2, actorHandle: 'two', actorName: 'Two', actorPhotoKey: null, postId: null, excerpt: null },
+    ];
+    const r = parse(await api(event('GET /notifications')));
+    expect(r.body.unread).toBe(1);
+    expect(r.body.items[0]).toMatchObject({ kind: 'follow', actorHandle: 'two', actorPhotoUrl: null });
+    expect(r.body.items[0].actorPhotoKey).toBeUndefined();
+    await api(event('POST /notifications/seen'));
+    expect(parse(await api(event('GET /notifications'))).body.unread).toBe(0);
   });
 });

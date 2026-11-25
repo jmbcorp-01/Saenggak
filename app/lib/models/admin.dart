@@ -8,6 +8,7 @@ class AdminStats {
     required this.postsToday,
     required this.pendingReview,
     required this.suspended,
+    this.openReports = 0,
   });
 
   factory AdminStats.fromJson(Map<String, dynamic> j) => AdminStats(
@@ -17,6 +18,7 @@ class AdminStats {
     postsToday: (j['postsToday'] as num).toInt(),
     pendingReview: (j['pendingReview'] as num).toInt(),
     suspended: (j['suspended'] as num).toInt(),
+    openReports: (j['openReports'] as num? ?? 0).toInt(),
   );
 
   final int users;
@@ -25,6 +27,7 @@ class AdminStats {
   final int postsToday;
   final int pendingReview;
   final int suspended;
+  final int openReports;
 }
 
 /// A blocked post waiting for an admin.
@@ -104,3 +107,45 @@ String blockedReasonName(String? reason) => switch (reason) {
   'classifier_declined' => '필터가 판단 보류',
   _ => '기타',
 };
+
+class OpenReport {
+  const OpenReport({
+    required this.id,
+    required this.reason,
+    required this.userId,
+    required this.userHandle,
+    required this.userName,
+    required this.reporterHandle,
+    required this.createdAt,
+    this.note = '',
+    this.postId,
+    this.postBody,
+    this.reportsOnUser = 1,
+  });
+
+  factory OpenReport.fromJson(Map<String, dynamic> j) => OpenReport(
+    id: j['id'] as String,
+    reason: j['reason'] as String,
+    note: j['note'] as String? ?? '',
+    userId: j['userId'] as String,
+    userHandle: j['userHandle'] as String,
+    userName: j['userName'] as String,
+    reporterHandle: j['reporterHandle'] as String,
+    postId: j['postId'] as String?,
+    postBody: j['postBody'] as String?,
+    reportsOnUser: (j['reportsOnUser'] as num? ?? 1).toInt(),
+    createdAt: parseServerTime(j['createdAt'] as String),
+  );
+
+  final String id;
+  final String reason;
+  final String note;
+  final String userId;
+  final String userHandle;
+  final String userName;
+  final String reporterHandle;
+  final String? postId;
+  final String? postBody;
+  final int reportsOnUser;
+  final DateTime createdAt;
+}

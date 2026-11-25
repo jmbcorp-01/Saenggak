@@ -33,6 +33,8 @@ const note = (v: unknown) => (typeof v === 'string' ? v.trim().slice(0, 500) : '
  *   GET    /admin/users?q=<handle or name>
  *   PUT    /admin/users/{id}/suspension          { suspended, reason }
  *   DELETE /admin/users/{id}/photo
+ *   GET    /admin/reports                        open reports, newest first
+ *   POST   /admin/reports/{id}/resolve           { note }
  */
 export const adminHandler = (deps: Deps) =>
   safely(async (event: Event) => {
@@ -78,6 +80,15 @@ export const adminHandler = (deps: Deps) =>
         if (id === me && b.suspended) return json(400, { error: 'self' });
         const done = await admin.setSuspended(id, me, b.suspended, note(b.reason));
         return done ? json(200, { suspended: b.suspended }) : json(404, { error: 'not_found' });
+      }
+
+      case 'GET /admin/reports':
+        return json(200, { items: await admin.openReports(PAGE_SIZE) });
+
+      case 'POST /admin/reports/{id}/resolve': {
+        if (!id || !/^\d{1,18}$/.test(id)) return json(400, { error: 'bad_request' });
+        const done = await admin.resolveReport(id, me, note(parseBody(event)?.note));
+        return done ? json(204, null) : json(404, { error: 'not_found' });
       }
 
       case 'DELETE /admin/users/{id}/photo': {

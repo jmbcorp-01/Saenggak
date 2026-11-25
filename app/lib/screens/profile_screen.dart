@@ -7,6 +7,7 @@ import '../models/profile.dart';
 import '../theme/tokens.dart';
 import '../widgets/post_actions.dart';
 import '../widgets/post_tile.dart';
+import '../widgets/report_sheet.dart';
 import '../widgets/symbol_mark.dart';
 import 'photo_capture_screen.dart';
 import 'profile_setup_screen.dart';
@@ -71,6 +72,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _toggleBlock(Profile user) async {
+    if (user.blockedByMe) {
+      try {
+        await widget.state.unblock(user.id);
+      } catch (_) {}
+      await _load();
+      return;
+    }
+    if (await blockFlow(context, widget.state, userId: user.id, handle: user.handle)) await _load();
   }
 
   Future<void> _takePhoto() async {
@@ -181,11 +193,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             child: const Text('프로필 수정'),
                           )
-                        : _FollowButton(
-                            profile: profile,
-                            canFollow: (widget.state.me?.followUnlocked ?? false) && profile.followUnlocked,
-                            busy: _busy,
-                            onPressed: () => _toggleFollow(profile),
+                        : Row(
+                            children: [
+                              if (!profile.blockedByMe)
+                                _FollowButton(
+                                  profile: profile,
+                                  canFollow: (widget.state.me?.followUnlocked ?? false) && profile.followUnlocked,
+                                  busy: _busy,
+                                  onPressed: () => _toggleFollow(profile),
+                                ),
+                              PopupMenuButton<String>(
+                                tooltip: '더보기',
+                                icon: const Icon(Icons.more_horiz),
+                                onSelected: (v) => v == 'report'
+                                    ? reportFlow(context, widget.state, userId: profile.id, handle: profile.handle)
+                                    : _toggleBlock(profile),
+                                itemBuilder: (_) => [
+                                  const PopupMenuItem(value: 'report', child: Text('신고')),
+                                  PopupMenuItem(value: 'block', child: Text(profile.blockedByMe ? '차단 풀기' : '차단')),
+                                ],
+                              ),
+                            ],
                           ),
                   ),
                 ],

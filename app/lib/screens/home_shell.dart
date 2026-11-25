@@ -4,6 +4,7 @@ import '../data/app_state.dart';
 import '../theme/tokens.dart';
 import 'compose_screen.dart';
 import 'feed_screen.dart';
+import 'notifications_screen.dart';
 import 'profile_screen.dart';
 
 /// Bottom menu (home, notifications, profile) and the write button.
@@ -33,7 +34,7 @@ class _HomeShellState extends State<HomeShell> {
           index: _tab,
           children: [
             FeedScreen(state: widget.state, onOpenProfile: () => setState(() => _tab = 2)),
-            const Center(child: Text('아직 알림이 없어요.', style: SgText.small)),
+            NotificationsScreen(state: widget.state),
             ProfileScreen(state: widget.state),
           ],
         ),
@@ -52,15 +53,31 @@ class _HomeShellState extends State<HomeShell> {
         indicatorColor: Colors.transparent,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
         selectedIndex: _tab,
-        onDestinationSelected: (i) => setState(() => _tab = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: '홈'),
+        onDestinationSelected: (i) {
+          setState(() => _tab = i);
+          if (i == 1) {
+            widget.state.loadNotifications().then((_) => widget.state.markNotificationsSeen());
+          }
+        },
+        destinations: [
+          const NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: '홈'),
           NavigationDestination(
-            icon: Icon(Icons.notifications_none),
-            selectedIcon: Icon(Icons.notifications),
+            icon: ListenableBuilder(
+              listenable: widget.state,
+              builder: (context, _) {
+                final n = widget.state.unreadNotifications;
+                return Badge(
+                  isLabelVisible: n > 0,
+                  label: Text(n > 99 ? '99+' : '$n'),
+                  backgroundColor: SgColors.accent,
+                  child: const Icon(Icons.notifications_none),
+                );
+              },
+            ),
+            selectedIcon: const Icon(Icons.notifications),
             label: '알림',
           ),
-          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: '프로필'),
+          const NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: '프로필'),
         ],
       ),
     );

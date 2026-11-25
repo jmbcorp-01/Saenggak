@@ -7,6 +7,8 @@ import { deletePost, editPost, publishPost } from '../src/posts/publish.js';
 import { MAX_COSINE_DISTANCE } from '../src/rules/similar.js';
 import { AuroraAdminRepository } from '../src/services/adminRepository.js';
 import { AuroraRepository } from '../src/services/repository.js';
+import { AuroraSocialRepository } from '../src/services/socialRepository.js';
+import { CLEANUP_SQL } from '../src/handlers/cleanup.js';
 import { editSession, humanSession } from './helpers.js';
 import { PgDataApi } from './pgDataApi.js';
 
@@ -271,5 +273,52 @@ describe.skipIf(!url)('AuroraRepository on Postgres', () => {
     );
     expect(Number(left.rows[0].n)).toBe(0);
     expect(await repo.deleteAccount(D)).toBe(false);
+  });
+
+  it('reports, blocks and notifications', async () => {
+    const social = new AuroraSocialRepository('arn:cluster', 'arn:secret', 'test', new PgDataApi(client) as unknown as RDSDataClient);
+    const admin = new AuroraAdminRepository('arn:cluster', 'arn:secret', 'test', new PgDataApi(client) as unknown as RDSDataClient);
+    const [post] = await repo.feed(C, { following: false, authorId: A, limit: 1 });
+    const id = post!.id;
+
+    expect(await social.report(C, { userId: A, postId: id, reason: 'spam', note: '' })).toBe('ok');
+    expect(await social.report(C, { userId: A, postId: id, reason: 'spam', note: '' })).toBe('ok'); // not doubled
+    expect(await social.report(C, { userId: B, postId: id, reason: 'spam', note: '' })).toBe('not_found'); // not B's post
+    expect(await social.report(C, { userId: B, reason: 'impersonation', note: 'fake' })).toBe('ok');
+    const open = await admin.openReports(30);
+    expect(open.filter((r) => r.userId === A)).toHaveLength(1);
+    expect(open.find((r) => r.userId === A)).toMatchObject({ postBody: post!.body, reporterHandle: 'cc', reportsOnUser: 1 });
+    expect((await admin.stats()).openReports).toBe(2);
+    expect(await admin.resolveReport(open[0]!.id, C, 'ok')).toBe(true);
+    expect(await admin.resolveReport(open[0]!.id, C, 'ok')).toBe(false);
+
+    // C gives A's post 공감, then A sees it in notifications.
+    await client.query(`DELETE FROM empathies WHERE post_id = $1`, [id]);
+    await repo.toggleEmpathy(id, C);
+    let n = await social.notifications(A, 30);
+    expect(n.items.some((x) => x.kind === 'empathy' && x.actorHandle === 'cc' && x.postId === id)).toBe(true);
+    expect(n.unread).toBeGreaterThan(0);
+    await social.markNotificationsSeen(A);
+    expect((await social.notifications(A, 30)).unread).toBe(0);
+
+    // A blocks C: C's 공감 leaves A's notifications, and neither sees the other's posts.
+    expect(await social.block(A, C)).toBe('ok');
+    n = await social.notifications(A, 30);
+    expect(n.items.some((x) => x.actorHandle === 'cc')).toBe(false);
+    expect((await repo.feed(C, { following: false, limit: 30 })).some((p) => p.authorId === A)).toBe(false);
+    expect((await repo.feed(A, { following: false, limit: 30 })).some((p) => p.authorId === C)).toBe(false);
+    expect((await repo.profile(C, A))?.blockedByMe).toBe(true);
+    await repo.toggleEmpathy(id, C); // removes the existing one
+    expect(await repo.toggleEmpathy(id, C)).toBeNull(); // cannot add while blocked
+    expect((await social.blocked(A)).map((u) => u.handle)).toEqual(['cc']);
+    await social.unblock(A, C);
+    expect((await repo.feed(C, { following: false, limit: 30 })).some((p) => p.authorId === A)).toBe(true);
+  });
+
+  it('runs the daily cleanup statements', async () => {
+    await client.query(`INSERT INTO write_log (author_id, at) VALUES ($1, now() - interval '2 days'), ($1, now())`, [A]);
+    for (const sql of CLEANUP_SQL) await client.query(sql);
+    const left = await client.query(`SELECT count(*) AS n FROM write_log WHERE author_id = $1 AND at < now() - interval '1 day'`, [A]);
+    expect(Number(left.rows[0].n)).toBe(0);
   });
 });

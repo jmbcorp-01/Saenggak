@@ -28,7 +28,7 @@ function setup() {
   const log: string[] = [];
   const removed: string[] = [];
   const admin: AdminRepository = {
-    stats: async () => ({ users: 2, usersToday: 1, posts: 5, postsToday: 1, pendingReview: 1, suspended: 0 }),
+    stats: async () => ({ users: 2, usersToday: 1, posts: 5, postsToday: 1, pendingReview: 1, suspended: 0, openReports: 0 }),
     reviewQueue: async () => [],
     reviewPost: async (id: string, by: string, d: ReviewDecision) => (log.push(`${d} ${id} by ${by}`), id === POST),
     removePost: async (id: string, _by: string, note: string) => (log.push(`remove ${id} ${note}`), id === POST),
@@ -37,6 +37,8 @@ function setup() {
       log.push(`${on ? 'suspend' : 'unsuspend'} ${id} ${reason}`), id === USER
     ),
     removePhoto: async (id: string) => (id === USER ? { previous: 'photos/u/a.jpg' } : false),
+    openReports: async () => [],
+    resolveReport: async (id: string) => (log.push(`resolve ${id}`), id === '7'),
   };
   const handler = adminHandler({ admin, photoStore: { put: async () => {}, remove: async (k) => void removed.push(k) } });
   return { handler, log, removed };
@@ -105,5 +107,12 @@ describe('admin pages', () => {
     const r = parse(await handler(event('DELETE /admin/users/{id}/photo', { pathParameters: { id: USER } })));
     expect(r.status).toBe(204);
     expect(removed).toEqual(['photos/u/a.jpg']);
+  });
+
+  it('resolves a report by its number only', async () => {
+    const { handler, log } = setup();
+    expect(parse(await handler(event('POST /admin/reports/{id}/resolve', { pathParameters: { id: '7' } }))).status).toBe(204);
+    expect(parse(await handler(event('POST /admin/reports/{id}/resolve', { pathParameters: { id: 'x' } }))).status).toBe(400);
+    expect(log).toEqual(['resolve 7']);
   });
 });

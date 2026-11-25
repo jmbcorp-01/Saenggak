@@ -1,0 +1,15 @@
+:root { --ink: #151515; --muted: #6b6b6b; --line: #ebebeb; --bg: #ffffff; --accent: #b8361f; }
+@media (prefers-color-scheme: dark) { :root { --ink: #ececec; --muted: #a3a3a3; --line: #2a2a2a; --bg: #121212; --accent: #f08a74; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.7 "Noto Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif; }
+main { max-width: 720px; margin: 0 auto; padding: 40px 20px 80px; }
+h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.5px; }
+h2 { font-size: 19px; margin: 36px 0 8px; }
+p, li { color: var(--ink); }
+.meta { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 12px 0; }
+th, td { border: 1px solid var(--line); padding: 8px; text-align: left; vertical-align: top; }
+a { color: var(--accent); }
+nav { font-size: 14px; margin-bottom: 32px; }
+nav a { margin-right: 16px; }
+footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }

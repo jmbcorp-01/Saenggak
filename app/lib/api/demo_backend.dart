@@ -6,6 +6,7 @@ import '../models/admin.dart';
 import '../models/post.dart';
 import '../models/profile.dart';
 import '../models/publish_outcome.dart';
+import '../models/social.dart';
 import 'backend.dart';
 
 /// Sample data kept in memory. Used when no server is configured and in tests.
@@ -100,6 +101,59 @@ class DemoBackend implements Backend {
   final Set<String> _suspended = {};
   final List<ReviewItem> _queue = [];
 
+  final List<OpenReport> _reports = [];
+  final Map<String, BlockedUser> _blocked = {};
+  final List<AppNotification> notificationItems = [];
+  int _seen = 0;
+
+  @override
+  Future<void> report({String? postId, String? userId, required String reason, String note = ''}) async {
+    final p = postId == null ? null : _posts.firstWhere((p) => p.id == postId);
+    final id = p?.authorId ?? userId!;
+    final author = _posts.firstWhere((x) => x.authorId == id, orElse: () => p!);
+    _reports.add(
+      OpenReport(
+        id: '${_reports.length + 1}',
+        reason: reason,
+        note: note,
+        userId: id,
+        userHandle: author.authorHandle,
+        userName: author.authorName,
+        reporterHandle: _me.handle,
+        postId: postId,
+        postBody: p?.body,
+        createdAt: _clock(),
+      ),
+    );
+  }
+
+  @override
+  Future<void> block(String userId) async {
+    final p = _posts.firstWhere((x) => x.authorId == userId);
+    _blocked[userId] = BlockedUser(id: userId, handle: p.authorHandle, displayName: p.authorName);
+    _following.remove(userId);
+  }
+
+  @override
+  Future<void> unblock(String userId) async => _blocked.remove(userId);
+
+  @override
+  Future<List<BlockedUser>> blockedUsers() async => _blocked.values.toList();
+
+  @override
+  Future<NotificationsPage> notifications({String? before}) async =>
+      NotificationsPage(List.of(notificationItems), notificationItems.length - _seen, null);
+
+  @override
+  Future<void> markNotificationsSeen() async => _seen = notificationItems.length;
+
+  @override
+  Future<List<OpenReport>> openReports() async => List.of(_reports);
+
+  @override
+  Future<void> resolveReport(String reportId, {String note = ''}) async =>
+      _reports.removeWhere((r) => r.id == reportId);
+
   @override
   Future<AdminStats> adminStats() async => AdminStats(
     users: {..._posts.map((p) => p.authorId), _me.id}.length,
@@ -108,6 +162,7 @@ class DemoBackend implements Backend {
     postsToday: _posts.where((p) => _clock().difference(p.createdAt).inDays < 1).length,
     pendingReview: _queue.length,
     suspended: _suspended.length,
+    openReports: _reports.length,
   );
 
   @override
@@ -158,6 +213,7 @@ class DemoBackend implements Backend {
       followUnlocked: true,
       followers: _following.contains(id) ? 1 : 0,
       followedByMe: _following.contains(id),
+      blockedByMe: _blocked.containsKey(id),
     );
   }
 
@@ -166,6 +222,7 @@ class DemoBackend implements Backend {
     final items = _posts
         .where((p) => authorId == null || p.authorId == authorId)
         .where((p) => !following || _following.contains(p.authorId))
+        .where((p) => !_blocked.containsKey(p.authorId))
         .toList();
     return FeedPage(items, null);
   }
