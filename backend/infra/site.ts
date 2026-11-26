@@ -8,5 +8,5 @@
  */
 export const SITE = {
   domain: 'saenggak.app',
-  certificateArn: '',
+  certificateArn: 'arn:aws:acm:us-east-1:242126391246:certificate/68b0882d-5bda-442d-bd42-ae9d03a54c75',
 };
