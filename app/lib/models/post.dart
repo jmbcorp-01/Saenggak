@@ -15,6 +15,7 @@ class Post {
     this.translation,
     this.editedAt,
     this.empathizedByMe = false,
+    this.bookmarked = false,
     this.isMine = false,
     this.authorPhotoUrl,
   });
@@ -34,6 +35,7 @@ class Post {
       typingTime: Duration(milliseconds: (j['typingMs'] as num).toInt()),
       empathyCount: (j['empathyCount'] as num).toInt(),
       empathizedByMe: j['empathizedByMe'] as bool? ?? false,
+      bookmarked: j['bookmarkedByMe'] as bool? ?? false,
       isMine: j['authorId'] == myId,
       authorPhotoUrl: j['photoUrl'] as String?,
     );
@@ -56,6 +58,9 @@ class Post {
   final Duration typingTime;
   final int empathyCount;
   final bool empathizedByMe;
+
+  /// Saved by the reader to read again.
+  final bool bookmarked;
   final bool isMine;
 
   /// The author's profile photo, or null when they have none.
@@ -72,7 +77,7 @@ class Post {
   /// Behind the initial when the author has no photo.
   int get avatarColor => avatarPalette[authorId.hashCode.abs() % avatarPalette.length];
 
-  Post copyWith({int? empathyCount, bool? empathizedByMe}) => Post(
+  Post copyWith({int? empathyCount, bool? empathizedByMe, bool? bookmarked}) => Post(
     id: id,
     authorId: authorId,
     authorName: authorName,
@@ -85,6 +90,7 @@ class Post {
     typingTime: typingTime,
     empathyCount: empathyCount ?? this.empathyCount,
     empathizedByMe: empathizedByMe ?? this.empathizedByMe,
+    bookmarked: bookmarked ?? this.bookmarked,
     isMine: isMine,
     authorPhotoUrl: authorPhotoUrl,
   );

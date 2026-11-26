@@ -9,6 +9,8 @@ import 'admin_screen.dart';
 import 'blocked_screen.dart';
 import 'photo_capture_screen.dart';
 import 'profile_setup_screen.dart';
+import 'saved_screen.dart';
+import '../core/save_file.dart';
 
 /// Time zones offered besides the device's own. Writing days follow the
 /// writer's calendar day, so this only matters for people who travel.
@@ -69,6 +71,19 @@ class SettingsScreen extends StatelessWidget {
     );
     if (picked != null && picked != current && context.mounted) {
       await _run(context, () => state.saveSettings(timeZone: picked), t('시간대를 바꾸지 못했어요.'));
+    }
+  }
+
+  Future<void> _export(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final json = await state.backend.exportData();
+      final downloaded = await saveTextFile('saenggak-${state.me?.handle ?? 'export'}.json', json);
+      messenger.showSnackBar(
+        SnackBar(content: Text(downloaded ? t('내 기록을 내려받았어요.') : t('내 기록을 복사했어요. 메모나 메일에 붙여넣어 보관하세요.'))),
+      );
+    } catch (_) {
+      messenger.showSnackBar(SnackBar(content: Text(t('내 기록을 내보내지 못했어요.'))));
     }
   }
 
@@ -134,6 +149,18 @@ class SettingsScreen extends StatelessWidget {
                   context,
                   rootNavigator: true,
                 ).push(MaterialPageRoute<void>(builder: (_) => PhotoCaptureScreen(state: state))),
+              ),
+              ListTile(
+                leading: const Icon(SgIcons.bookmark),
+                title: Text(t('저장한 글')),
+                onTap: () => _push(context, (_) => SavedScreen(state: state)),
+              ),
+              ListTile(
+                key: const Key('export'),
+                leading: const Icon(Icons.download_outlined),
+                title: Text(t('내 기록 내보내기')),
+                subtitle: Text(t('프로필, 쓴 글, 공감, 팔로우를 파일 하나로 받아요.')),
+                onTap: () => _export(context),
               ),
               _Header(t('화면')),
               ListTile(

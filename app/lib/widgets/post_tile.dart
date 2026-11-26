@@ -134,6 +134,8 @@ class PostTile extends StatefulWidget {
     this.onAdminRemove,
     this.onReport,
     this.onBlock,
+    this.onBookmark,
+    this.onCopyLink,
   });
 
   final Post post;
@@ -156,6 +158,10 @@ class PostTile extends StatefulWidget {
   final VoidCallback? onReport;
   final VoidCallback? onBlock;
 
+  /// Saves the post to read again, or takes it off the saved list.
+  final VoidCallback? onBookmark;
+  final VoidCallback? onCopyLink;
+
   @override
   State<PostTile> createState() => _PostTileState();
 }
@@ -168,6 +174,8 @@ class _PostTileState extends State<PostTile> {
   List<({String value, String label, bool danger})> _actions() {
     final post = widget.post;
     return [
+      if (widget.onBookmark != null) (value: 'bookmark', label: post.bookmarked ? t('저장 취소') : t('저장'), danger: false),
+      if (widget.onCopyLink != null) (value: 'link', label: t('링크 복사'), danger: false),
       if (!post.isMine && widget.onReport != null) (value: 'report', label: t('신고'), danger: false),
       if (!post.isMine && widget.onBlock != null)
         (value: 'block', label: t('@{0} 차단', [post.authorHandle]), danger: false),
@@ -182,6 +190,8 @@ class _PostTileState extends State<PostTile> {
     'delete' => widget.onDelete!(),
     'report' => widget.onReport!(),
     'block' => widget.onBlock!(),
+    'bookmark' => widget.onBookmark!(),
+    'link' => widget.onCopyLink!(),
     _ => widget.onAdminRemove!(),
   };
 

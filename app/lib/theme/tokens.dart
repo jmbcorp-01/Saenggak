@@ -281,6 +281,11 @@ class SgIcons {
   static const keyboard = Icons.keyboard_outlined;
   static const check = Icons.check_rounded;
   static const up = Icons.arrow_upward_rounded;
+  static const search = Icons.search_rounded;
+  static const searchActive = Icons.manage_search_rounded;
+  static const bookmark = Icons.bookmark_border_rounded;
+  static const bookmarked = Icons.bookmark_rounded;
+  static const link = Icons.link_rounded;
 }
 
 ThemeData buildTheme([SgPalette p = SgPalette.light]) {

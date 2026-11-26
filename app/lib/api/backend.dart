@@ -78,6 +78,30 @@ abstract class Backend {
 
   Future<void> delete(String postId);
 
+  /// One post, for a shared link. Throws [ApiException] 404 when it is gone.
+  Future<Post> post(String postId, {required String lang});
+
+  /// Saves the post for later, or takes it off the saved list.
+  Future<void> setBookmark(String postId, bool saved);
+
+  /// The reader's saved posts, newest saved first.
+  Future<List<Post>> bookmarks({required String lang});
+
+  /// People whose handle or name matches.
+  Future<List<PersonHit>> searchPeople(String query);
+
+  /// Posts close in meaning to [query].
+  Future<List<Post>> searchPosts(String query, {required String lang});
+
+  /// Everything stored about the reader, as JSON text.
+  Future<String> exportData();
+
+  /// A short sentence to type when activity looks automated.
+  Future<String> humanCheckPhrase(String lang);
+
+  /// Throws [ApiException] `not_human` when the typing does not pass.
+  Future<void> passHumanCheck(String text, TypingSession session);
+
   /// Throws [ApiException] with code `not_allowed` unless both people have follow permission.
   Future<void> follow(String userId);
   Future<void> unfollow(String userId);
@@ -90,6 +114,28 @@ class FeedPage {
   /// Cursor for the next page, or null at the end.
   final String? next;
 }
+
+/// A person found by search.
+class PersonHit {
+  const PersonHit({required this.id, required this.handle, required this.displayName, this.bio = '', this.photoUrl});
+
+  factory PersonHit.fromJson(Map<String, dynamic> j) => PersonHit(
+    id: j['id'] as String,
+    handle: j['handle'] as String,
+    displayName: j['displayName'] as String,
+    bio: j['bio'] as String? ?? '',
+    photoUrl: j['photoUrl'] as String?,
+  );
+
+  final String id;
+  final String handle;
+  final String displayName;
+  final String bio;
+  final String? photoUrl;
+}
+
+/// The server asks for a typing check (HTTP 428) before more activity.
+bool isHumanCheck(Object e) => e is ApiException && e.status == 428;
 
 class ApiException implements Exception {
   const ApiException(this.status, this.code);

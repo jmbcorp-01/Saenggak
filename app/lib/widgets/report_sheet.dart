@@ -33,7 +33,7 @@ Future<void> reportFlow(
   );
   if (reason == null || !context.mounted) return;
   try {
-    await state.backend.report(postId: postId, userId: userId, reason: reason);
+    await state.report(postId: postId, userId: userId, reason: reason);
   } catch (_) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t('신고하지 못했어요. 다시 시도해주세요.'))));

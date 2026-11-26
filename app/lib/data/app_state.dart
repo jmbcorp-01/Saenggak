@@ -52,6 +52,33 @@ class AppState extends ChangeNotifier {
   /// a little motion instead of popping in.
   Set<String> fresh = const {};
 
+  /// Posts the reader saved, newest saved first. Loaded when the list opens.
+  List<Post> saved = const [];
+
+  /// The last search: people and posts close in meaning to [searchQuery].
+  String searchQuery = '';
+  List<PersonHit> people = const [];
+  List<Post> found = const [];
+
+  /// Posts opened on their own, such as from a shared link.
+  List<Post> opened = const [];
+
+  /// Shows the typing check and returns true once it is passed. The home
+  /// screen sets it; without it a check request is an ordinary error.
+  Future<bool> Function()? askHumanCheck;
+
+  /// Runs [action]. When the server first wants a typing check, shows it and
+  /// tries once more after it is passed.
+  Future<T> guarded<T>(Future<T> Function() action) async {
+    try {
+      return await action();
+    } catch (e) {
+      final ask = askHumanCheck;
+      if (!isHumanCheck(e) || ask == null || !await ask()) rethrow;
+      return action();
+    }
+  }
+
   /// Feed translations go into the reader's language.
   String get lang => AppLang.instance.value;
   bool get hasMore => _feedNext != null;
@@ -156,6 +183,9 @@ class AppState extends ChangeNotifier {
     feed = apply(feed);
     following = apply(following);
     mine = apply(mine);
+    saved = apply(saved);
+    found = apply(found);
+    opened = apply(opened);
     notifyListeners();
   }
 
@@ -165,7 +195,7 @@ class AppState extends ChangeNotifier {
     final was = post.empathizedByMe;
     _replace(post.id, (p) => p.copyWith(empathizedByMe: !was, empathyCount: p.empathyCount + (was ? -1 : 1)));
     try {
-      final r = await backend.toggleEmpathy(post.id);
+      final r = await guarded(() => backend.toggleEmpathy(post.id));
       _replace(post.id, (p) => p.copyWith(empathizedByMe: r.empathized, empathyCount: r.count));
     } catch (_) {
       _replace(post.id, (p) => p.copyWith(empathizedByMe: was, empathyCount: post.empathyCount));
@@ -173,16 +203,85 @@ class AppState extends ChangeNotifier {
   }
 
   Future<PublishOutcome> publish(String text, TypingSession session) async {
-    final outcome = await backend.publish(text: text, session: session, localDate: localDateOf(clock()));
+    final outcome = await _checked(
+      () => backend.publish(text: text, session: session, localDate: localDateOf(clock())),
+    );
     await _afterWrite(outcome);
     return outcome;
   }
 
   Future<PublishOutcome> edit(Post post, String text, TypingSession session) async {
-    final outcome = await backend.edit(post.id, text: text, session: session, localDate: localDateOf(clock()));
+    final outcome = await _checked(
+      () => backend.edit(post.id, text: text, session: session, localDate: localDateOf(clock())),
+    );
     await _afterWrite(outcome);
     return outcome;
   }
+
+  /// A post refused for want of a typing check is sent again once it passes.
+  Future<PublishOutcome> _checked(Future<PublishOutcome> Function() send) async {
+    final outcome = await send();
+    final ask = askHumanCheck;
+    if (outcome is Rejected && outcome.reason == RejectReason.humanCheck && ask != null && await ask()) {
+      return send();
+    }
+    return outcome;
+  }
+
+  /// Saves or unsaves at once, then confirms with the server.
+  Future<void> toggleBookmark(Post post) async {
+    final want = !post.bookmarked;
+    _replace(post.id, (p) => p.copyWith(bookmarked: want));
+    saved = want ? [post.copyWith(bookmarked: true), ...saved] : saved.where((p) => p.id != post.id).toList();
+    notifyListeners();
+    try {
+      await backend.setBookmark(post.id, want);
+    } catch (_) {
+      _replace(post.id, (p) => p.copyWith(bookmarked: !want));
+      await loadSaved();
+      rethrow;
+    }
+  }
+
+  Future<void> loadSaved() async {
+    saved = await backend.bookmarks(lang: lang);
+    notifyListeners();
+  }
+
+  /// Looks for people and for posts close in meaning. Short queries clear it.
+  Future<void> search(String query) async {
+    searchQuery = query.trim();
+    if (searchQuery.isEmpty) {
+      people = const [];
+      found = const [];
+      notifyListeners();
+      return;
+    }
+    final asked = searchQuery;
+    final results = await Future.wait([
+      backend.searchPeople(asked),
+      if (asked.replaceFirst('@', '').length >= 2 && !asked.startsWith('@'))
+        backend.searchPosts(asked, lang: lang)
+      else
+        Future.value(const <Post>[]),
+    ]);
+    // A newer search may have started meanwhile.
+    if (asked != searchQuery) return;
+    people = results[0] as List<PersonHit>;
+    found = results[1] as List<Post>;
+    notifyListeners();
+  }
+
+  /// Fetches one post to show on its own page.
+  Future<Post> open(String postId) async {
+    final post = await backend.post(postId, lang: lang);
+    opened = [post, ...opened.where((p) => p.id != postId)];
+    notifyListeners();
+    return post;
+  }
+
+  Future<void> report({String? postId, String? userId, required String reason}) =>
+      guarded(() => backend.report(postId: postId, userId: userId, reason: reason));
 
   Future<void> _afterWrite(PublishOutcome outcome) async {
     // A blocked post can take follow permission away, so refresh then too.
@@ -197,6 +296,9 @@ class AppState extends ChangeNotifier {
 
   Future<void> delete(Post post) async {
     await backend.delete(post.id);
+    found = found.where((p) => p.id != post.id).toList();
+    opened = opened.where((p) => p.id != post.id).toList();
+    saved = saved.where((p) => p.id != post.id).toList();
     feed = feed.where((p) => p.id != post.id).toList();
     following = following.where((p) => p.id != post.id).toList();
     mine = mine.where((p) => p.id != post.id).toList();
@@ -274,7 +376,7 @@ class AppState extends ChangeNotifier {
 
   /// Hides the person's posts at once; the server also ends follows both ways.
   Future<void> block(String userId) async {
-    await backend.block(userId);
+    await guarded(() => backend.block(userId));
     feed = feed.where((p) => p.authorId != userId).toList();
     following = following.where((p) => p.authorId != userId).toList();
     notifications = notifications.where((n) => n.actorId != userId).toList();
@@ -298,7 +400,9 @@ class AppState extends ChangeNotifier {
   Future<void> signOut() async {
     await backend.signOut();
     me = null;
-    feed = following = mine = const [];
+    feed = following = mine = saved = found = opened = const [];
+    people = const [];
+    searchQuery = '';
     notifications = const [];
     unreadNotifications = 0;
     _feedNext = null;
@@ -309,7 +413,7 @@ class AppState extends ChangeNotifier {
   /// Follows or unfollows and returns the updated profile.
   Future<Profile> setFollowing(Profile user, bool follow) async {
     if (follow) {
-      await backend.follow(user.id);
+      await guarded(() => backend.follow(user.id));
     } else {
       await backend.unfollow(user.id);
     }

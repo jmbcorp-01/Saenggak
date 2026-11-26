@@ -1,5 +1,7 @@
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../core/links.dart';
 import '../core/nav.dart';
 import '../data/app_state.dart';
 import '../l10n/l10n.dart';
@@ -35,7 +37,28 @@ class ConnectedPostTile extends StatelessWidget {
       onAdminRemove: (state.me?.isAdmin ?? false) ? () => _adminRemove(context) : null,
       onReport: () => reportFlow(context, state, userId: post.authorId, handle: post.authorHandle, postId: post.id),
       onBlock: () => blockFlow(context, state, userId: post.authorId, handle: post.authorHandle),
+      onBookmark: () => _bookmark(context),
+      onCopyLink: () => _copyLink(context),
     );
+  }
+
+  void _say(BuildContext context, String text) => ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(text)));
+
+  Future<void> _bookmark(BuildContext context) async {
+    final saving = !post.bookmarked;
+    try {
+      await state.toggleBookmark(post);
+      if (context.mounted) _say(context, saving ? t('저장했어요. 설정의 저장한 글에서 볼 수 있어요.') : t('저장을 취소했어요.'));
+    } catch (_) {
+      if (context.mounted) _say(context, t('저장하지 못했어요. 다시 시도해주세요.'));
+    }
+  }
+
+  Future<void> _copyLink(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: postLink(post.id).toString()));
+    if (context.mounted) _say(context, t('링크를 복사했어요.'));
   }
 
   Future<void> _adminRemove(BuildContext context) async {
