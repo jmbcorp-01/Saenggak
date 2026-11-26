@@ -122,6 +122,41 @@ describe('SaenggakStack', () => {
     withSite.hasOutput('ApiUrl', { Value: 'https://saenggak.app/api' });
   });
 
+  it('adds Google and Apple sign-in at auth.saenggak.app once set up', () => {
+    const withSignIn = Template.fromStack(
+      new SaenggakStack(new App(), 'SignIn', {
+        env: { account: '123456789012', region: 'us-east-1' },
+        site: { domain: 'saenggak.app', certificateArn: 'arn:aws:acm:us-east-1:123456789012:certificate/abc' },
+        signIn: {
+          authDomain: 'auth.saenggak.app',
+          authCertificateArn: 'arn:aws:acm:us-east-1:123456789012:certificate/auth',
+          google: { clientId: 'g.apps.googleusercontent.com' },
+          apple: { servicesId: 'app.saenggak.signin', teamId: 'TEAM', keyId: 'KEY' },
+        },
+      }),
+    );
+    withSignIn.hasResourceProperties('AWS::Cognito::UserPoolDomain', {
+      Domain: 'auth.saenggak.app',
+      CustomDomainConfig: { CertificateArn: 'arn:aws:acm:us-east-1:123456789012:certificate/auth' },
+    });
+    withSignIn.hasResourceProperties('AWS::Cognito::UserPoolIdentityProvider', { ProviderName: 'Google', ProviderType: 'Google' });
+    withSignIn.hasResourceProperties('AWS::Cognito::UserPoolIdentityProvider', {
+      ProviderName: 'SignInWithApple',
+      ProviderDetails: Match.objectLike({ client_id: 'app.saenggak.signin', team_id: 'TEAM', key_id: 'KEY' }),
+    });
+    withSignIn.hasResourceProperties('AWS::Cognito::UserPoolClient', {
+      AllowedOAuthFlows: ['code'],
+      CallbackURLs: ['saenggak://auth', 'https://saenggak.app/auth.html'],
+      SupportedIdentityProviders: ['COGNITO', 'Google', 'SignInWithApple'],
+    });
+    withSignIn.hasOutput('AuthDomainTarget', Match.anyValue());
+  });
+
+  it('leaves sign-in to email until set up', () => {
+    template.resourceCountIs('AWS::Cognito::UserPoolDomain', 0);
+    template.resourceCountIs('AWS::Cognito::UserPoolIdentityProvider', 0);
+  });
+
   it('keeps the CloudFront address without a certificate', () => {
     const cdn = template.findResources('AWS::CloudFront::Distribution');
     expect(Object.values(cdn).every((d) => !(d as { Properties: { DistributionConfig: { Aliases?: unknown } } }).Properties.DistributionConfig.Aliases)).toBe(true);

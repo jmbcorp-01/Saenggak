@@ -10,18 +10,30 @@ import 'package:http/http.dart' as http;
 /// the deploy writes from the stack outputs. Without either, the app runs on
 /// the offline demo backend.
 class ApiConfig {
-  const ApiConfig({required this.apiUrl, required this.region, required this.clientId});
+  const ApiConfig({
+    required this.apiUrl,
+    required this.region,
+    required this.clientId,
+    this.authDomain = '',
+    this.signInWith = const [],
+  });
 
-  static const fromEnvironment = ApiConfig(
-    apiUrl: String.fromEnvironment('API_URL'),
-    region: String.fromEnvironment('COGNITO_REGION', defaultValue: 'us-east-1'),
-    clientId: String.fromEnvironment('COGNITO_CLIENT_ID'),
+  static const _signInWith = String.fromEnvironment('SIGN_IN_WITH');
+
+  static final fromEnvironment = ApiConfig(
+    apiUrl: const String.fromEnvironment('API_URL'),
+    region: const String.fromEnvironment('COGNITO_REGION', defaultValue: 'us-east-1'),
+    clientId: const String.fromEnvironment('COGNITO_CLIENT_ID'),
+    authDomain: const String.fromEnvironment('AUTH_DOMAIN'),
+    signInWith: _signInWith.isEmpty ? const [] : _signInWith.split(','),
   );
 
   factory ApiConfig.fromJson(Map<String, dynamic> j) => ApiConfig(
     apiUrl: j['apiUrl'] as String? ?? '',
     region: j['cognitoRegion'] as String? ?? 'us-east-1',
     clientId: j['cognitoClientId'] as String? ?? '',
+    authDomain: j['authDomain'] as String? ?? '',
+    signInWith: [for (final p in j['signInWith'] as List? ?? const []) p as String],
   );
 
   /// Build-time settings first; on the web, config.json when there are none.
@@ -41,6 +53,15 @@ class ApiConfig {
   final String apiUrl;
   final String region;
   final String clientId;
+
+  /// Cognito's sign-in pages, such as auth.saenggak.app. Empty until set up.
+  final String authDomain;
+
+  /// The other ways in that are set up: `google`, `apple`.
+  final List<String> signInWith;
+
+  /// The ways in the app can offer: set up on the server and in this build.
+  List<String> get socialProviders => authDomain.isEmpty ? const [] : signInWith;
 
   bool get isDemo => apiUrl.isEmpty || clientId.isEmpty;
 }

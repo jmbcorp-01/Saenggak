@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { apiHandler } from '../src/handlers/api.js';
 import type { Event } from '../src/handlers/http.js';
 import { writeHandler } from '../src/handlers/write.js';
-import { handler as preSignUp } from '../src/handlers/preSignUp.js';
+import { type Accounts, handler as preSignUp, makeHandler, splitProviderUser } from '../src/handlers/preSignUp.js';
 import type { PreSignUpTriggerEvent } from 'aws-lambda';
 import type { FeedPost } from '../src/services/ports.js';
 import { editSession, humanSession, MemoryRepo, MemorySocial } from './helpers.js';
@@ -487,5 +487,40 @@ describe('entry checks', () => {
     const signUp = (email: string) => ({ request: { userAttributes: { email } } }) as unknown as PreSignUpTriggerEvent;
     await expect(preSignUp(signUp('bot@Mailinator.com'))).rejects.toThrow('disposable_email');
     await expect(preSignUp(signUp('me@gmail.com'))).resolves.toBeTruthy();
+  });
+
+  it('joins a first Google or Apple sign-in to the email account with the same address', async () => {
+    const calls: string[] = [];
+    const existing = new Map([['me@gmail.com', 'sub-me']]);
+    const accounts: Accounts = {
+      findByEmail: async (_pool, email) => existing.get(email),
+      create: async (_pool, email) => {
+        calls.push(`create ${email}`);
+        return 'sub-new';
+      },
+      link: async (_pool, username, provider, id) => void calls.push(`link ${username} ${provider} ${id}`),
+    };
+    const external = (userName: string, email?: string) =>
+      ({
+        triggerSource: 'PreSignUp_ExternalProvider',
+        userPoolId: 'pool',
+        userName,
+        request: { userAttributes: email ? { email } : {} },
+      }) as unknown as PreSignUpTriggerEvent;
+    const run = makeHandler(accounts);
+
+    await run(external('Google_123', 'Me@Gmail.com'));
+    await run(external('SignInWithApple_001.abc', 'x@privaterelay.appleid.com'));
+    expect(calls).toEqual([
+      'link sub-me Google 123',
+      'create x@privaterelay.appleid.com',
+      'link sub-new SignInWithApple 001.abc',
+    ]);
+    await expect(run(external('Google_9'))).rejects.toThrow('email_required');
+  });
+
+  it('names the provider from the Cognito username', () => {
+    expect(splitProviderUser('google_1_2')).toEqual({ provider: 'Google', id: '1_2' });
+    expect(splitProviderUser('signinwithapple_001.x')).toEqual({ provider: 'SignInWithApple', id: '001.x' });
   });
 });

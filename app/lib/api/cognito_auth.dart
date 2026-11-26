@@ -1,23 +1,48 @@
 import 'dart:convert';
+import 'dart:math';
 
+import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'package:http/http.dart' as http;
 
 import '../l10n/l10n.dart';
 import 'config.dart';
 import 'token_store.dart';
 
+/// Opens [url] in the system's sign-in browser and returns the address it
+/// came back to, which starts with [callbackScheme].
+typedef WebAuthenticator = Future<String> Function(Uri url, String callbackScheme);
+
+Future<String> _systemBrowser(Uri url, String callbackScheme) =>
+    FlutterWebAuth2.authenticate(url: url.toString(), callbackUrlScheme: callbackScheme);
+
+/// Where Cognito's sign-in pages send people back to.
+Uri defaultRedirect() => kIsWeb ? Uri.base.resolve('/auth.html') : Uri.parse('saenggak://auth');
+
 /// Email sign-up and sign-in with Amazon Cognito, called directly over HTTPS.
-/// These Cognito operations are public, so no AWS signing is needed.
+/// These Cognito operations are public, so no AWS signing is needed. Google
+/// and Apple go through Cognito's sign-in pages in the system browser.
 class CognitoAuth {
-  CognitoAuth(this.config, {http.Client? client, DateTime Function()? clock, TokenStore? store})
-    : _client = client ?? http.Client(),
-      _clock = clock ?? DateTime.now,
-      _store = store ?? MemoryTokenStore();
+  CognitoAuth(
+    this.config, {
+    http.Client? client,
+    DateTime Function()? clock,
+    TokenStore? store,
+    WebAuthenticator? browser,
+    Uri? redirect,
+  }) : _client = client ?? http.Client(),
+       _clock = clock ?? DateTime.now,
+       _store = store ?? MemoryTokenStore(),
+       _browser = browser ?? _systemBrowser,
+       _redirect = redirect ?? defaultRedirect();
 
   final ApiConfig config;
   final TokenStore _store;
   final http.Client _client;
   final DateTime Function() _clock;
+  final WebAuthenticator _browser;
+  final Uri _redirect;
 
   String? _accessToken;
   String? _refreshToken;
@@ -67,6 +92,72 @@ class CognitoAuth {
       'AuthParameters': {'USERNAME': email, 'PASSWORD': password},
     });
     _take(out);
+  }
+
+  /// Signs in with `google` or `apple` through Cognito's sign-in pages. The
+  /// first time, the server joins it to the email account with the same
+  /// address; Cognito then turns that first try away once, so it is tried again.
+  Future<void> signInWith(String provider) async {
+    try {
+      await _signInWith(provider);
+    } on AuthException catch (e) {
+      if (e.type != 'AccountLinked') rethrow;
+      await _signInWith(provider);
+    }
+  }
+
+  Future<void> _signInWith(String provider) async {
+    final verifier = _random(48);
+    final state = _random(16);
+    final url = Uri.https(config.authDomain, '/oauth2/authorize', {
+      'response_type': 'code',
+      'client_id': config.clientId,
+      'redirect_uri': _redirect.toString(),
+      'identity_provider': provider == 'apple' ? 'SignInWithApple' : 'Google',
+      'scope': 'openid email aws.cognito.signin.user.admin',
+      'state': state,
+      'code_challenge': base64Url.encode(sha256.convert(ascii.encode(verifier)).bytes).replaceAll('=', ''),
+      'code_challenge_method': 'S256',
+    });
+    final String back;
+    try {
+      back = await _browser(url, _redirect.scheme);
+    } catch (_) {
+      throw const AuthException('Cancelled');
+    }
+    final answer = Uri.parse(back);
+    final params = {...answer.queryParameters, ...Uri.splitQueryString(answer.fragment)};
+    final error = params['error_description'] ?? params['error'];
+    if (error != null) {
+      throw AuthException(error.contains('Already found an entry') ? 'AccountLinked' : 'ProviderError');
+    }
+    final code = params['code'];
+    if (code == null || params['state'] != state) throw const AuthException('ProviderError');
+    final res = await _client.post(
+      Uri.https(config.authDomain, '/oauth2/token'),
+      headers: {'content-type': 'application/x-www-form-urlencoded'},
+      body: {
+        'grant_type': 'authorization_code',
+        'client_id': config.clientId,
+        'code': code,
+        'redirect_uri': _redirect.toString(),
+        'code_verifier': verifier,
+      },
+    );
+    if (res.statusCode != 200) throw const AuthException('ProviderError');
+    final json = jsonDecode(res.body) as Map<String, dynamic>;
+    _take({
+      'AuthenticationResult': {
+        'AccessToken': json['access_token'],
+        'RefreshToken': json['refresh_token'],
+        'ExpiresIn': json['expires_in'],
+      },
+    });
+  }
+
+  static String _random(int bytes) {
+    final r = Random.secure();
+    return base64Url.encode(List<int>.generate(bytes, (_) => r.nextInt(256))).replaceAll('=', '');
   }
 
   /// Signs in again with the refresh token saved last time, so people stay
@@ -166,6 +257,8 @@ class AuthException implements Exception {
 
   String get message => switch (type) {
     'UsernameExistsException' => t('이미 가입한 이메일이에요. 로그인해주세요.'),
+    'Cancelled' => t('로그인을 취소했어요.'),
+    'ProviderError' || 'AccountLinked' => t('로그인하지 못했어요. 다시 시도해주세요.'),
     'NotAuthorizedException' => t('이메일이나 비밀번호가 맞지 않아요.'),
     'UserNotFoundException' => t('이메일이나 비밀번호가 맞지 않아요.'),
     'UserNotConfirmedException' => t('이메일 인증을 마쳐주세요.'),

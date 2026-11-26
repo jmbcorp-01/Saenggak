@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CfnOutput, Duration, RemovalPolicy, Stack, type StackProps } from 'aws-cdk-lib';
+import { CfnOutput, Duration, RemovalPolicy, SecretValue, Stack, type StackProps } from 'aws-cdk-lib';
 import * as apigw from 'aws-cdk-lib/aws-apigatewayv2';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
@@ -23,6 +23,7 @@ import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as triggers from 'aws-cdk-lib/triggers';
 import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 import type { Construct } from 'constructs';
+import type { SignInSettings } from './site.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const handlerPath = (name: string) => path.join(here, '..', 'src', 'handlers', `${name}.ts`);
@@ -38,14 +39,20 @@ const webBuild = path.join(here, '..', '..', 'app', 'build', 'web');
 export interface SaenggakProps extends StackProps {
   /** The site's own domain and its us-east-1 certificate; without it, only the CloudFront address. */
   site?: { domain: string; certificateArn: string };
+  /** Google and Apple sign-in through Cognito's sign-in pages; see infra/site.ts. */
+  signIn?: SignInSettings;
 }
+
+/** Where the sign-in pages send people back: the app's own link, and the web app's page. */
+export const APP_CALLBACK = 'saenggak://auth';
+
 
 export class SaenggakStack extends Stack {
   constructor(scope: Construct, id: string, props?: SaenggakProps) {
     super(scope, id, props);
     const domain = props?.site;
 
-    // Sign-in: email and password. Social sign-in can be added to this pool later.
+    // Sign-in: email and password, and Google and Apple once set up (infra/site.ts).
     const users = new cognito.UserPool(this, 'Users', {
       selfSignUpEnabled: true,
       signInAliases: { email: true },
@@ -54,10 +61,34 @@ export class SaenggakStack extends Stack {
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
       removalPolicy: RemovalPolicy.RETAIN,
     });
+    const signIn = props?.signIn;
+    const providers = signIn ? this.socialSignIn(users, signIn) : [];
+    const callbacks = [APP_CALLBACK, ...(domain ? [`https://${domain.domain}/auth.html`] : [])];
     const appClient = users.addClient('App', {
       authFlows: { userSrp: true, userPassword: true },
       preventUserExistenceErrors: true,
+      ...(signIn && {
+        oAuth: {
+          flows: { authorizationCodeGrant: true },
+          scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.COGNITO_ADMIN],
+          callbackUrls: callbacks,
+          logoutUrls: callbacks,
+        },
+        supportedIdentityProviders: [
+          cognito.UserPoolClientIdentityProvider.COGNITO,
+          ...providers.map((p) => p.provider),
+        ],
+      }),
     });
+    for (const p of providers) appClient.node.addDependency(p.idp);
+    const authDomain = signIn
+      ? users.addDomain('Auth', {
+          customDomain: {
+            domainName: signIn.authDomain,
+            certificate: acm.Certificate.fromCertificateArn(this, 'AuthCertificate', signIn.authCertificateArn),
+          },
+        })
+      : undefined;
     // People in this group can use the admin pages. Add someone with
     // aws cognito-idp admin-add-user-to-group (see deploy/README.md).
     new cognito.CfnUserPoolGroup(this, 'Admins', {
@@ -182,6 +213,20 @@ export class SaenggakStack extends Stack {
       bundling: { minify: true },
     });
     users.addTrigger(cognito.UserPoolOperation.PRE_SIGN_UP, preSignUp);
+    // A first Google or Apple sign-in joins the email account with the same
+    // address, making one if there is none. The pool's ARN would make a loop
+    // (the pool names this function), so the grant covers this account's pools.
+    preSignUp.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: [
+          'cognito-idp:ListUsers',
+          'cognito-idp:AdminCreateUser',
+          'cognito-idp:AdminSetUserPassword',
+          'cognito-idp:AdminLinkProviderForUser',
+        ],
+        resources: [`arn:aws:cognito-idp:${this.region}:${this.account}:userpool/*`],
+      }),
+    );
 
     // Only CloudFront, behind the firewall, may call the API: it adds this
     // secret header, and the Lambdas refuse requests without it.
@@ -354,6 +399,7 @@ export class SaenggakStack extends Stack {
       apiUrl,
       cognitoRegion: this.region,
       cognitoClientId: appClient.userPoolClientId,
+      ...(signIn && { authDomain: signIn.authDomain, signInWith: providers.map((p) => p.name) }),
     };
     new s3deploy.BucketDeployment(this, 'WebFiles', {
       destinationBucket: site,
@@ -373,7 +419,45 @@ export class SaenggakStack extends Stack {
     new CfnOutput(this, 'ApiUrl', { value: apiUrl });
     new CfnOutput(this, 'UserPoolId', { value: users.userPoolId });
     new CfnOutput(this, 'UserPoolClientId', { value: appClient.userPoolClientId });
+    if (authDomain) {
+      // auth.saenggak.app gets a CNAME (proxy off) to this address.
+      new CfnOutput(this, 'AuthDomainTarget', { value: authDomain.cloudFrontEndpoint });
+    }
     new CfnOutput(this, 'DbClusterArn', { value: db.clusterArn });
+  }
+
+  /** Google and Apple as sign-in providers, each once its settings are filled in. */
+  private socialSignIn(users: cognito.UserPool, s: SignInSettings) {
+    const out: { name: string; provider: cognito.UserPoolClientIdentityProvider; idp: cognito.IUserPoolIdentityProvider }[] = [];
+    if (s.google.clientId) {
+      const idp = new cognito.UserPoolIdentityProviderGoogle(this, 'Google', {
+        userPool: users,
+        clientId: s.google.clientId,
+        clientSecretValue: SecretValue.secretsManager('saenggak/google-client-secret'),
+        scopes: ['openid', 'email'],
+        attributeMapping: {
+          email: cognito.ProviderAttribute.GOOGLE_EMAIL,
+          emailVerified: cognito.ProviderAttribute.GOOGLE_EMAIL_VERIFIED,
+        },
+      });
+      out.push({ name: 'google', provider: cognito.UserPoolClientIdentityProvider.GOOGLE, idp });
+    }
+    if (s.apple.teamId && s.apple.keyId) {
+      const idp = new cognito.UserPoolIdentityProviderApple(this, 'Apple', {
+        userPool: users,
+        clientId: s.apple.servicesId,
+        teamId: s.apple.teamId,
+        keyId: s.apple.keyId,
+        privateKeyValue: SecretValue.secretsManager('saenggak/apple-private-key'),
+        scopes: ['email'],
+        attributeMapping: {
+          email: cognito.ProviderAttribute.APPLE_EMAIL,
+          emailVerified: cognito.ProviderAttribute.APPLE_EMAIL_VERIFIED,
+        },
+      });
+      out.push({ name: 'apple', provider: cognito.UserPoolClientIdentityProvider.APPLE, idp });
+    }
+    return out;
   }
 
   /**
