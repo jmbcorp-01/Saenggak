@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CfnOutput, Duration, RemovalPolicy, Stack, type StackProps } from 'aws-cdk-lib';
 import * as apigw from 'aws-cdk-lib/aws-apigatewayv2';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import { HttpJwtAuthorizer } from 'aws-cdk-lib/aws-apigatewayv2-authorizers';
@@ -34,9 +35,15 @@ const webBuild = path.join(here, '..', '..', 'app', 'build', 'web');
  * Serverless v2 PostgreSQL with pgvector, reached through the Data API so the
  * Lambdas need no VPC), three Lambdas (write, api, admin) behind an HTTP API with a JWT check.
  */
+export interface SaenggakProps extends StackProps {
+  /** The site's own domain and its us-east-1 certificate; without it, only the CloudFront address. */
+  site?: { domain: string; certificateArn: string };
+}
+
 export class SaenggakStack extends Stack {
-  constructor(scope: Construct, id: string, props?: StackProps) {
+  constructor(scope: Construct, id: string, props?: SaenggakProps) {
     super(scope, id, props);
+    const domain = props?.site;
 
     // Sign-in: email and password. Social sign-in can be added to this pool later.
     const users = new cognito.UserPool(this, 'Users', {
@@ -272,7 +279,13 @@ export class SaenggakStack extends Stack {
       },
       defaultRootObject: 'index.html',
       priceClass: cloudfront.PriceClass.PRICE_CLASS_200,
+      ...(domain && {
+        domainNames: [domain.domain, `www.${domain.domain}`],
+        certificate: acm.Certificate.fromCertificateArn(this, 'SiteCertificate', domain.certificateArn),
+      }),
     });
+    // Where people reach the site: its own domain once set, else CloudFront's.
+    const webHost = domain ? domain.domain : cdn.distributionDomainName;
     // Profile photos: private bucket, served read-only through the same CDN at /photos/*.
     // Only the write function stores them, after the face and moderation checks.
     const photos = new s3.Bucket(this, 'Photos', {
@@ -313,7 +326,7 @@ export class SaenggakStack extends Stack {
         functionAssociations: [{ function: stripApi, eventType: cloudfront.FunctionEventType.VIEWER_REQUEST }],
       },
     );
-    const apiUrl = `https://${cdn.distributionDomainName}/api`;
+    const apiUrl = `https://${webHost}/api`;
 
     // Sign-up and sign-in: known bad addresses and bursts from one address are stopped.
     new wafv2.CfnWebACLAssociation(this, 'SignInFirewall', {
@@ -335,7 +348,7 @@ export class SaenggakStack extends Stack {
       }),
     );
     for (const f of [write, api, admin]) f.addEnvironment('PHOTO_BUCKET', photos.bucketName);
-    for (const f of [write, api, admin]) f.addEnvironment('PHOTO_BASE_URL', `https://${cdn.distributionDomainName}`);
+    for (const f of [write, api, admin]) f.addEnvironment('PHOTO_BASE_URL', `https://${webHost}`);
 
     const config = {
       apiUrl,
@@ -355,7 +368,8 @@ export class SaenggakStack extends Stack {
     });
 
     new CfnOutput(this, 'ClaudeApiKeySecret', { value: claudeKey.secretName });
-    new CfnOutput(this, 'WebUrl', { value: `https://${cdn.distributionDomainName}` });
+    new CfnOutput(this, 'WebUrl', { value: `https://${webHost}` });
+    new CfnOutput(this, 'CdnDomain', { value: cdn.distributionDomainName });
     new CfnOutput(this, 'ApiUrl', { value: apiUrl });
     new CfnOutput(this, 'UserPoolId', { value: users.userPoolId });
     new CfnOutput(this, 'UserPoolClientId', { value: appClient.userPoolClientId });
