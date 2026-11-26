@@ -2,5 +2,7 @@
   "API_URL": "https://saenggak.app/api",
   "COGNITO_REGION": "us-east-1",
   "COGNITO_CLIENT_ID": "4i4dpflbvoetuite7sce3jhpa6",
-  "SITE_URL": "https://saenggak.app"
+  "SITE_URL": "https://saenggak.app",
+  "AUTH_DOMAIN": "auth.saenggak.app",
+  "SIGN_IN_WITH": "apple,google"
 }

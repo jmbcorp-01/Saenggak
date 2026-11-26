@@ -18,4 +18,10 @@ void main() {
     expect(config['COGNITO_CLIENT_ID'], isNotEmpty);
     expect(Uri.parse(config['SITE_URL'] as String).scheme, 'https');
   });
+
+  test('store builds offer Apple whenever they offer Google, as Apple requires', () {
+    final ways = (config['SIGN_IN_WITH'] as String? ?? '').split(',').where((w) => w.isNotEmpty).toSet();
+    if (ways.contains('google')) expect(ways, contains('apple'));
+    if (ways.isNotEmpty) expect(config['AUTH_DOMAIN'], 'auth.saenggak.app');
+  });
 }
