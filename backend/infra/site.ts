@@ -27,7 +27,7 @@ export const SIGN_IN = {
   authDomain: 'auth.saenggak.app',
   authCertificateArn: 'arn:aws:acm:us-east-1:242126391246:certificate/0e5b06f6-60a2-44b9-bdfa-6b99abaf9c60',
   google: { clientId: '579952219461-f4tcp0s3httvr7nca1i39v3j5kmrga0t.apps.googleusercontent.com' },
-  apple: { servicesId: 'app.saenggak.signin', teamId: '', keyId: '' },
+  apple: { servicesId: 'app.saenggak.signin', teamId: '3U34CQC5NT', keyId: 'R36H686AXB' },
 };
 
 export type SignInSettings = typeof SIGN_IN;
