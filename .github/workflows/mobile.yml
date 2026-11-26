@@ -85,7 +85,7 @@ jobs:
           packageName: app.saenggak
           releaseFiles: app/build/app/outputs/bundle/release/app-release.aab
           track: internal
-          status: draft
+          status: completed
 
   ios:
     if: ${{ !inputs.make_android_key }}
