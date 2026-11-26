@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import '../core/weighted_length.dart';
 import '../core/typing_session.dart';
 import '../models/admin.dart';
 import '../models/post.dart';
@@ -255,7 +256,7 @@ class DemoBackend implements Backend {
       authorId: _me.id,
       authorName: _me.displayName,
       authorHandle: _me.handle,
-      body: text.trim(),
+      body: WeightedLength.tidy(text),
       lang: RegExp('[가-힣]').hasMatch(text) ? 'ko' : 'en',
       createdAt: _clock(),
       typingTime: session.activeDuration,
@@ -282,7 +283,7 @@ class DemoBackend implements Backend {
       authorId: old.authorId,
       authorName: old.authorName,
       authorHandle: old.authorHandle,
-      body: text.trim(),
+      body: WeightedLength.tidy(text),
       lang: old.lang,
       createdAt: old.createdAt,
       editedAt: _clock(),

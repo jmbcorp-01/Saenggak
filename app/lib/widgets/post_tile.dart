@@ -6,6 +6,7 @@ import '../l10n/l10n.dart';
 import '../models/post.dart';
 import '../theme/tokens.dart';
 import 'pressable.dart';
+import 'post_body.dart';
 
 /// Round profile photo. Shows the initial on a colored circle when there is
 /// no photo, or while it loads, or if it fails to load.
@@ -295,7 +296,7 @@ class _PostTileState extends State<PostTile> {
                         duration: SgMotion.medium,
                         layoutBuilder: (current, previous) =>
                             Stack(alignment: Alignment.topLeft, children: [...previous, ?current]),
-                        child: Text(
+                        child: PostBody(
                           translated ? post.translation! : post.body,
                           key: ValueKey(translated),
                           style: SgText.body,

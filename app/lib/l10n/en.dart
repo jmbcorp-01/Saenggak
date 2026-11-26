@@ -215,6 +215,9 @@ const english = <String, String>{
   '편한 방법으로 들어가요.': "Sign in the way that suits you.",
   '로그인을 취소했어요.': "Sign-in was cancelled.",
   '로그인하지 못했어요. 다시 시도해주세요.': "Couldn't sign you in. Please try again.",
+  '줄이 너무 많아요 ({0}/{1})': "Too many lines ({0}/{1})",
+  '줄을 조금 합쳐주세요. 빈 줄을 포함해 12줄까지 올릴 수 있어요.':
+      "Please join some lines. Posts can have up to 12 lines, blank ones included.",
   '이메일이나 비밀번호가 맞지 않아요.': "The email or password is incorrect.",
   '이미 가입한 이메일이에요. 로그인해주세요.': "This email already has an account. Please sign in.",
   '이미 계정이 있나요?': "Already have an account?",

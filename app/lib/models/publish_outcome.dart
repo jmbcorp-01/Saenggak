@@ -48,6 +48,7 @@ class Published extends PublishOutcome {
 enum RejectReason {
   tooShort,
   tooLong,
+  tooManyLines,
   notHuman,
   blocked,
   locked,
@@ -66,7 +67,11 @@ class Rejected extends PublishOutcome {
   factory Rejected.fromJson(int status, Map<String, dynamic> j) {
     switch (j['error']) {
       case 'invalid_length':
-        return Rejected(j['verdict'] == 'too_long' ? RejectReason.tooLong : RejectReason.tooShort);
+        return Rejected(switch (j['verdict']) {
+          'too_long' => RejectReason.tooLong,
+          'too_many_lines' => RejectReason.tooManyLines,
+          _ => RejectReason.tooShort,
+        });
       case 'not_human':
         return const Rejected(RejectReason.notHuman);
       case 'blocked':
@@ -96,6 +101,7 @@ class Rejected extends PublishOutcome {
   String get message => switch (reason) {
     RejectReason.tooShort => t('조금 더 써주세요. 한국어 40자, 영어 15단어 정도부터 올릴 수 있어요.'),
     RejectReason.tooLong => t('조금 줄여주세요. 한국어 200자, 영어 70단어 정도까지 올릴 수 있어요.'),
+    RejectReason.tooManyLines => t('줄을 조금 합쳐주세요. 빈 줄을 포함해 12줄까지 올릴 수 있어요.'),
     RejectReason.notHuman => t('사람이 직접 입력한 기록으로 확인되지 않았어요. 다시 써주세요.'),
     RejectReason.locked => t('공감을 받은 글은 수정할 수 없어요.'),
     RejectReason.notFound => t('글을 찾을 수 없어요. 이미 삭제됐을 수 있어요.'),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkLength, weightedLength } from '../src/rules/weightedLength.js';
+import { checkLength, lineCount, tidyPost, weightedLength } from '../src/rules/weightedLength.js';
 import { activeDurationMs, evaluate, parseSession } from '../src/rules/humanCheck.js';
 import { followUnlocked } from '../src/rules/follow.js';
 import { cosineSimilarity, MAX_COSINE_DISTANCE, summarizeSimilar } from '../src/rules/similar.js';
@@ -14,6 +14,16 @@ describe('weighted length', () => {
     expect(checkLength('가'.repeat(40))).toBe('ok');
     expect(checkLength('가'.repeat(200))).toBe('ok');
     expect(checkLength('가'.repeat(201))).toBe('too_long');
+  });
+  it('keeps one blank line at most and drops stray spaces', () => {
+    expect(tidyPost('\n\n첫 줄   \r\n\n\n\n\n둘째 줄\t\n\n')).toBe('첫 줄\n\n둘째 줄');
+    expect(tidyPost('한 줄\n다음 줄')).toBe('한 줄\n다음 줄');
+  });
+  it('allows twelve lines, blank ones included', () => {
+    const lines = (n: number) => Array.from({ length: n }, () => '가나다라마바').join('\n');
+    expect(lineCount(lines(12))).toBe(12);
+    expect(checkLength(lines(12))).toBe('ok');
+    expect(checkLength(lines(13))).toBe('too_many_lines');
   });
 });
 

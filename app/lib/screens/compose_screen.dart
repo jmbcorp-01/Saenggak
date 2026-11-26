@@ -268,11 +268,15 @@ class LengthRing extends StatelessWidget {
         ? t('조금 더 써주세요')
         : status.tooLong
         ? t('조금 줄여주세요')
+        : status.tooManyLines
+        ? t('줄이 너무 많아요 ({0}/{1})', [status.lines, WeightedLength.maxLines])
         : null;
     final label = status.tooShort
         ? t('길이 부족')
         : status.tooLong
         ? t('최대 길이 넘음')
+        : status.tooManyLines
+        ? t('줄이 너무 많아요 ({0}/{1})', [status.lines, WeightedLength.maxLines])
         : t('최대까지 {0}', [status.remaining]);
     return Semantics(
       label: label,
@@ -283,7 +287,9 @@ class LengthRing extends StatelessWidget {
             ExcludeSemantics(
               child: Text(
                 hint,
-                style: SgText.small.copyWith(color: status.tooLong ? SgColors.accentText : SgColors.muted),
+                style: SgText.small.copyWith(
+                  color: status.tooLong || status.tooManyLines ? SgColors.accentText : SgColors.muted,
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -309,7 +315,7 @@ class _RingPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5;
     canvas.drawCircle(center, r, track);
-    final color = status.tooLong
+    final color = status.tooLong || status.tooManyLines
         ? SgColors.accentText
         : status.tooShort
         ? SgColors.muted
@@ -323,5 +329,5 @@ class _RingPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_RingPainter old) => old.status.units != status.units;
+  bool shouldRepaint(_RingPainter old) => old.status.units != status.units || old.status.lines != status.lines;
 }
