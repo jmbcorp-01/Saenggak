@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'api/cognito_auth.dart';
@@ -5,15 +8,18 @@ import 'api/config.dart';
 import 'api/demo_backend.dart';
 import 'api/http_backend.dart';
 import 'api/token_store.dart';
+import 'core/appearance.dart';
 import 'data/app_state.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_shell.dart';
 import 'screens/profile_setup_screen.dart';
 import 'screens/start_screen.dart';
 import 'theme/tokens.dart';
+import 'widgets/symbol_mark.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Appearance.instance.load();
   final config = await ApiConfig.load();
   if (config.isDemo) {
     runApp(SaenggakApp(state: AppState(backend: DemoBackend())));
@@ -34,7 +40,7 @@ Future<void> main() async {
 }
 
 /// Without [auth] the app runs on the demo backend and skips sign-in.
-class SaenggakApp extends StatelessWidget {
+class SaenggakApp extends StatefulWidget {
   const SaenggakApp({super.key, required this.state, this.auth, this.resumed = false});
 
   final AppState state;
@@ -43,9 +49,60 @@ class SaenggakApp extends StatelessWidget {
   /// A saved session was restored, so the start screen is skipped.
   final bool resumed;
 
+  @override
+  State<SaenggakApp> createState() => _SaenggakAppState();
+}
+
+class _SaenggakAppState extends State<SaenggakApp> with WidgetsBindingObserver {
+  AppState get state => widget.state;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    Appearance.instance.addListener(_applyPalette);
+    SgColors.use(_palette());
+  }
+
+  @override
+  void dispose() {
+    Appearance.instance.removeListener(_applyPalette);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangePlatformBrightness() => _applyPalette();
+
+  SgPalette _palette() {
+    final dark = switch (Appearance.instance.value) {
+      ThemeMode.dark => true,
+      ThemeMode.light => false,
+      ThemeMode.system => WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark,
+    };
+    return dark ? SgPalette.dark : SgPalette.light;
+  }
+
+  /// Colors are read from [SgColors] during build, so every widget is
+  /// rebuilt (keeping its state) when the palette changes.
+  void _applyPalette() {
+    final next = _palette();
+    if (next == SgColors.palette) return;
+    SgColors.use(next);
+    setState(() {});
+    void visit(Element e) {
+      e.markNeedsBuild();
+      e.visitChildren(visit);
+    }
+
+    WidgetsBinding.instance.rootElement?.visitChildren(visit);
+  }
+
   /// After sign-in: create the profile if this is a new account, then home.
   Future<void> _enter(NavigatorState nav) async {
-    await state.start();
+    // Home opens as soon as the profile is known; the timeline fills in there.
+    await state.loadMe();
+    if (state.me != null) unawaited(state.loadLists());
     if (state.me == null) {
       await nav.pushAndRemoveUntil(
         MaterialPageRoute<void>(
@@ -53,7 +110,7 @@ class SaenggakApp extends StatelessWidget {
             state: state,
             firstTime: true,
             onDone: () {
-              state.refresh();
+              state.loadLists();
               nav.pushNamedAndRemoveUntil('/home', (_) => false);
             },
           ),
@@ -67,7 +124,7 @@ class SaenggakApp extends StatelessWidget {
 
   void _openAuth(BuildContext context, {required bool signUp}) {
     final nav = Navigator.of(context);
-    final auth = this.auth;
+    final auth = widget.auth;
     if (auth == null) {
       _enter(nav);
       return;
@@ -81,11 +138,19 @@ class SaenggakApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = SgColors.palette;
     return MaterialApp(
       title: '생각',
       debugShowCheckedModeBanner: false,
-      theme: buildTheme(),
-      initialRoute: resumed ? '/resume' : '/',
+      theme: buildTheme(palette),
+      // Widgets take their colors straight from the palette, so the theme
+      // switches at once rather than fading under them.
+      themeAnimationDuration: Duration.zero,
+      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SgColors.isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+        child: child!,
+      ),
+      initialRoute: widget.resumed ? '/resume' : '/',
       routes: {
         '/': (context) => StartScreen(
           onSignUp: () => _openAuth(context, signUp: true),
@@ -126,5 +191,5 @@ class _ResumeState extends State<_Resume> {
   }
 
   @override
-  Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator()));
+  Widget build(BuildContext context) => const Scaffold(body: Center(child: SymbolMark(size: 48)));
 }

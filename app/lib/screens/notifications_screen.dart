@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../core/nav.dart';
 import '../data/app_state.dart';
 import '../models/post.dart' show avatarPalette, timeAgo;
 import '../theme/tokens.dart';
@@ -19,11 +20,11 @@ class NotificationsScreen extends StatelessWidget {
       builder: (context, _) {
         final items = state.notifications;
         final now = state.clock();
-        return RefreshIndicator(
+        final list = RefreshIndicator(
           onRefresh: state.loadNotifications,
           child: items.isEmpty
               ? ListView(
-                  children: const [
+                  children: [
                     SizedBox(height: 160),
                     Center(child: Text('아직 알림이 없어요.', style: SgText.small)),
                     SizedBox(height: 8),
@@ -32,7 +33,7 @@ class NotificationsScreen extends StatelessWidget {
                 )
               : ListView.separated(
                   itemCount: items.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1, color: SgColors.line),
+                  separatorBuilder: (_, _) => Divider(height: 1, color: SgColors.line),
                   itemBuilder: (context, i) {
                     final n = items[i];
                     final what = n.kind == 'follow' ? '님이 나를 팔로우해요.' : '님이 내 생각에 공감했어요.';
@@ -55,17 +56,25 @@ class NotificationsScreen extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => Scaffold(
-                            appBar: AppBar(backgroundColor: SgColors.surface, surfaceTintColor: Colors.transparent),
-                            body: ProfileScreen(state: state, userId: n.actorId),
-                          ),
-                        ),
-                      ),
+                      onTap: () => pushPage<void>(context, (_) => ProfilePage(state: state, userId: n.actorId)),
                     );
                   },
                 ),
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              height: 52,
+              padding: const EdgeInsets.symmetric(horizontal: SgSpace.lg),
+              alignment: Alignment.centerLeft,
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: SgColors.line)),
+              ),
+              child: Semantics(header: true, child: Text('알림', style: SgText.title)),
+            ),
+            Expanded(child: list),
+          ],
         );
       },
     );

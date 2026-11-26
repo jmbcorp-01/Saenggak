@@ -4,6 +4,7 @@ import '../api/backend.dart';
 import '../data/app_state.dart';
 import '../models/post.dart';
 import '../models/profile.dart';
+import '../core/nav.dart';
 import '../theme/tokens.dart';
 import '../widgets/post_actions.dart';
 import '../widgets/post_tile.dart';
@@ -12,6 +13,20 @@ import '../widgets/symbol_mark.dart';
 import 'photo_capture_screen.dart';
 import 'profile_setup_screen.dart';
 import 'settings_screen.dart';
+
+/// Someone else's profile as its own page, with a back button.
+class ProfilePage extends StatelessWidget {
+  const ProfilePage({super.key, required this.state, required this.userId});
+
+  final AppState state;
+  final String userId;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(),
+    body: ProfileScreen(state: state, userId: userId),
+  );
+}
 
 /// A writer's profile: photo, counts, follow progress or button, and posts.
 /// Without [userId] (or with the reader's own id) it is the reader's own.
@@ -86,8 +101,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _takePhoto() async {
-    final saved = await Navigator.of(context)
-        .push<bool>(MaterialPageRoute(builder: (context) => PhotoCaptureScreen(state: widget.state)));
+    final saved = await Navigator.of(
+      context,
+      rootNavigator: true,
+    ).push<bool>(MaterialPageRoute(builder: (context) => PhotoCaptureScreen(state: widget.state)));
     if (saved == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('프로필 사진을 바꿨어요.')));
     }
@@ -121,10 +138,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   Container(
                     height: 104,
-                    decoration: const BoxDecoration(color: SgColors.band),
+                    decoration: BoxDecoration(color: SgColors.band),
                     alignment: Alignment.topRight,
                     clipBehavior: Clip.hardEdge,
-                    child: const SymbolMark(
+                    child: SymbolMark(
                       size: 150,
                       strokeColor: SgColors.bandMark,
                       dotColor: SgColors.bandMark,
@@ -135,7 +152,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     left: 16,
                     top: 104 - 44,
                     child: Container(
-                      decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: SgColors.surface),
                       padding: const EdgeInsets.all(4),
                       child: Avatar(
                         initial: profile.initial,
@@ -152,11 +169,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       top: 104 + 44 - 30,
                       child: Material(
                         color: SgColors.ink,
-                        shape: const CircleBorder(side: BorderSide(color: Colors.white, width: 2)),
+                        shape: CircleBorder(side: BorderSide(color: SgColors.surface, width: 2)),
                         child: IconButton(
                           onPressed: _takePhoto,
                           tooltip: profile.photoUrl == null ? '프로필 사진 찍기' : '프로필 사진 다시 찍기',
-                          icon: const Icon(Icons.photo_camera_outlined, size: 18, color: Colors.white),
+                          icon: Icon(Icons.photo_camera_outlined, size: 18, color: SgColors.onInk),
                           constraints: const BoxConstraints.tightFor(width: 44, height: 44),
                           padding: EdgeInsets.zero,
                         ),
@@ -168,10 +185,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       top: 4,
                       child: IconButton(
                         tooltip: '설정',
-                        icon: const Icon(Icons.settings_outlined, color: SgColors.ink),
-                        onPressed: () =>
-                            Navigator.of(context)
-                                .push(MaterialPageRoute<void>(builder: (_) => SettingsScreen(state: widget.state))),
+                        icon: Icon(Icons.settings_outlined, color: SgColors.ink),
+                        onPressed: () => pushPage<void>(context, (_) => SettingsScreen(state: widget.state)),
                       ),
                     ),
                   Positioned(
@@ -187,7 +202,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: SgColors.ink,
-                              side: const BorderSide(color: SgColors.outline),
+                              side: BorderSide(color: SgColors.outline),
                               minimumSize: const Size(0, 40),
                               textStyle: SgText.label(size: 14),
                             ),
@@ -268,7 +283,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const Divider(height: 1),
             if (shown.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.all(32),
                 child: Text('아직 쓴 글이 없어요.', textAlign: TextAlign.center, style: SgText.small),
               ),
@@ -282,7 +297,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   TextSpan _count(String n) => TextSpan(
     text: n,
-    style: const TextStyle(color: SgColors.ink, fontWeight: FontWeight.w700),
+    style: TextStyle(color: SgColors.ink, fontWeight: FontWeight.w700),
   );
 }
 
@@ -300,12 +315,12 @@ class _FollowButton extends StatelessWidget {
     final style = following
         ? OutlinedButton.styleFrom(
             foregroundColor: SgColors.ink,
-            side: const BorderSide(color: SgColors.outline),
+            side: BorderSide(color: SgColors.outline),
             textStyle: SgText.label(size: 14, weight: FontWeight.w700),
           )
         : OutlinedButton.styleFrom(
             backgroundColor: SgColors.ink,
-            foregroundColor: Colors.white,
+            foregroundColor: SgColors.onInk,
             disabledBackgroundColor: SgColors.line,
             disabledForegroundColor: SgColors.muted,
             side: BorderSide.none,

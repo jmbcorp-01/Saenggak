@@ -51,7 +51,7 @@ class PublishResultScreen extends StatelessWidget {
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.only(left: 14),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(left: BorderSide(color: SgColors.line, width: 3)),
               ),
               child: Text.rich(
@@ -66,18 +66,18 @@ class PublishResultScreen extends StatelessWidget {
               const SizedBox(height: 28),
               const Text('처음 쓴 표현', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
               const SizedBox(height: 4),
-              const Text('지금까지 아무도 쓰지 않았던 표현이에요.', style: SgText.small),
+              Text('지금까지 아무도 쓰지 않았던 표현이에요.', style: SgText.small),
               const SizedBox(height: 8),
               for (final phrase in outcome.firstPhrases)
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     border: Border(bottom: BorderSide(color: SgColors.line)),
                   ),
                   child: Row(
                     children: [
                       Expanded(
-                        child: Text('“$phrase”', style: const TextStyle(fontSize: 16, color: SgColors.ink)),
+                        child: Text('“$phrase”', style: TextStyle(fontSize: 16, color: SgColors.ink)),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -96,7 +96,7 @@ class PublishResultScreen extends StatelessWidget {
             ],
             const SizedBox(height: 28),
             if (outcome.followUnlocked)
-              const Text('팔로우가 열려 있어요. 마음에 드는 글쓴이를 팔로우해보세요.', style: SgText.small)
+              Text('팔로우가 열려 있어요. 마음에 드는 글쓴이를 팔로우해보세요.', style: SgText.small)
             else
               FollowProgress(days: outcome.writingDays, total: daysToFollow),
             const SizedBox(height: 28),
@@ -105,7 +105,7 @@ class PublishResultScreen extends StatelessWidget {
               onPressed: () => Navigator.of(context).pop(),
               style: FilledButton.styleFrom(
                 backgroundColor: SgColors.ink,
-                foregroundColor: Colors.white,
+                foregroundColor: SgColors.onInk,
                 minimumSize: const Size.fromHeight(50),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
                 textStyle: SgText.label(size: 16, weight: FontWeight.w700),
@@ -155,15 +155,15 @@ class _SimilarCard extends StatelessWidget {
                   semanticsLabel: '비슷한 생각을 한 사람 ${outcome.similarPeople}명',
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   '비슷한 생각을 한 사람이 있어요',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: SgColors.ink),
                 ),
                 const SizedBox(height: 8),
-                const Text('뜻이 가까운 글을 쓴 다른 사람 수예요. 누가 썼는지는 보여주지 않아요.', style: SgText.small),
+                Text('뜻이 가까운 글을 쓴 다른 사람 수예요. 누가 썼는지는 보여주지 않아요.', style: SgText.small),
               ],
             )
-          : const Column(
+          : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
@@ -200,7 +200,7 @@ List<InlineSpan> highlightPhrases(String body, List<String> phrases) {
     spans.add(
       TextSpan(
         text: body.substring(start, end),
-        style: const TextStyle(
+        style: TextStyle(
           decoration: TextDecoration.underline,
           decorationColor: SgColors.accent,
           decorationThickness: 2,

@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../core/nav.dart';
 import '../data/app_state.dart';
 import '../models/post.dart';
 import '../screens/admin_screen.dart' show askNote;
@@ -26,21 +27,9 @@ class ConnectedPostTile extends StatelessWidget {
       now: state.clock(),
       onEmpathy: () => state.toggleEmpathy(post),
       onOpenAuthor: openAuthor
-          ? () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => Scaffold(
-                  appBar: AppBar(backgroundColor: SgColors.surface, surfaceTintColor: Colors.transparent),
-                  body: ProfileScreen(state: state, userId: post.authorId),
-                ),
-              ),
-            )
+          ? () => pushPage<void>(context, (_) => ProfilePage(state: state, userId: post.authorId))
           : null,
-      onEdit: () => Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          fullscreenDialog: true,
-          builder: (_) => ComposeScreen(state: state, editing: post),
-        ),
-      ),
+      onEdit: () => pushModal<void>(context, (_) => ComposeScreen(state: state, editing: post)),
       onDelete: () => confirmDelete(context, state, post),
       onAdminRemove: (state.me?.isAdmin ?? false) ? () => _adminRemove(context) : null,
       onReport: () => reportFlow(context, state, userId: post.authorId, handle: post.authorHandle, postId: post.id),

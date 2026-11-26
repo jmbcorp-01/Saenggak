@@ -85,13 +85,13 @@ class _AuthScreenState extends State<AuthScreen> {
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
+          padding: formPadding(context),
           children: [
             Text(title, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.5)),
             const SizedBox(height: 8),
             Text(
               _needsCode ? '${_email.text.trim()}로 보낸 6자리 코드를 입력해주세요.' : '이메일과 비밀번호로 ${_signUp ? '시작해요' : '들어가요'}.',
-              style: const TextStyle(fontSize: 15, color: SgColors.muted),
+              style: TextStyle(fontSize: 15, color: SgColors.muted),
             ),
             const SizedBox(height: 28),
             if (!_needsCode) ...[
@@ -122,7 +122,7 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
             if (_error != null) ...[
               const SizedBox(height: 12),
-              Text(_error!, style: const TextStyle(fontSize: 14, color: SgColors.accentText)),
+              Text(_error!, style: TextStyle(fontSize: 14, color: SgColors.accentText)),
             ],
             const SizedBox(height: 24),
             FilledButton(
@@ -130,16 +130,16 @@ class _AuthScreenState extends State<AuthScreen> {
               onPressed: _busy ? null : _submit,
               style: FilledButton.styleFrom(
                 backgroundColor: SgColors.ink,
-                foregroundColor: Colors.white,
+                foregroundColor: SgColors.onInk,
                 minimumSize: const Size.fromHeight(50),
                 shape: pill,
                 textStyle: SgText.label(size: 16, weight: FontWeight.w700),
               ),
               child: _busy
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: SgColors.onInk),
                     )
                   : Text(_needsCode ? '인증하기' : (_signUp ? '다음' : '로그인')),
             ),
@@ -150,12 +150,12 @@ class _AuthScreenState extends State<AuthScreen> {
                   alignment: WrapAlignment.center,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    const Text('가입하면 ', style: SgText.small),
+                    Text('가입하면 ', style: SgText.small),
                     InkWell(
                       onTap: () => openPage('terms.html'),
                       child: const Text('이용약관', style: TextStyle(fontSize: 13, decoration: TextDecoration.underline)),
                     ),
-                    const Text('과 ', style: SgText.small),
+                    Text('과 ', style: SgText.small),
                     InkWell(
                       onTap: () => openPage('privacy.html'),
                       child: const Text(
@@ -163,7 +163,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         style: TextStyle(fontSize: 13, decoration: TextDecoration.underline),
                       ),
                     ),
-                    const Text('에 동의하게 돼요. 만 14세 이상만 가입할 수 있어요.', style: SgText.small),
+                    Text('에 동의하게 돼요. 만 14세 이상만 가입할 수 있어요.', style: SgText.small),
                   ],
                 ),
               ),
@@ -206,11 +206,11 @@ class _AuthScreenState extends State<AuthScreen> {
     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: SgColors.outline),
+      borderSide: BorderSide(color: SgColors.outline),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: SgColors.ink, width: 1.5),
+      borderSide: BorderSide(color: SgColors.ink, width: 1.5),
     ),
   );
 }

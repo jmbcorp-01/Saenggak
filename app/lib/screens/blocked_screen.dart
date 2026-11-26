@@ -53,7 +53,7 @@ class _BlockedScreenState extends State<BlockedScreen> {
       body: users == null
           ? const Center(child: CircularProgressIndicator())
           : users.isEmpty
-          ? const Center(child: Text('차단한 사람이 없어요.', style: SgText.small))
+          ? Center(child: Text('차단한 사람이 없어요.', style: SgText.small))
           : ListView(
               children: [
                 for (final u in users)

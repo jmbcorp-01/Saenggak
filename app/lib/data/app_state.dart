@@ -43,13 +43,34 @@ class AppState extends ChangeNotifier {
   int unreadNotifications = 0;
   String? error;
 
+  /// Newer posts found by [checkForNew], held back until the reader asks for
+  /// them so the timeline does not jump under their thumb.
+  List<Post> incoming = const [];
+
+  /// Posts that have just arrived at the top of the feed. They settle in with
+  /// a little motion instead of popping in.
+  Set<String> fresh = const {};
+
   /// Feed translations go into the reader's language.
   String get lang => me?.locale ?? 'ko';
   bool get hasMore => _feedNext != null;
 
   /// Loads the profile and the first page of each list.
   Future<void> start() async {
+    await loadMe();
+    await loadLists();
+  }
+
+  /// The reader's own profile; null for a new account.
+  Future<void> loadMe() async {
     me = await backend.me();
+    notifyListeners();
+  }
+
+  /// The first page of each list. Until it arrives the feed shows
+  /// placeholder rows.
+  Future<void> loadLists() async {
+    loading = true;
     notifyListeners();
     await Future.wait([refresh(), if (me != null) loadNotifications()]);
   }
@@ -65,8 +86,11 @@ class AppState extends ChangeNotifier {
         if (unlocked) backend.feed(lang: lang, following: true),
         if (me != null) backend.feed(lang: lang, authorId: me!.id),
       ]);
+      final before = {for (final p in feed) p.id};
       feed = results[0].items;
       _feedNext = results[0].next;
+      incoming = const [];
+      fresh = before.isEmpty ? const {} : {for (final p in feed.takeWhile((p) => !before.contains(p.id))) p.id};
       var k = 1;
       following = unlocked ? results[k++].items : const [];
       mine = me != null ? results[k].items : const [];
@@ -76,6 +100,34 @@ class AppState extends ChangeNotifier {
       loading = false;
       notifyListeners();
     }
+  }
+
+  /// Looks for posts newer than the top of the feed, without showing them.
+  Future<void> checkForNew() async {
+    if (loading || feed.isEmpty) return;
+    try {
+      final page = await backend.feed(lang: lang);
+      final known = {for (final p in feed) p.id, for (final p in incoming) p.id};
+      final newest = feed.first.createdAt;
+      final found = [
+        for (final p in page.items)
+          if (!known.contains(p.id) && !p.isMine && p.createdAt.isAfter(newest)) p,
+      ];
+      if (found.isEmpty) return;
+      incoming = [...found, ...incoming];
+      notifyListeners();
+    } catch (_) {
+      // Quietly try again next time.
+    }
+  }
+
+  /// Puts the posts [checkForNew] found at the top of the feed.
+  void showIncoming() {
+    if (incoming.isEmpty) return;
+    fresh = {for (final p in incoming) p.id};
+    feed = [...incoming, ...feed];
+    incoming = const [];
+    notifyListeners();
   }
 
   Future<void> loadMore() async {

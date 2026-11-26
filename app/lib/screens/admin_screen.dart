@@ -125,7 +125,7 @@ class _ReviewTabState extends State<_ReviewTab> {
       onRefresh: _load,
       child: items.isEmpty
           ? ListView(
-              children: const [
+              children: [
                 SizedBox(height: 120),
                 Center(child: Text('검토할 글이 없어요.', style: SgText.small)),
               ],
@@ -240,7 +240,7 @@ class _ReportsTabState extends State<_ReportsTab> {
       onRefresh: _load,
       child: items.isEmpty
           ? ListView(
-              children: const [
+              children: [
                 SizedBox(height: 120),
                 Center(child: Text('처리할 신고가 없어요.', style: SgText.small)),
               ],
@@ -379,7 +379,7 @@ class _UsersTabState extends State<_UsersTab> {
           child: users == null
               ? Center(child: _error == null ? const CircularProgressIndicator() : Text(_error!, style: SgText.small))
               : users.isEmpty
-              ? const Center(child: Text('찾는 사람이 없어요.', style: SgText.small))
+              ? Center(child: Text('찾는 사람이 없어요.', style: SgText.small))
               : ListView.builder(
                   itemCount: users.length,
                   itemBuilder: (context, i) {
@@ -398,7 +398,7 @@ class _UsersTabState extends State<_UsersTab> {
                           if (u.suspended)
                             '정지됨${u.suspendedReason?.isNotEmpty == true ? ' (${u.suspendedReason})' : ''}',
                         ].join(' · '),
-                        style: u.suspended ? const TextStyle(color: SgColors.accentText) : null,
+                        style: u.suspended ? TextStyle(color: SgColors.accentText) : null,
                       ),
                       trailing: u.id == widget.myId
                           ? null

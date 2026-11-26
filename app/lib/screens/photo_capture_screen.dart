@@ -155,7 +155,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> with WidgetsBin
         ),
       );
     } else {
-      view = const ColoredBox(color: SgColors.band);
+      view = ColoredBox(color: SgColors.band);
     }
 
     return Scaffold(
@@ -179,7 +179,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> with WidgetsBin
                 child: Text(
                   _error!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: SgColors.accentText, fontSize: 14, height: 1.4),
+                  style: TextStyle(color: SgColors.accentText, fontSize: 14, height: 1.4),
                 ),
               )
             else

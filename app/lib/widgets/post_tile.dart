@@ -1,8 +1,10 @@
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/typing_session.dart';
 import '../models/post.dart';
 import '../theme/tokens.dart';
+import 'pressable.dart';
 
 /// Round profile photo. Shows the initial on a colored circle when there is
 /// no photo, or while it loads, or if it fails to load.
@@ -18,7 +20,7 @@ class Avatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bg = Color(color);
-    final fg = bg.computeLuminance() > 0.4 ? SgColors.ink : Colors.white;
+    final fg = bg.computeLuminance() > 0.4 ? const Color(0xFF151515) : Colors.white;
     final letter = Text(
       initial,
       style: TextStyle(color: fg, fontSize: size * 0.38, fontWeight: FontWeight.w500),
@@ -108,7 +110,7 @@ class TypingTimeLabel extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.keyboard_outlined, size: 15, color: SgColors.muted),
+            Icon(SgIcons.keyboard, size: 15, color: SgColors.muted),
             const SizedBox(width: 5),
             Text(text, style: SgText.mono),
           ],
@@ -160,167 +162,344 @@ class PostTile extends StatefulWidget {
 class _PostTileState extends State<PostTile> {
   bool _showOriginal = false;
 
+  /// The actions open to this reader, for the "..." menu and the long-press
+  /// sheet alike.
+  List<({String value, String label, bool danger})> _actions() {
+    final post = widget.post;
+    return [
+      if (!post.isMine && widget.onReport != null) (value: 'report', label: '신고', danger: false),
+      if (!post.isMine && widget.onBlock != null) (value: 'block', label: '@${post.authorHandle} 차단', danger: false),
+      if (!post.isMine && widget.onAdminRemove != null) (value: 'admin-remove', label: '관리자: 글 내리기', danger: true),
+      if (post.editable && widget.onEdit != null) (value: 'edit', label: '수정', danger: false),
+      if (post.isMine && widget.onDelete != null) (value: 'delete', label: '삭제', danger: true),
+    ];
+  }
+
+  void _run(String value) => switch (value) {
+    'edit' => widget.onEdit!(),
+    'delete' => widget.onDelete!(),
+    'report' => widget.onReport!(),
+    'block' => widget.onBlock!(),
+    _ => widget.onAdminRemove!(),
+  };
+
+  /// Long press on a phone: the same actions in a sheet from the bottom.
+  Future<void> _openSheet() async {
+    final actions = _actions();
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      useRootNavigator: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final a in actions)
+              ListTile(
+                title: Text(a.label, style: TextStyle(color: a.danger ? SgColors.accentText : SgColors.ink)),
+                onTap: () => Navigator.pop(context, a.value),
+              ),
+            const SizedBox(height: SgSpace.sm),
+          ],
+        ),
+      ),
+    );
+    if (picked != null && mounted) _run(picked);
+  }
+
   @override
   Widget build(BuildContext context) {
     final post = widget.post;
-    final active = post.empathizedByMe;
-    final empathyColor = active ? SgColors.accentText : SgColors.muted;
     final translated = post.translation != null && !_showOriginal;
     final ago = timeAgo(post.createdAt, widget.now ?? DateTime.now());
-    final canEdit = post.editable && widget.onEdit != null;
-    final canDelete = post.isMine && widget.onDelete != null;
-    final canRemove = !post.isMine && widget.onAdminRemove != null;
-    final canReport = !post.isMine && widget.onReport != null;
-    final canBlock = !post.isMine && widget.onBlock != null;
+    final actions = _actions();
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: SgColors.line)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // The name beside it is the labelled way to the profile; the photo is
-          // a second place to tap and is left out of the screen reader.
-          ExcludeSemantics(
-            child: GestureDetector(
-              onTap: widget.onOpenAuthor,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Avatar(initial: post.authorInitial, color: post.avatarColor, photoUrl: post.authorPhotoUrl),
+    return Pressable(
+      onLongPress: actions.isEmpty ? null : _openSheet,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(SgSpace.lg, SgSpace.sm, SgSpace.sm, SgSpace.xs),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: SgColors.line)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // The name beside it is the labelled way to the profile; the photo is
+            // a second place to tap and is left out of the screen reader.
+            ExcludeSemantics(
+              child: MouseRegion(
+                cursor: widget.onOpenAuthor != null ? SystemMouseCursors.click : MouseCursor.defer,
+                child: GestureDetector(
+                  onTap: widget.onOpenAuthor,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Avatar(initial: post.authorInitial, color: post.avatarColor, photoUrl: post.authorPhotoUrl),
+                  ),
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Semantics(
-                        button: widget.onOpenAuthor != null,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: widget.onOpenAuthor,
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(minHeight: 48),
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              widthFactor: 1,
-                              child: Text.rich(
-                                TextSpan(
-                                  children: [
-                                    TextSpan(text: post.authorName, style: SgText.name),
-                                    TextSpan(
-                                      text: ' @${post.authorHandle} · $ago${post.editedAt != null ? ' · 수정됨' : ''}',
-                                      style: SgText.meta,
-                                    ),
-                                  ],
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
+            const SizedBox(width: SgSpace.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Semantics(
+                          button: widget.onOpenAuthor != null,
+                          child: _AuthorLine(
+                            name: post.authorName,
+                            rest: ' @${post.authorHandle} · $ago${post.editedAt != null ? ' · 수정됨' : ''}',
+                            onTap: widget.onOpenAuthor,
                           ),
+                        ),
+                      ),
+                      if (actions.isNotEmpty)
+                        PopupMenuButton<String>(
+                          key: ValueKey('menu-${post.id}'),
+                          tooltip: '더보기',
+                          iconSize: 18,
+                          icon: Icon(SgIcons.more, color: SgColors.muted),
+                          onSelected: _run,
+                          itemBuilder: (_) => [
+                            for (final a in actions)
+                              PopupMenuItem(
+                                value: a.value,
+                                child: Text(a.label, style: a.danger ? TextStyle(color: SgColors.accentText) : null),
+                              ),
+                          ],
+                        )
+                      else
+                        const SizedBox(height: 48),
+                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: SgSpace.sm),
+                    child: AnimatedSize(
+                      duration: SgMotion.medium,
+                      curve: SgMotion.ease,
+                      alignment: Alignment.topLeft,
+                      child: AnimatedSwitcher(
+                        duration: SgMotion.medium,
+                        layoutBuilder: (current, previous) =>
+                            Stack(alignment: Alignment.topLeft, children: [...previous, ?current]),
+                        child: Text(
+                          translated ? post.translation! : post.body,
+                          key: ValueKey(translated),
+                          style: SgText.body,
                         ),
                       ),
                     ),
-                    if (canEdit || canDelete || canRemove || canReport || canBlock)
-                      PopupMenuButton<String>(
-                        key: ValueKey('menu-${post.id}'),
-                        tooltip: '더보기',
-                        iconSize: 18,
-                        icon: const Icon(Icons.more_horiz, color: SgColors.muted),
-                        onSelected: (v) => switch (v) {
-                          'edit' => widget.onEdit!(),
-                          'delete' => widget.onDelete!(),
-                          'report' => widget.onReport!(),
-                          'block' => widget.onBlock!(),
-                          _ => widget.onAdminRemove!(),
-                        },
-                        itemBuilder: (_) => [
-                          if (canReport) const PopupMenuItem(value: 'report', child: Text('신고')),
-                          if (canBlock) PopupMenuItem(value: 'block', child: Text('@${post.authorHandle} 차단')),
-                          if (canRemove)
-                            const PopupMenuItem(
-                              value: 'admin-remove',
-                              child: Text('관리자: 글 내리기', style: TextStyle(color: SgColors.accentText)),
-                            ),
-                          if (canEdit) const PopupMenuItem(value: 'edit', child: Text('수정')),
-                          if (canDelete)
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: Text('삭제', style: TextStyle(color: SgColors.accentText)),
-                            ),
-                        ],
-                      )
-                    else
-                      const SizedBox(height: 48),
-                  ],
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Text(translated ? post.translation! : post.body, style: SgText.body),
-                ),
-                if (post.translation != null)
-                  Row(
-                    children: [
-                      Text(translated ? '${languageName(post.lang)}에서 번역됨 · ' : '원문 · ', style: SgText.small),
-                      TextButton(
-                        onPressed: () => setState(() => _showOriginal = !_showOriginal),
-                        style: TextButton.styleFrom(
-                          foregroundColor: SgColors.accentText,
-                          padding: const EdgeInsets.symmetric(horizontal: 2),
-                          minimumSize: const Size(48, 44),
-                          textStyle: SgText.label(size: 13, weight: FontWeight.w500),
-                        ),
-                        child: Text(translated ? '원문 보기' : '번역 보기'),
-                      ),
-                    ],
                   ),
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Semantics(
-                        key: ValueKey('empathy-${post.id}'),
-                        container: true,
-                        button: !post.isMine,
-                        label: '공감 ${post.empathyCount}${active ? ', 공감함' : ''}',
-                        child: ExcludeSemantics(
-                          child: InkWell(
+                  if (post.translation != null)
+                    Row(
+                      children: [
+                        Text(translated ? '${languageName(post.lang)}에서 번역됨 · ' : '원문 · ', style: SgText.small),
+                        TextButton(
+                          onPressed: () => setState(() => _showOriginal = !_showOriginal),
+                          style: TextButton.styleFrom(
+                            foregroundColor: SgColors.accentText,
+                            padding: const EdgeInsets.symmetric(horizontal: 2),
+                            minimumSize: const Size(48, 44),
+                            textStyle: SgText.label(size: 13, weight: FontWeight.w500),
+                          ),
+                          child: Text(translated ? '원문 보기' : '번역 보기'),
+                        ),
+                      ],
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: SgSpace.sm),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // The hover circle reaches past the text edge so the icon lines up with it.
+                        Transform.translate(
+                          offset: const Offset(-6, 0),
+                          child: EmpathyButton(
+                            key: ValueKey('empathy-${post.id}'),
+                            active: post.empathizedByMe,
+                            count: post.empathyCount,
                             onTap: post.isMine ? null : widget.onEmpathy,
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(minHeight: 44),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  EmpathyIcon(active: active, color: empathyColor),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    '${post.empathyCount}',
-                                    style: SgText.small.copyWith(
-                                      color: empathyColor,
-                                      fontWeight: active ? FontWeight.w500 : FontWeight.w400,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
                           ),
                         ),
-                      ),
-                      TypingTimeLabel(duration: post.typingTime),
-                    ],
+                        TypingTimeLabel(duration: post.typingTime),
+                      ],
+                    ),
                   ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "이름 @handle · 3시간". The name underlines under the mouse, as a link.
+class _AuthorLine extends StatefulWidget {
+  const _AuthorLine({required this.name, required this.rest, this.onTap});
+
+  final String name;
+  final String rest;
+  final VoidCallback? onTap;
+
+  @override
+  State<_AuthorLine> createState() => _AuthorLineState();
+}
+
+class _AuthorLineState extends State<_AuthorLine> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    // Only the text itself is the link, not the empty space after it.
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: MouseRegion(
+        cursor: widget.onTap != null ? SystemMouseCursors.click : MouseCursor.defer,
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              widthFactor: 1,
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: widget.name,
+                      style: SgText.name.copyWith(
+                        decoration: _hover && widget.onTap != null ? TextDecoration.underline : null,
+                      ),
+                    ),
+                    TextSpan(text: widget.rest, style: SgText.meta),
+                  ],
                 ),
-              ],
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The 공감 button. Turning it on pops the icon, fills it, and rolls the
+/// count up; turning it off rolls the count down.
+class EmpathyButton extends StatefulWidget {
+  const EmpathyButton({super.key, required this.active, required this.count, this.onTap});
+
+  final bool active;
+  final int count;
+
+  /// Null on the reader's own posts, which cannot be 공감ed.
+  final VoidCallback? onTap;
+
+  @override
+  State<EmpathyButton> createState() => _EmpathyButtonState();
+}
+
+class _EmpathyButtonState extends State<EmpathyButton> with SingleTickerProviderStateMixin {
+  late final _pop = AnimationController(vsync: this, duration: const Duration(milliseconds: 360));
+  late final _scale = TweenSequence<double>([
+    TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.32).chain(CurveTween(curve: Curves.easeOut)), weight: 40),
+    TweenSequenceItem(tween: Tween(begin: 1.32, end: 1.0).chain(CurveTween(curve: Curves.elasticOut)), weight: 60),
+  ]).animate(_pop);
+  bool _hover = false;
+  int _direction = 1;
+
+  @override
+  void didUpdateWidget(EmpathyButton old) {
+    super.didUpdateWidget(old);
+    if (old.count != widget.count) _direction = widget.count > old.count ? 1 : -1;
+    if (widget.active && !old.active) _pop.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _pop.dispose();
+    super.dispose();
+  }
+
+  void _tap() {
+    if (!widget.active) HapticFeedback.lightImpact();
+    widget.onTap!();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.active;
+    final color = active || (_hover && widget.onTap != null) ? SgColors.accentText : SgColors.muted;
+    return Semantics(
+      container: true,
+      button: widget.onTap != null,
+      label: '공감 ${widget.count}${active ? ', 공감함' : ''}',
+      child: ExcludeSemantics(
+        child: MouseRegion(
+          cursor: widget.onTap != null ? SystemMouseCursors.click : MouseCursor.defer,
+          onEnter: (_) => setState(() => _hover = true),
+          onExit: (_) => setState(() => _hover = false),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.onTap == null ? null : _tap,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // A soft accent circle behind the icon under the mouse.
+                  AnimatedContainer(
+                    duration: SgMotion.fast,
+                    width: 32,
+                    height: 32,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _hover && widget.onTap != null
+                          ? SgColors.accent.withValues(alpha: 0.1)
+                          : SgColors.accent.withValues(alpha: 0),
+                    ),
+                    child: ScaleTransition(
+                      scale: _scale,
+                      child: EmpathyIcon(active: active, color: color),
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  ClipRect(
+                    child: AnimatedSwitcher(
+                      duration: SgMotion.medium,
+                      switchInCurve: SgMotion.ease,
+                      switchOutCurve: Curves.easeIn,
+                      transitionBuilder: (child, animation) {
+                        final incoming = child.key == ValueKey(widget.count);
+                        final from = Offset(0, incoming ? 0.8 * _direction : -0.8 * _direction);
+                        return SlideTransition(
+                          position: Tween(begin: from, end: Offset.zero).animate(animation),
+                          child: FadeTransition(opacity: animation, child: child),
+                        );
+                      },
+                      child: Text(
+                        '${widget.count}',
+                        key: ValueKey(widget.count),
+                        style: SgText.small.copyWith(
+                          color: color,
+                          fontWeight: active ? FontWeight.w500 : FontWeight.w400,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -89,10 +89,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: formPadding(context, side: 24),
         children: [
           if (widget.firstTime) ...[
-            const Text('다른 사람에게 보이는 이름이에요.', style: TextStyle(fontSize: 15, color: SgColors.muted)),
+            Text('다른 사람에게 보이는 이름이에요.', style: TextStyle(fontSize: 15, color: SgColors.muted)),
             const SizedBox(height: 20),
           ],
           TextField(
@@ -116,7 +116,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             minLines: 1,
             decoration: const InputDecoration(labelText: '소개 (선택)'),
           ),
-          if (_error != null) Text(_error!, style: const TextStyle(fontSize: 14, color: SgColors.accentText)),
+          if (_error != null) Text(_error!, style: TextStyle(fontSize: 14, color: SgColors.accentText)),
         ],
       ),
     );

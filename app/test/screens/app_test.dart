@@ -155,7 +155,8 @@ void main() {
     await tester.tap(find.text('수정'));
     await tester.pumpAndSettle();
     expect(find.text('수정하기'), findsOneWidget);
-    expect(find.text(text), findsOneWidget);
+    // On a wide screen the editor opens over the timeline, which shows the post too.
+    expect(find.descendant(of: find.byType(ComposeScreen), matching: find.text(text)), findsOneWidget);
 
     await tester.showKeyboard(find.byKey(const Key('thought')));
     await typeLikeAPerson(tester, ' 오늘도 그랬다.', (d) => now = now.add(d), start: text);
@@ -254,7 +255,7 @@ void main() {
   testWidgets('my profile has a camera button for the photo', (tester) async {
     final state = AppState(backend: DemoBackend());
     await openHome(tester, state);
-    await tester.tap(find.text('프로필').last);
+    await tester.tap(find.byTooltip('프로필').first);
     await tester.pumpAndSettle();
     expect(find.byTooltip('프로필 사진 찍기'), findsOneWidget);
   });
