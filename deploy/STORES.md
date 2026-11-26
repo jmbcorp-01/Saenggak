@@ -44,9 +44,9 @@ App ids: **`app.saenggak`** on both stores. App name: **생각** (English: Saeng
 
 ## Store listing checklist
 
-- Privacy policy: `https://d2mvhrf2jc4qa9.cloudfront.net/privacy.html` (English: `/en/privacy.html`).
-  Support: `https://d2mvhrf2jc4qa9.cloudfront.net/support.html`. Switch these, and `SITE_URL` in
-  `app/config/production.json`, once a domain such as saenggak.app points at the site.
+- Privacy policy: `https://saenggak.app/privacy.html` (English: `/en/privacy.html`).
+  Support: `https://saenggak.app/support.html`. Support email: `support@saenggak.app`
+  (Cloudflare Email Routing forwards it to the owner's inbox).
 - Account deletion: in the app under Profile > Settings > 계정 삭제. On the web, use
   the same URL as support.
 - Content: user-generated, with reports, blocks and moderation. The age rating
