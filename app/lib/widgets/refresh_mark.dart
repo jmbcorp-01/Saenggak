@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../theme/tokens.dart';
+import 'symbol_mark.dart';
 
 /// The ㅅ symbol drawn stroke by stroke as the reader pulls down, then
 /// breathing while the feed reloads.
@@ -60,7 +61,7 @@ class _RefreshMarkState extends State<RefreshMark> with SingleTickerProviderStat
             scale: 1 + 0.12 * pulse,
             child: CustomPaint(
               size: Size.square(widget.size),
-              painter: _MarkPainter(
+              painter: SymbolStrokePainter(
                 progress: widget.spinning ? 1 : widget.progress,
                 dotLift: widget.spinning ? pulse : 0,
                 stroke: SgColors.accent,
@@ -72,48 +73,4 @@ class _RefreshMarkState extends State<RefreshMark> with SingleTickerProviderStat
       ),
     );
   }
-}
-
-class _MarkPainter extends CustomPainter {
-  _MarkPainter({required this.progress, required this.dotLift, required this.stroke, required this.dot});
-
-  final double progress;
-  final double dotLift;
-  final Color stroke;
-  final Color dot;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.scale(size.width / 64, size.height / 64);
-    final pen = Paint()
-      ..color = stroke
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 6.5
-      ..strokeCap = StrokeCap.round;
-    final first = Path()
-      ..moveTo(34, 9)
-      ..cubicTo(33, 27, 25, 43, 11, 55);
-    final second = Path()
-      ..moveTo(30.5, 30)
-      ..cubicTo(36, 42, 45, 50, 54, 55);
-    // First stroke over the first 45% of the pull, the second over the next
-    // 45%, then the dot.
-    void partial(Path path, double t) {
-      if (t <= 0) return;
-      for (final m in path.computeMetrics()) {
-        canvas.drawPath(m.extractPath(0, m.length * t.clamp(0.0, 1.0)), pen);
-      }
-    }
-
-    partial(first, progress / 0.45);
-    partial(second, (progress - 0.45) / 0.45);
-    final d = ((progress - 0.9) / 0.1).clamp(0.0, 1.0);
-    if (d > 0) {
-      canvas.drawCircle(Offset(47, 14 - 4 * dotLift), 3.4 * d, Paint()..color = dot);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_MarkPainter old) =>
-      old.progress != progress || old.dotLift != dotLift || old.stroke != stroke || old.dot != dot;
 }

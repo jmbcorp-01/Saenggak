@@ -4,7 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../theme/tokens.dart';
 import '../widgets/appear.dart';
-import '../widgets/symbol_mark.dart';
+import '../widgets/drawn_symbol.dart';
 
 /// First screen: what the app is, and the way in.
 class StartScreen extends StatelessWidget {
@@ -22,29 +22,36 @@ class StartScreen extends StatelessWidget {
             // Wide screens: the symbol large on the left, the words and the
             // way in on the right.
             if (c.maxWidth >= 900) {
-              return Row(
-                children: [
-                  Expanded(
-                    child: Appear(
-                      child: Center(child: SymbolMark(size: math.min(c.maxHeight * 0.55, 380), semanticLabel: null)),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 460,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(SgSpace.xl, SgSpace.xxl, 64, SgSpace.xxl),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Appear(delay: const Duration(milliseconds: 80), child: _headline(48)),
-                          const SizedBox(height: 56),
-                          Appear(delay: const Duration(milliseconds: 160), child: _actions()),
-                        ],
+              return MouseArea(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Center(
+                        child: LeanToMouse(
+                          child: DrawnSymbol(
+                            size: math.min(c.maxHeight * 0.55, 380),
+                            delay: const Duration(milliseconds: 400),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                    SizedBox(
+                      width: 460,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(SgSpace.xl, SgSpace.xxl, 64, SgSpace.xxl),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Appear(delay: const Duration(milliseconds: 500), child: _headline(48)),
+                            const SizedBox(height: 56),
+                            Appear(delay: const Duration(milliseconds: 800), child: _actions()),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               );
             }
             // Phones, and tablets with the same layout in a narrower column.
@@ -56,11 +63,11 @@ class StartScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Center(child: SymbolMark(size: 44)),
+                      const Center(child: DrawnSymbol(size: 44, breaths: 0, delay: Duration(milliseconds: 400))),
                       const Spacer(),
-                      Appear(child: _headline(34)),
+                      Appear(delay: const Duration(milliseconds: 400), child: _headline(34)),
                       const Spacer(),
-                      Appear(delay: const Duration(milliseconds: 100), child: _actions()),
+                      Appear(delay: const Duration(milliseconds: 600), child: _actions()),
                     ],
                   ),
                 ),
@@ -99,16 +106,18 @@ class StartScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FilledButton(
-          onPressed: onSignUp,
-          style: FilledButton.styleFrom(
-            backgroundColor: SgColors.ink,
-            foregroundColor: SgColors.onInk,
-            minimumSize: const Size.fromHeight(50),
-            shape: pill,
-            textStyle: SgText.label(size: 16, weight: FontWeight.w700),
+        HoverLift(
+          child: FilledButton(
+            onPressed: onSignUp,
+            style: FilledButton.styleFrom(
+              backgroundColor: SgColors.ink,
+              foregroundColor: SgColors.onInk,
+              minimumSize: const Size.fromHeight(50),
+              shape: pill,
+              textStyle: SgText.label(size: 16, weight: FontWeight.w700),
+            ),
+            child: const Text('계정 만들기'),
           ),
-          child: const Text('계정 만들기'),
         ),
         const SizedBox(height: 12),
         Row(
@@ -122,16 +131,18 @@ class StartScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        OutlinedButton(
-          onPressed: onSignIn,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: SgColors.accentText,
-            side: BorderSide(color: SgColors.outline),
-            minimumSize: const Size.fromHeight(50),
-            shape: pill,
-            textStyle: SgText.label(size: 16, weight: FontWeight.w700),
+        HoverLift(
+          child: OutlinedButton(
+            onPressed: onSignIn,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: SgColors.accentText,
+              side: BorderSide(color: SgColors.outline),
+              minimumSize: const Size.fromHeight(50),
+              shape: pill,
+              textStyle: SgText.label(size: 16, weight: FontWeight.w700),
+            ),
+            child: const Text('로그인'),
           ),
-          child: const Text('로그인'),
         ),
         const SizedBox(height: 12),
         Row(
