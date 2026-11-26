@@ -73,7 +73,7 @@ class SettingsScreen extends StatelessWidget {
 
   Future<void> _signOut(BuildContext context) async {
     await state.signOut();
-    if (context.mounted) Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+    if (context.mounted) Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil('/', (_) => false);
   }
 
   Future<void> _deleteAccount(BuildContext context) async {
@@ -99,7 +99,7 @@ class SettingsScreen extends StatelessWidget {
     try {
       await state.deleteAccount();
       if (!context.mounted) return;
-      Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+      Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil('/', (_) => false);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('계정을 삭제했어요.')));
     } catch (_) {
       if (context.mounted) {
@@ -129,7 +129,10 @@ class SettingsScreen extends StatelessWidget {
               ListTile(
                 leading: const Icon(Icons.photo_camera_outlined),
                 title: const Text('프로필 사진 찍기'),
-                onTap: () => _push(context, (_) => PhotoCaptureScreen(state: state)),
+                onTap: () => Navigator.of(
+                  context,
+                  rootNavigator: true,
+                ).push(MaterialPageRoute<void>(builder: (_) => PhotoCaptureScreen(state: state))),
               ),
               const _Header('화면'),
               ListTile(

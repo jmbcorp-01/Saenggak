@@ -5,15 +5,10 @@ import '../theme/tokens.dart';
 /// The ㅅ symbol: two brush strokes like a walking person, and a dot above
 /// for a thought that has just come up. Drawn on a 64 x 64 grid.
 class SymbolMark extends StatelessWidget {
-  const SymbolMark({
-    super.key,
-    this.size = 30,
-    this.strokeColor,
-    this.dotColor,
-    this.semanticLabel = '생각',
-  });
+  const SymbolMark({super.key, this.size = 30, this.strokeColor, this.dotColor, this.semanticLabel = '생각'});
 
   final double size;
+
   /// Defaults to the accent.
   final Color? strokeColor;
 
@@ -23,7 +18,10 @@ class SymbolMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mark = CustomPaint(size: Size.square(size), painter: _SymbolPainter(strokeColor ?? SgColors.accent, dotColor ?? SgColors.ink));
+    final mark = CustomPaint(
+      size: Size.square(size),
+      painter: _SymbolPainter(strokeColor ?? SgColors.accent, dotColor ?? SgColors.ink),
+    );
     if (semanticLabel == null) return ExcludeSemantics(child: mark);
     return Semantics(label: semanticLabel, image: true, child: mark);
   }

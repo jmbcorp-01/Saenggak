@@ -332,7 +332,10 @@ ThemeData buildTheme([SgPalette p = SgPalette.light]) {
     ),
     // Buttons resolve their own text style, so the font is set here too.
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(foregroundColor: p.ink, textStyle: SgText.label(weight: FontWeight.w500)),
+      style: TextButton.styleFrom(
+        foregroundColor: p.ink,
+        textStyle: SgText.label(weight: FontWeight.w500),
+      ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(

@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../core/nav.dart';
 import '../data/app_state.dart';
 import '../models/post.dart' show avatarPalette, timeAgo;
 import '../theme/tokens.dart';
@@ -19,7 +20,7 @@ class NotificationsScreen extends StatelessWidget {
       builder: (context, _) {
         final items = state.notifications;
         final now = state.clock();
-        return RefreshIndicator(
+        final list = RefreshIndicator(
           onRefresh: state.loadNotifications,
           child: items.isEmpty
               ? ListView(
@@ -55,17 +56,25 @@ class NotificationsScreen extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => Scaffold(
-                            appBar: AppBar(backgroundColor: SgColors.surface, surfaceTintColor: Colors.transparent),
-                            body: ProfileScreen(state: state, userId: n.actorId),
-                          ),
-                        ),
-                      ),
+                      onTap: () => pushPage<void>(context, (_) => ProfilePage(state: state, userId: n.actorId)),
                     );
                   },
                 ),
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              height: 52,
+              padding: const EdgeInsets.symmetric(horizontal: SgSpace.lg),
+              alignment: Alignment.centerLeft,
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: SgColors.line)),
+              ),
+              child: Semantics(header: true, child: Text('알림', style: SgText.title)),
+            ),
+            Expanded(child: list),
+          ],
         );
       },
     );

@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/human_check.dart';
 import '../core/human_input_formatter.dart';
+import '../core/nav.dart';
 import '../core/typing_session.dart';
 import '../core/weighted_length.dart';
 import '../data/app_state.dart';
@@ -99,14 +101,17 @@ class _ComposeScreenState extends State<ComposeScreen> {
     setState(() => _sending = false);
     switch (outcome) {
       case final Published published:
+        HapticFeedback.mediumImpact();
         await Navigator.of(context).pushReplacement(
-          MaterialPageRoute<void>(
-            builder: (_) => PublishResultScreen(
+          modalRoute<void>(
+            context,
+            (_) => PublishResultScreen(
               outcome: published,
               body: text.trim(),
               edited: widget.editing != null,
               daysToFollow: widget.state.me?.daysToFollow ?? 10,
             ),
+            maxHeight: 760,
           ),
         );
       case final Rejected rejected:

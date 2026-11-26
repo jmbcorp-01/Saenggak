@@ -4,6 +4,7 @@ import '../api/backend.dart';
 import '../data/app_state.dart';
 import '../models/post.dart';
 import '../models/profile.dart';
+import '../core/nav.dart';
 import '../theme/tokens.dart';
 import '../widgets/post_actions.dart';
 import '../widgets/post_tile.dart';
@@ -12,6 +13,20 @@ import '../widgets/symbol_mark.dart';
 import 'photo_capture_screen.dart';
 import 'profile_setup_screen.dart';
 import 'settings_screen.dart';
+
+/// Someone else's profile as its own page, with a back button.
+class ProfilePage extends StatelessWidget {
+  const ProfilePage({super.key, required this.state, required this.userId});
+
+  final AppState state;
+  final String userId;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(),
+    body: ProfileScreen(state: state, userId: userId),
+  );
+}
 
 /// A writer's profile: photo, counts, follow progress or button, and posts.
 /// Without [userId] (or with the reader's own id) it is the reader's own.
@@ -86,8 +101,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _takePhoto() async {
-    final saved = await Navigator.of(context)
-        .push<bool>(MaterialPageRoute(builder: (context) => PhotoCaptureScreen(state: widget.state)));
+    final saved = await Navigator.of(
+      context,
+      rootNavigator: true,
+    ).push<bool>(MaterialPageRoute(builder: (context) => PhotoCaptureScreen(state: widget.state)));
     if (saved == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('프로필 사진을 바꿨어요.')));
     }
@@ -169,9 +186,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: IconButton(
                         tooltip: '설정',
                         icon: Icon(Icons.settings_outlined, color: SgColors.ink),
-                        onPressed: () =>
-                            Navigator.of(context)
-                                .push(MaterialPageRoute<void>(builder: (_) => SettingsScreen(state: widget.state))),
+                        onPressed: () => pushPage<void>(context, (_) => SettingsScreen(state: widget.state)),
                       ),
                     ),
                   Positioned(

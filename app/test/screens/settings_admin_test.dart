@@ -15,7 +15,7 @@ Future<AppState> openSettings(WidgetTester tester, {DemoBackend? backend}) async
   await tester.pumpWidget(SaenggakApp(state: state));
   await tester.tap(find.text('로그인'));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('프로필').last);
+  await tester.tap(find.byTooltip('프로필').first);
   await tester.pumpAndSettle();
   await tester.tap(find.byTooltip('설정'));
   await tester.pumpAndSettle();
@@ -111,7 +111,7 @@ void main() {
     final state = await openSettings(tester, backend: backend);
     await tester.pageBack();
     await tester.pumpAndSettle();
-    await tester.tap(find.text('홈').last);
+    await tester.tap(find.byTooltip('홈').last);
     await tester.pumpAndSettle();
 
     final author = state.feed.firstWhere((p) => !p.isMine);
@@ -151,7 +151,7 @@ void main() {
     expect(state.unreadNotifications, 1);
     expect(find.text('1'), findsOneWidget);
 
-    await tester.tap(find.text('알림').last);
+    await tester.tap(find.byTooltip('알림').first);
     await tester.pumpAndSettle();
     expect(find.textContaining('님이 내 생각에 공감했어요.'), findsOneWidget);
     expect(state.unreadNotifications, 0);
