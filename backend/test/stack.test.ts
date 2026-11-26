@@ -1,7 +1,12 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { App } from 'aws-cdk-lib';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { describe, expect, it } from 'vitest';
 import { SaenggakStack } from '../infra/stack.js';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 describe('SaenggakStack', () => {
   const template = Template.fromStack(
@@ -38,7 +43,19 @@ describe('SaenggakStack', () => {
       PublicAccessBlockConfiguration: Match.objectLike({ BlockPublicAcls: true, RestrictPublicBuckets: true }),
     });
     template.resourceCountIs('AWS::CloudFront::Distribution', 1);
-    template.resourceCountIs('Custom::CDKBucketDeployment', 1);
+    // The web files revalidate on each load; our fonts, when the build is
+    // there to deploy, are kept a week.
+    template.hasResourceProperties('Custom::CDKBucketDeployment', { SystemMetadata: { 'cache-control': 'no-cache' } });
+    const deployments = Object.values(template.findResources('Custom::CDKBucketDeployment'));
+    if (existsSync(path.join(here, '..', '..', 'app', 'build', 'web'))) {
+      expect(deployments).toHaveLength(2);
+      template.hasResourceProperties('Custom::CDKBucketDeployment', {
+        SystemMetadata: { 'cache-control': 'public, max-age=604800' },
+        Include: ['assets/assets/fonts/*'],
+      });
+    } else {
+      expect(deployments).toHaveLength(1);
+    }
   });
 
   it('serves profile photos at /photos/* and lets only the write function store them', () => {

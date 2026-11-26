@@ -131,7 +131,8 @@ export class SaenggakStack extends Stack {
         entry: handlerPath(name),
         runtime: lambda.Runtime.NODEJS_22_X,
         architecture: lambda.Architecture.ARM_64,
-        memorySize: 512,
+        // More memory also means more CPU, which shortens cold starts.
+        memorySize: 1024,
         timeout: Duration.seconds(timeout),
         environment,
         bundling: { minify: true, sourceMap: true },
@@ -401,17 +402,32 @@ export class SaenggakStack extends Stack {
       cognitoClientId: appClient.userPoolClientId,
       ...(signIn && { authDomain: signIn.authDomain, signInWith: providers.map((p) => p.name) }),
     };
+    // Our own font files rarely change and are the largest download, so
+    // browsers keep them a week instead of asking again on every visit.
+    const fonts = 'assets/assets/fonts/*';
     new s3deploy.BucketDeployment(this, 'WebFiles', {
       destinationBucket: site,
       sources: [
         ...(existsSync(webBuild) ? [s3deploy.Source.asset(webBuild)] : []),
         s3deploy.Source.jsonData('config.json', config),
       ],
+      exclude: [fonts],
       distribution: cdn,
       memoryLimit: 512,
       // Revalidate on each load so a new deploy shows up at once; unchanged files answer 304.
       cacheControl: [s3deploy.CacheControl.fromString('no-cache')],
     });
+    if (existsSync(webBuild)) {
+      new s3deploy.BucketDeployment(this, 'WebFonts', {
+        destinationBucket: site,
+        sources: [s3deploy.Source.asset(webBuild)],
+        exclude: ['*'],
+        include: [fonts],
+        prune: false,
+        memoryLimit: 512,
+        cacheControl: [s3deploy.CacheControl.fromString('public, max-age=604800')],
+      });
+    }
 
     new CfnOutput(this, 'ClaudeApiKeySecret', { value: claudeKey.secretName });
     new CfnOutput(this, 'WebUrl', { value: `https://${webHost}` });
