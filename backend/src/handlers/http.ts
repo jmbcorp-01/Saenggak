@@ -43,6 +43,10 @@ export function isUuid(v: unknown): v is string {
  */
 export function safely(handler: (event: Event) => Promise<APIGatewayProxyResultV2>) {
   return async (event: Event): Promise<APIGatewayProxyResultV2> => {
+    // Requests must come through CloudFront and its firewall, which add this
+    // header; the API's own address answers nothing else.
+    const secret = process.env.ORIGIN_SECRET;
+    if (secret && event.headers?.['x-origin-verify'] !== secret) return json(403, { error: 'forbidden' });
     try {
       return await handler(event);
     } catch (e) {

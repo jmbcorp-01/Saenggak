@@ -38,3 +38,19 @@ export async function translateFeed(
     }),
   );
 }
+
+/**
+ * Keeps one writer from filling a page: past [perAuthor] posts, a writer's
+ * further posts move to the end of the page, in order.
+ */
+export function spreadAuthors<T extends { authorId: string }>(posts: T[], perAuthor = 2): T[] {
+  const seen = new Map<string, number>();
+  const first: T[] = [];
+  const later: T[] = [];
+  for (const p of posts) {
+    const n = (seen.get(p.authorId) ?? 0) + 1;
+    seen.set(p.authorId, n);
+    (n <= perAuthor ? first : later).push(p);
+  }
+  return [...first, ...later];
+}

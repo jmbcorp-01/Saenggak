@@ -20,6 +20,7 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as triggers from 'aws-cdk-lib/triggers';
+import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 import type { Construct } from 'constructs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -157,6 +158,31 @@ export class SaenggakStack extends Stack {
     claudeKey.grantRead(write);
     write.addEnvironment('ANTHROPIC_KEY_SECRET_ARN', claudeKey.secretArn);
     api.addToRolePolicy(new iam.PolicyStatement({ actions: ['translate:TranslateText'], resources: ['*'] }));
+    // Searching posts by meaning embeds the search words.
+    api.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['bedrock:InvokeModel'],
+        resources: [`arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v2:0`],
+      }),
+    );
+
+    // Sign-ups from throwaway mail services are refused before a code is sent.
+    const preSignUp = new NodejsFunction(this, 'preSignUp', {
+      entry: handlerPath('preSignUp'),
+      runtime: lambda.Runtime.NODEJS_22_X,
+      architecture: lambda.Architecture.ARM_64,
+      timeout: Duration.seconds(5),
+      bundling: { minify: true },
+    });
+    users.addTrigger(cognito.UserPoolOperation.PRE_SIGN_UP, preSignUp);
+
+    // Only CloudFront, behind the firewall, may call the API: it adds this
+    // secret header, and the Lambdas refuse requests without it.
+    const originSecret = new secretsmanager.Secret(this, 'OriginSecret', {
+      description: 'Header value CloudFront adds to API requests so the API answers only through the CDN',
+      generateSecretString: { excludePunctuation: true, passwordLength: 40 },
+    });
+    for (const f of [write, api, admin]) f.addEnvironment('ORIGIN_SECRET', originSecret.secretValue.unsafeUnwrap());
 
     const http = new apigw.HttpApi(this, 'Api', {
       defaultAuthorizer: new HttpJwtAuthorizer('Jwt', users.userPoolProviderUrl, {
@@ -184,6 +210,15 @@ export class SaenggakStack extends Stack {
       ['/posts/{id}', M.DELETE, apiIntegration],
       ['/posts/{id}/empathy', M.POST, apiIntegration],
       ['/feed', M.GET, apiIntegration],
+      ['/posts/{id}', M.GET, apiIntegration],
+      ['/posts/{id}/bookmark', M.PUT, apiIntegration],
+      ['/posts/{id}/bookmark', M.DELETE, apiIntegration],
+      ['/bookmarks', M.GET, apiIntegration],
+      ['/search/users', M.GET, apiIntegration],
+      ['/search/posts', M.GET, apiIntegration],
+      ['/me/export', M.GET, apiIntegration],
+      ['/me/human-check', M.GET, apiIntegration],
+      ['/me/human-check', M.POST, apiIntegration],
       ['/me', M.GET, apiIntegration],
       ['/me', M.PUT, writeIntegration],
       ['/me', M.DELETE, apiIntegration],
@@ -212,8 +247,8 @@ export class SaenggakStack extends Stack {
     for (const [path, method, integration] of routes) http.addRoutes({ path, methods: [method], integration });
 
     // These limits are shared by every user of the API, so they only guard the
-    // account against floods. Per-person limits are the hourly write limit in
-    // the database and, before launch, per-IP rate rules in WAF.
+    // account against floods. Per-person limits are the hourly write limit and
+    // the activity risk score in the database; per-IP limits are in the firewall.
     const stage = http.defaultStage?.node.defaultChild as apigw.CfnStage | undefined;
     stage?.addPropertyOverride('DefaultRouteSettings', { ThrottlingRateLimit: 500, ThrottlingBurstLimit: 1000 });
 
@@ -225,7 +260,9 @@ export class SaenggakStack extends Stack {
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
     });
+    const edgeFirewall = this.region === 'us-east-1' ? this.firewall('EdgeFirewall', 'CLOUDFRONT') : undefined;
     const cdn = new cloudfront.Distribution(this, 'Cdn', {
+      webAclId: edgeFirewall?.attrArn,
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(site),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -246,6 +283,42 @@ export class SaenggakStack extends Stack {
       viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
       cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
     });
+    // The API at /api/*, through the firewall, never cached. The prefix is
+    // dropped before the request reaches API Gateway.
+    const stripApi = new cloudfront.Function(this, 'StripApiPrefix', {
+      runtime: cloudfront.FunctionRuntime.JS_2_0,
+      code: cloudfront.FunctionCode.fromInline(
+        "function handler(event) { var r = event.request; r.uri = r.uri.replace(/^\\/api/, '') || '/'; return r; }",
+      ),
+    });
+    cdn.addBehavior(
+      '/api/*',
+      new origins.HttpOrigin(`${http.httpApiId}.execute-api.${this.region}.${this.urlSuffix}`, {
+        customHeaders: { 'x-origin-verify': originSecret.secretValue.unsafeUnwrap() },
+      }),
+      {
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
+        allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+        // Nothing is cached; the sign-in token and query go to the API.
+        cachePolicy: new cloudfront.CachePolicy(this, 'ApiNoCache', {
+          defaultTtl: Duration.seconds(0),
+          minTtl: Duration.seconds(0),
+          maxTtl: Duration.seconds(1),
+          headerBehavior: cloudfront.CacheHeaderBehavior.allowList('Authorization'),
+          queryStringBehavior: cloudfront.CacheQueryStringBehavior.all(),
+        }),
+        originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+        functionAssociations: [{ function: stripApi, eventType: cloudfront.FunctionEventType.VIEWER_REQUEST }],
+      },
+    );
+    const apiUrl = `https://${cdn.distributionDomainName}/api`;
+
+    // Sign-up and sign-in: known bad addresses and bursts from one address are stopped.
+    new wafv2.CfnWebACLAssociation(this, 'SignInFirewall', {
+      resourceArn: users.userPoolArn,
+      webAclArn: this.firewall('SignInFirewallAcl', 'REGIONAL', 100).attrArn,
+    });
+
     photos.grantPut(write);
     photos.grantDelete(write);
     photos.grantDelete(admin);
@@ -263,7 +336,7 @@ export class SaenggakStack extends Stack {
     for (const f of [write, api, admin]) f.addEnvironment('PHOTO_BASE_URL', `https://${cdn.distributionDomainName}`);
 
     const config = {
-      apiUrl: http.apiEndpoint,
+      apiUrl,
       cognitoRegion: this.region,
       cognitoClientId: appClient.userPoolClientId,
     };
@@ -281,9 +354,82 @@ export class SaenggakStack extends Stack {
 
     new CfnOutput(this, 'ClaudeApiKeySecret', { value: claudeKey.secretName });
     new CfnOutput(this, 'WebUrl', { value: `https://${cdn.distributionDomainName}` });
-    new CfnOutput(this, 'ApiUrl', { value: http.apiEndpoint });
+    new CfnOutput(this, 'ApiUrl', { value: apiUrl });
     new CfnOutput(this, 'UserPoolId', { value: users.userPoolId });
     new CfnOutput(this, 'UserPoolClientId', { value: appClient.userPoolClientId });
     new CfnOutput(this, 'DbClusterArn', { value: db.clusterArn });
+  }
+
+  /**
+   * A firewall: Amazon's list of known bad addresses (botnets, scanners),
+   * known attack patterns, and a cap on requests per address per five
+   * minutes. On CloudFront, writes to the API get a tighter cap.
+   */
+  private firewall(id: string, scope: 'CLOUDFRONT' | 'REGIONAL', perAddress = 2000): wafv2.CfnWebACL {
+    const seen = (name: string) => ({ cloudWatchMetricsEnabled: true, metricName: `${id}${name}`, sampledRequestsEnabled: true });
+    const managed = (name: string, priority: number) => ({
+      name,
+      priority,
+      overrideAction: { none: {} },
+      statement: { managedRuleGroupStatement: { vendorName: 'AWS', name } },
+      visibilityConfig: seen(name),
+    });
+    const rules: wafv2.CfnWebACL.RuleProperty[] = [
+      managed('AWSManagedRulesAmazonIpReputationList', 0),
+      managed('AWSManagedRulesKnownBadInputsRuleSet', 1),
+      {
+        name: 'PerAddress',
+        priority: 2,
+        action: { block: {} },
+        statement: { rateBasedStatement: { limit: perAddress, aggregateKeyType: 'IP' } },
+        visibilityConfig: seen('PerAddress'),
+      },
+    ];
+    if (scope === 'CLOUDFRONT') {
+      rules.push({
+        name: 'ApiWritesPerAddress',
+        priority: 3,
+        action: { block: {} },
+        statement: {
+          rateBasedStatement: {
+            limit: 300,
+            aggregateKeyType: 'IP',
+            scopeDownStatement: {
+              andStatement: {
+                statements: [
+                  {
+                    byteMatchStatement: {
+                      fieldToMatch: { uriPath: {} },
+                      positionalConstraint: 'STARTS_WITH',
+                      searchString: '/api/',
+                      textTransformations: [{ priority: 0, type: 'NONE' }],
+                    },
+                  },
+                  {
+                    notStatement: {
+                      statement: {
+                        byteMatchStatement: {
+                          fieldToMatch: { method: {} },
+                          positionalConstraint: 'EXACTLY',
+                          searchString: 'GET',
+                          textTransformations: [{ priority: 0, type: 'NONE' }],
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+        visibilityConfig: seen('ApiWrites'),
+      });
+    }
+    return new wafv2.CfnWebACL(this, id, {
+      scope,
+      defaultAction: { allow: {} },
+      rules,
+      visibilityConfig: seen('All'),
+    });
   }
 }
