@@ -53,7 +53,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: 3.50.1
@@ -89,7 +89,7 @@ jobs:
 
   ios:
     if: ${{ !inputs.make_android_key }}
-    runs-on: macos-15
+    runs-on: macos-26
     defaults:
       run:
         working-directory: app

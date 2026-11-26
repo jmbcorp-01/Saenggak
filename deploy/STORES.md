@@ -13,8 +13,11 @@ App ids: **`app.saenggak`** on both stores. App name: **생각** (English: Saeng
 1. **Create the app.** In App Store Connect, go to Apps > + > New App. Choose iOS, name 생각,
    primary language Korean, bundle ID `app.saenggak` (register it first under
    Certificates, Identifiers & Profiles > Identifiers if it is not listed), and SKU `saenggak`.
+   Then register at least one iPhone under Certificates, Identifiers & Profiles > Devices > +
+   (its UDID). Archiving with automatic signing needs a development profile, and Apple makes
+   one only when the team has a device.
 2. **API key for uploads.** In App Store Connect, go to Users and Access > Integrations >
-   App Store Connect API > Team Keys > +, with access **App Manager**. Download the
+   App Store Connect API > Team Keys > +, with access **Admin** (GitHub creates the signing certificate, which needs Admin). Download the
    `.p8` file (it can be downloaded only once) and note the Key ID and the Issuer ID.
 3. **In GitHub**, go to Settings > Secrets and variables > Actions:
    - Secrets: `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`,
