@@ -15,7 +15,11 @@ import type {
   Profile,
   ProfileInput,
   Repository,
+  ThoughtScores,
+  UserHit,
 } from './ports.js';
+import { LOW_THOUGHT_SCORE } from '../rules/thoughtScore.js';
+import type { ActionKind, Activity } from '../rules/risk.js';
 
 type Param = string | number | boolean | null;
 
@@ -33,6 +37,36 @@ function toParam(name: string, value: Param): SqlParameter {
 function fieldValue(f: Field | undefined): unknown {
   if (!f || f.isNull) return null;
   return f.stringValue ?? f.longValue ?? f.doubleValue ?? f.booleanValue ?? null;
+}
+
+/** The columns every feed-shaped list reads, with :v as the viewer. */
+const FEED_COLUMNS = `p.id::text, p.author_id::text, u.handle, u.display_name, u.photo_key,
+       p.body, p.lang, p.typing_ms, p.created_at::text, p.edited_at::text,
+       (SELECT count(*) FROM empathies e WHERE e.post_id = p.id) AS empathy_count,
+       EXISTS (SELECT 1 FROM empathies e WHERE e.post_id = p.id AND e.user_id = :v::uuid) AS mine,
+       EXISTS (SELECT 1 FROM bookmarks s WHERE s.post_id = p.id AND s.user_id = :v::uuid) AS saved`;
+
+/** Published, by someone not suspended, and no block either way with the viewer :v. */
+const VISIBLE = `p.status = 'published' AND u.suspended_at IS NULL
+         AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = :v::uuid AND b.blocked_id = p.author_id)
+                                                 OR (b.blocker_id = p.author_id AND b.blocked_id = :v::uuid))`;
+
+function feedPost(r: Record<string, unknown>): FeedPost {
+  return {
+    id: r.id as string,
+    authorId: r.author_id as string,
+    authorHandle: r.handle as string,
+    authorName: r.display_name as string,
+    photoKey: (r.photo_key as string | null) ?? null,
+    body: r.body as string,
+    lang: r.lang as string,
+    typingMs: Number(r.typing_ms),
+    empathyCount: Number(r.empathy_count),
+    empathizedByMe: Boolean(r.mine),
+    bookmarkedByMe: Boolean(r.saved),
+    createdAt: r.created_at as string,
+    editedAt: (r.edited_at as string | null) ?? null,
+  };
 }
 
 /** Aurora PostgreSQL through the RDS Data API (no connection pool in Lambda). */
@@ -218,37 +252,206 @@ export class AuroraRepository implements Repository {
   }
 
   async feed(viewerId: string, opts: FeedOptions): Promise<FeedPost[]> {
+    if (opts.ranked) return this.rankedFeed(viewerId, opts);
     const rows = await this.query(
-      `SELECT p.id::text, p.author_id::text, u.handle, u.display_name, u.photo_key,
-              p.body, p.lang, p.typing_ms, p.created_at::text, p.edited_at::text,
-              (SELECT count(*) FROM empathies e WHERE e.post_id = p.id) AS empathy_count,
-              EXISTS (SELECT 1 FROM empathies e WHERE e.post_id = p.id AND e.user_id = :v::uuid) AS mine
+      `SELECT ${FEED_COLUMNS}
        FROM posts p JOIN users u ON u.id = p.author_id
-       WHERE p.status = 'published' AND u.suspended_at IS NULL
-         AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = :v::uuid AND b.blocked_id = p.author_id) OR (b.blocker_id = p.author_id AND b.blocked_id = :v::uuid))
-         AND (CAST(:before AS text) IS NULL OR p.created_at < CAST(:before AS timestamptz))
+       ${opts.saved ? 'JOIN bookmarks bm ON bm.post_id = p.id AND bm.user_id = :v::uuid' : ''}
+       WHERE ${VISIBLE}
+         AND (CAST(:before AS text) IS NULL OR ${opts.saved ? 'bm.created_at' : 'p.created_at'} < CAST(:before AS timestamptz))
          AND (NOT :following OR EXISTS (
                SELECT 1 FROM follows f
                WHERE f.follower_id = :v::uuid AND f.followee_id = p.author_id AND NOT f.hidden))
          AND (CAST(:author AS text) IS NULL OR p.author_id = CAST(:author AS uuid))
-       ORDER BY p.created_at DESC
+       ORDER BY ${opts.saved ? 'bm.created_at' : 'p.created_at'} DESC
        LIMIT :limit`,
       { v: viewerId, before: opts.before ?? null, following: opts.following, author: opts.authorId ?? null, limit: opts.limit },
     );
+    return rows.map(feedPost);
+  }
+
+  /**
+   * The 추천 order. Each post of the last 30 days gets
+   *   (0.5 + thought score) x (1 + ln(1 + 공감)) / (hours + 2)^1.2 x (1 + 0.5 x taste)
+   * where taste is how close the post is in meaning to what the reader gave
+   * 공감 to in the last 30 days. A post without a score counts as 50.
+   */
+  private async rankedFeed(viewerId: string, opts: FeedOptions): Promise<FeedPost[]> {
+    const rows = await this.query(
+      `WITH taste AS (
+         SELECT avg(p2.embedding) AS c
+         FROM empathies e JOIN posts p2 ON p2.id = e.post_id
+         WHERE e.user_id = :v::uuid AND e.created_at > now() - interval '30 days' AND p2.embedding IS NOT NULL
+       )
+       SELECT ${FEED_COLUMNS}
+       FROM posts p JOIN users u ON u.id = p.author_id CROSS JOIN taste
+       WHERE ${VISIBLE} AND p.created_at > now() - interval '30 days'
+       ORDER BY
+         (0.5 + coalesce(p.thought_score, 50) / 100.0)
+         * (1 + ln(1 + (SELECT count(*) FROM empathies e WHERE e.post_id = p.id)))
+         / power(extract(epoch FROM now() - p.created_at) / 3600 + 2, 1.2)
+         * (1 + 0.5 * greatest(0, 1 - coalesce(p.embedding <=> taste.c, 1)))
+         DESC,
+         p.created_at DESC
+       LIMIT :limit OFFSET :offset`,
+      { v: viewerId, limit: opts.limit, offset: opts.offset ?? 0 },
+    );
+    return rows.map(feedPost);
+  }
+
+  async post(viewerId: string, postId: string): Promise<FeedPost | null> {
+    const rows = await this.query(
+      `SELECT ${FEED_COLUMNS}
+       FROM posts p JOIN users u ON u.id = p.author_id
+       WHERE ${VISIBLE} AND p.id = :p::uuid`,
+      { v: viewerId, p: postId },
+    );
+    return rows[0] ? feedPost(rows[0]) : null;
+  }
+
+  async setBookmark(userId: string, postId: string, saved: boolean): Promise<boolean> {
+    if (!saved) {
+      await this.query(`DELETE FROM bookmarks WHERE user_id = :u::uuid AND post_id = :p::uuid`, { u: userId, p: postId });
+      return true;
+    }
+    const rows = await this.query(
+      `INSERT INTO bookmarks (user_id, post_id)
+       SELECT :u::uuid, id FROM posts WHERE id = :p::uuid AND status = 'published'
+       ON CONFLICT DO NOTHING
+       RETURNING 1 AS ok`,
+      { u: userId, p: postId },
+    );
+    if (rows.length > 0) return true;
+    // Already saved, or no such post.
+    const existing = await this.query(`SELECT 1 FROM bookmarks WHERE user_id = :u::uuid AND post_id = :p::uuid`, {
+      u: userId,
+      p: postId,
+    });
+    return existing.length > 0;
+  }
+
+  async findUsers(viewerId: string, query: string, limit: number): Promise<UserHit[]> {
+    const q = query.trim().replace(/^@/, '').toLowerCase();
+    const like = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    const rows = await this.query(
+      `SELECT u.id::text, u.handle, u.display_name, u.bio, u.photo_key
+       FROM users u
+       WHERE u.suspended_at IS NULL
+         AND (lower(u.handle) LIKE :like OR lower(u.display_name) LIKE :like)
+         AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = :v::uuid AND b.blocked_id = u.id)
+                                                 OR (b.blocker_id = u.id AND b.blocked_id = :v::uuid))
+       ORDER BY lower(u.handle) = :q DESC, lower(u.handle) LIKE :prefix DESC,
+                (SELECT count(*) FROM follows f WHERE f.followee_id = u.id AND NOT f.hidden) DESC, u.handle
+       LIMIT :limit`,
+      { v: viewerId, q, like, prefix: `${q}%`, limit },
+    );
     return rows.map((r) => ({
       id: r.id as string,
-      authorId: r.author_id as string,
-      authorHandle: r.handle as string,
-      authorName: r.display_name as string,
+      handle: r.handle as string,
+      displayName: r.display_name as string,
+      bio: r.bio as string,
       photoKey: (r.photo_key as string | null) ?? null,
-      body: r.body as string,
-      lang: r.lang as string,
-      typingMs: Number(r.typing_ms),
-      empathyCount: Number(r.empathy_count),
-      empathizedByMe: Boolean(r.mine),
-      createdAt: r.created_at as string,
-      editedAt: (r.edited_at as string | null) ?? null,
     }));
+  }
+
+  async searchPosts(viewerId: string, embedding: number[], maxDistance: number, limit: number): Promise<FeedPost[]> {
+    const rows = await this.query(
+      // Nearest first with LIMIT so the HNSW index does the search, then the distance cut.
+      `SELECT * FROM (
+         SELECT ${FEED_COLUMNS}, p.embedding <=> CAST(CAST(:emb AS text) AS vector) AS distance
+         FROM posts p JOIN users u ON u.id = p.author_id
+         WHERE ${VISIBLE} AND p.embedding IS NOT NULL
+         ORDER BY p.embedding <=> CAST(CAST(:emb AS text) AS vector)
+         LIMIT :limit
+       ) hits WHERE distance <= :max ORDER BY distance`,
+      { v: viewerId, emb: JSON.stringify(embedding), max: maxDistance, limit },
+    );
+    return rows.map(feedPost);
+  }
+
+  async setThoughtScores(postId: string, sc: ThoughtScores): Promise<void> {
+    await this.query(
+      `UPDATE posts SET process_score = :pr, content_score = :co, thought_score = :th WHERE id = :p::uuid`,
+      { p: postId, pr: sc.process, co: sc.content, th: sc.thought },
+    );
+  }
+
+  async activity(userId: string): Promise<Activity> {
+    const [counts, user] = await Promise.all([
+      this.query(
+        `SELECT kind, count(*) FILTER (WHERE at > now() - interval '10 minutes') AS m10, count(*) AS h1
+         FROM action_log WHERE user_id = :u::uuid AND at > now() - interval '1 hour'
+         GROUP BY kind`,
+        { u: userId },
+      ),
+      this.query(
+        `SELECT extract(epoch FROM now() - u.created_at) / 3600 AS age,
+                extract(epoch FROM now() - u.human_checked_at) / 3600 AS since_check,
+                (SELECT count(*) FROM (
+                   SELECT thought_score FROM posts
+                   WHERE author_id = u.id AND status = 'published' AND thought_score IS NOT NULL
+                   ORDER BY created_at DESC LIMIT 5) last5
+                 WHERE thought_score < :low) AS low
+         FROM users u WHERE u.id = :u::uuid`,
+        { u: userId, low: LOW_THOUGHT_SCORE },
+      ),
+    ]);
+    const last10m: Activity['last10m'] = {};
+    const lastHour: Activity['lastHour'] = {};
+    for (const r of counts) {
+      const k = r.kind as ActionKind;
+      last10m[k] = Number(r.m10);
+      lastHour[k] = Number(r.h1);
+    }
+    const u = user[0];
+    return {
+      last10m,
+      lastHour,
+      accountAgeHours: u ? Number(u.age) : 0,
+      lowScorePosts: u ? Number(u.low) : 0,
+      hoursSinceCheck: u && u.since_check !== null ? Number(u.since_check) : null,
+    };
+  }
+
+  async recordAction(userId: string, kind: ActionKind): Promise<void> {
+    await this.query(`INSERT INTO action_log (user_id, kind) VALUES (:u::uuid, :k)`, { u: userId, k: kind });
+  }
+
+  async setHumanChecked(userId: string): Promise<void> {
+    await this.query(`UPDATE users SET human_checked_at = now() WHERE id = :u::uuid`, { u: userId });
+    await this.query(`DELETE FROM action_log WHERE user_id = :u::uuid AND kind = 'check_failed'`, { u: userId });
+  }
+
+  async exportData(userId: string): Promise<Record<string, unknown> | null> {
+    const profile = await this.query(
+      `SELECT handle, display_name, bio, locale, time_zone, created_at::text FROM users WHERE id = :u::uuid`,
+      { u: userId },
+    );
+    if (profile.length === 0) return null;
+    const [posts, empathies, following, bookmarks, blocks] = await Promise.all([
+      this.query(
+        `SELECT id::text, body, lang, typing_ms, local_date::text, status, created_at::text, edited_at::text
+         FROM posts WHERE author_id = :u::uuid ORDER BY created_at`,
+        { u: userId },
+      ),
+      this.query(`SELECT post_id::text, created_at::text FROM empathies WHERE user_id = :u::uuid ORDER BY created_at`, {
+        u: userId,
+      }),
+      this.query(
+        `SELECT u.handle, f.created_at::text FROM follows f JOIN users u ON u.id = f.followee_id
+         WHERE f.follower_id = :u::uuid ORDER BY f.created_at`,
+        { u: userId },
+      ),
+      this.query(`SELECT post_id::text, created_at::text FROM bookmarks WHERE user_id = :u::uuid ORDER BY created_at`, {
+        u: userId,
+      }),
+      this.query(
+        `SELECT u.handle, b.created_at::text FROM blocks b JOIN users u ON u.id = b.blocked_id
+         WHERE b.blocker_id = :u::uuid ORDER BY b.created_at`,
+        { u: userId },
+      ),
+    ]);
+    return { exportedAt: new Date().toISOString(), profile: profile[0], posts, empathies, following, bookmarks, blocks };
   }
 
   async cachedTranslation(postId: string, lang: string): Promise<string | null> {
@@ -333,6 +536,8 @@ export class AuroraRepository implements Repository {
        s AS (DELETE FROM typing_sessions WHERE post_id IN (SELECT id FROM mine)),
        l AS (DELETE FROM follow_losses WHERE author_id IN (SELECT id FROM me)),
        w AS (DELETE FROM write_log WHERE author_id IN (SELECT id FROM me)),
+       al AS (DELETE FROM action_log WHERE user_id IN (SELECT id FROM me)),
+       bm AS (DELETE FROM bookmarks WHERE user_id IN (SELECT id FROM me) OR post_id IN (SELECT id FROM mine)),
        p AS (DELETE FROM posts WHERE id IN (SELECT id FROM mine)),
        u AS (DELETE FROM users WHERE id IN (SELECT id FROM me))
        SELECT photo_key FROM me`,

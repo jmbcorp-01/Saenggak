@@ -184,8 +184,7 @@ class HttpBackend implements Backend {
         query: {'lang': lang, 'tab': following ? 'following' : 'all', 'author': ?authorId, 'before': ?before},
       ),
     );
-    final items = (j['items'] as List).cast<Map<String, dynamic>>().map((p) => Post.fromJson(p, myId: myId)).toList();
-    return FeedPage(items, j['next'] as String?);
+    return FeedPage(_posts(j), j['next'] as String?);
   }
 
   @override
@@ -225,6 +224,47 @@ class HttpBackend implements Backend {
 
   @override
   Future<void> delete(String postId) async => _ok(await _send('DELETE', 'posts/$postId'));
+
+  List<Post> _posts(Map<String, dynamic> j) =>
+      (j['items'] as List).cast<Map<String, dynamic>>().map((p) => Post.fromJson(p, myId: myId)).toList();
+
+  @override
+  Future<Post> post(String postId, {required String lang}) async =>
+      Post.fromJson(_ok(await _send('GET', 'posts/$postId', query: {'lang': lang})), myId: myId);
+
+  @override
+  Future<void> setBookmark(String postId, bool saved) async =>
+      _ok(await _send(saved ? 'PUT' : 'DELETE', 'posts/$postId/bookmark'));
+
+  @override
+  Future<List<Post>> bookmarks({required String lang}) async =>
+      _posts(_ok(await _send('GET', 'bookmarks', query: {'lang': lang})));
+
+  @override
+  Future<List<PersonHit>> searchPeople(String query) async =>
+      (_ok(await _send('GET', 'search/users', query: {'q': query}))['items'] as List)
+          .cast<Map<String, dynamic>>()
+          .map(PersonHit.fromJson)
+          .toList();
+
+  @override
+  Future<List<Post>> searchPosts(String query, {required String lang}) async =>
+      _posts(_ok(await _send('GET', 'search/posts', query: {'q': query, 'lang': lang})));
+
+  @override
+  Future<String> exportData() async {
+    final res = await _send('GET', 'me/export');
+    _ok(res);
+    return const JsonEncoder.withIndent('  ').convert(jsonDecode(utf8.decode(res.bodyBytes)));
+  }
+
+  @override
+  Future<String> humanCheckPhrase(String lang) async =>
+      _ok(await _send('GET', 'me/human-check', query: {'lang': lang}))['phrase'] as String;
+
+  @override
+  Future<void> passHumanCheck(String text, TypingSession session) async =>
+      _ok(await _send('POST', 'me/human-check', body: {'text': text, 'session': session.toJson()}));
 
   @override
   Future<void> follow(String userId) async => _ok(await _send('PUT', 'users/$userId/follow'));

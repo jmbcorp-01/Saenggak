@@ -108,6 +108,7 @@ class DemoBackend implements Backend {
 
   @override
   Future<void> report({String? postId, String? userId, required String reason, String note = ''}) async {
+    _guard();
     final p = postId == null ? null : _posts.firstWhere((p) => p.id == postId);
     final id = p?.authorId ?? userId!;
     final author = _posts.firstWhere((x) => x.authorId == id, orElse: () => p!);
@@ -129,6 +130,7 @@ class DemoBackend implements Backend {
 
   @override
   Future<void> block(String userId) async {
+    _guard();
     final p = _posts.firstWhere((x) => x.authorId == userId);
     _blocked[userId] = BlockedUser(id: userId, handle: p.authorHandle, displayName: p.authorName);
     _following.remove(userId);
@@ -229,6 +231,7 @@ class DemoBackend implements Backend {
 
   @override
   Future<({bool empathized, int count})> toggleEmpathy(String postId) async {
+    _guard();
     final i = _posts.indexWhere((p) => p.id == postId);
     if (i < 0 || _posts[i].isMine) throw const ApiException(404, 'not_found');
     final p = _posts[i];
@@ -245,6 +248,7 @@ class DemoBackend implements Backend {
     required TypingSession session,
     required String localDate,
   }) async {
+    if (wantsHumanCheck) return const Rejected(RejectReason.humanCheck);
     final post = Post(
       id: 'local-${_next++}',
       authorId: _me.id,
@@ -313,12 +317,85 @@ class DemoBackend implements Backend {
 
   @override
   Future<void> follow(String userId) async {
+    _guard();
     if (!_me.followUnlocked) throw const ApiException(403, 'not_allowed');
     _following.add(userId);
   }
 
   @override
   Future<void> unfollow(String userId) async => _following.remove(userId);
+
+  /// Set to make the next guarded action ask for a typing check, as the
+  /// server does when activity looks automated.
+  bool wantsHumanCheck = false;
+
+  void _guard() {
+    if (wantsHumanCheck) throw const ApiException(428, 'human_check');
+  }
+
+  static const demoCheckPhrase = '오늘 하늘은 어제보다 조금 더 맑다';
+
+  @override
+  Future<Post> post(String postId, {required String lang}) async =>
+      _posts.firstWhere((p) => p.id == postId, orElse: () => throw const ApiException(404, 'not_found'));
+
+  @override
+  Future<void> setBookmark(String postId, bool saved) async {
+    final i = _posts.indexWhere((p) => p.id == postId);
+    if (i < 0) throw const ApiException(404, 'not_found');
+    _posts[i] = _posts[i].copyWith(bookmarked: saved);
+    _savedOrder.remove(postId);
+    if (saved) _savedOrder.insert(0, postId);
+  }
+
+  final List<String> _savedOrder = [];
+
+  @override
+  Future<List<Post>> bookmarks({required String lang}) async => [
+    for (final id in _savedOrder) ..._posts.where((p) => p.id == id),
+  ];
+
+  @override
+  Future<List<PersonHit>> searchPeople(String query) async {
+    final q = query.replaceFirst('@', '').toLowerCase();
+    final seen = <String>{};
+    return [
+      for (final p in _posts)
+        if (!p.isMine &&
+            !_blocked.containsKey(p.authorId) &&
+            (p.authorHandle.toLowerCase().contains(q) || p.authorName.toLowerCase().contains(q)) &&
+            seen.add(p.authorId))
+          PersonHit(id: p.authorId, handle: p.authorHandle, displayName: p.authorName),
+    ];
+  }
+
+  /// No embeddings here: posts that share a word with the query.
+  @override
+  Future<List<Post>> searchPosts(String query, {required String lang}) async {
+    final words = query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.length > 1).toList();
+    return [
+      for (final p in _posts)
+        if (!_blocked.containsKey(p.authorId) && words.any((w) => p.body.toLowerCase().contains(w))) p,
+    ];
+  }
+
+  @override
+  Future<String> exportData() async => const JsonEncoder.withIndent('  ').convert({
+    'profile': {'handle': _me.handle, 'displayName': _me.displayName, 'bio': _me.bio},
+    'posts': [
+      for (final p in _posts.where((p) => p.isMine))
+        {'id': p.id, 'body': p.body, 'createdAt': p.createdAt.toIso8601String()},
+    ],
+  });
+
+  @override
+  Future<String> humanCheckPhrase(String lang) async => demoCheckPhrase;
+
+  @override
+  Future<void> passHumanCheck(String text, TypingSession session) async {
+    if (text.trim() != demoCheckPhrase || session.events.isEmpty) throw const ApiException(400, 'not_human');
+    wantsHumanCheck = false;
+  }
 }
 
 /// Three-word windows within each sentence, for the demo only. The server

@@ -5,25 +5,35 @@ import 'package:material_ui/material_ui.dart';
 
 import '../core/nav.dart';
 import '../data/app_state.dart';
+import '../l10n/l10n.dart';
 import '../theme/tokens.dart';
 import '../widgets/right_panel.dart';
 import '../widgets/shell_chrome.dart';
 import '../widgets/side_nav.dart';
+import '../core/links.dart';
 import 'compose_screen.dart';
 import 'feed_screen.dart';
+import 'human_check_screen.dart';
 import 'notifications_screen.dart';
+import 'post_screen.dart';
 import 'profile_screen.dart';
+import 'search_screen.dart';
 
-/// The signed-in app: home, notifications and profile, and the write button.
+/// The signed-in app: home, search, notifications and profile, and the write
+/// button.
 ///
 /// On a phone the menu is at the bottom. From [SgBreakpoints.rail] it moves to
 /// the left and the timeline becomes a centered column; from
 /// [SgBreakpoints.full] a panel appears on the right. Each tab keeps its own
 /// page history, so opening a profile keeps the menus in place.
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key, required this.state, this.checkEvery = const Duration(minutes: 1)});
+  const HomeShell({super.key, required this.state, this.checkEvery = const Duration(minutes: 1), this.openPostId});
 
   final AppState state;
+
+  /// A post to open over the timeline, as from a shared link. On the web it
+  /// comes from the address.
+  final String? openPostId;
 
   /// How often to look for new posts while the app is open.
   final Duration checkEvery;
@@ -34,7 +44,8 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _tab = 0;
-  final _navigators = List.generate(3, (_) => GlobalKey<NavigatorState>());
+  static const _home = 0, _alerts = 2, _profile = 3;
+  final _navigators = List.generate(4, (_) => GlobalKey<NavigatorState>());
   final _chrome = ValueNotifier(true);
 
   /// Counts taps on the home button while home is open: the feed scrolls to
@@ -49,11 +60,34 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _check = Timer.periodic(widget.checkEvery, (_) => state.checkForNew());
+    state.askHumanCheck = _askHumanCheck;
+    final linked = widget.openPostId ?? linkedPostId();
+    if (linked != null) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _navigators[_home].currentState?.push(
+          MaterialPageRoute<void>(
+            builder: (_) => PostScreen(state: state, postId: linked),
+          ),
+        ),
+      );
+    }
+  }
+
+  /// Only one typing check at a time, however many actions asked for it.
+  Future<bool>? _checking;
+
+  Future<bool> _askHumanCheck() {
+    if (!mounted) return Future.value(false);
+    return _checking ??= pushModal<bool>(
+      context,
+      (_) => HumanCheckScreen(backend: state.backend, lang: state.lang),
+    ).then((passed) => passed ?? false).whenComplete(() => _checking = null);
   }
 
   @override
   void dispose() {
     _check?.cancel();
+    if (state.askHumanCheck == _askHumanCheck) state.askHumanCheck = null;
     WidgetsBinding.instance.removeObserver(this);
     _chrome.dispose();
     _homeAgain.dispose();
@@ -73,13 +107,13 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       final nav = _navigators[i].currentState;
       if (nav != null && nav.canPop()) {
         nav.popUntil((r) => r.isFirst);
-      } else if (i == 0) {
+      } else if (i == _home) {
         _homeAgain.value++;
       }
       return;
     }
     setState(() => _tab = i);
-    if (i == 1) {
+    if (i == _alerts) {
       state.loadNotifications().then((_) => state.markNotificationsSeen());
     }
   }
@@ -89,7 +123,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   void _openAuthor(String userId) {
     final nav = _navigators[_tab].currentState;
     if (userId == state.me?.id) {
-      _select(2);
+      _select(_profile);
       return;
     }
     nav?.push(
@@ -100,14 +134,16 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   }
 
   List<NavItem> _items() => [
-    const NavItem(icon: SgIcons.home, activeIcon: SgIcons.homeActive, label: '홈'),
-    NavItem(icon: SgIcons.bell, activeIcon: SgIcons.bellActive, label: '알림', badge: state.unreadNotifications),
-    const NavItem(icon: SgIcons.person, activeIcon: SgIcons.personActive, label: '프로필'),
+    NavItem(icon: SgIcons.home, activeIcon: SgIcons.homeActive, label: t('홈')),
+    NavItem(icon: SgIcons.search, activeIcon: SgIcons.searchActive, label: t('검색')),
+    NavItem(icon: SgIcons.bell, activeIcon: SgIcons.bellActive, label: t('알림'), badge: state.unreadNotifications),
+    NavItem(icon: SgIcons.person, activeIcon: SgIcons.personActive, label: t('프로필')),
   ];
 
   Widget _tabs() {
     final roots = <WidgetBuilder>[
-      (_) => FeedScreen(state: state, onOpenProfile: () => _select(2), homeAgain: _homeAgain),
+      (_) => FeedScreen(state: state, onOpenProfile: () => _select(_profile), homeAgain: _homeAgain),
+      (_) => SearchScreen(state: state),
       (_) => NotificationsScreen(state: state),
       (_) => ProfileScreen(state: state),
     ];
@@ -160,7 +196,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           child: AnimatedScale(scale: visible ? 1 : 0.9, duration: SgMotion.medium, curve: SgMotion.ease, child: child),
         ),
         child: FloatingActionButton(
-          tooltip: '생각 쓰기',
+          tooltip: t('생각 쓰기'),
           onPressed: _compose,
           backgroundColor: SgColors.accent,
           foregroundColor: SgColors.onAccent,

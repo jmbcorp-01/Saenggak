@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../data/app_state.dart';
+import '../l10n/l10n.dart';
 import '../models/social.dart';
 import '../theme/tokens.dart';
 
@@ -37,10 +38,10 @@ class _BlockedScreenState extends State<BlockedScreen> {
       await widget.state.unblock(u.id);
       if (!mounted) return;
       setState(() => _users = _users?.where((x) => x.id != u.id).toList());
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('@${u.handle} 님 차단을 풀었어요.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t('@{0} 님 차단을 풀었어요.', [u.handle]))));
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('차단을 풀지 못했어요.')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t('차단을 풀지 못했어요.'))));
       }
     }
   }
@@ -49,18 +50,18 @@ class _BlockedScreenState extends State<BlockedScreen> {
   Widget build(BuildContext context) {
     final users = _users;
     return Scaffold(
-      appBar: AppBar(title: const Text('차단한 사람')),
+      appBar: AppBar(title: Text(t('차단한 사람'))),
       body: users == null
           ? const Center(child: CircularProgressIndicator())
           : users.isEmpty
-          ? Center(child: Text('차단한 사람이 없어요.', style: SgText.small))
+          ? Center(child: Text(t('차단한 사람이 없어요.'), style: SgText.small))
           : ListView(
               children: [
                 for (final u in users)
                   ListTile(
                     title: Text(u.displayName),
                     subtitle: Text('@${u.handle}'),
-                    trailing: OutlinedButton(onPressed: () => _unblock(u), child: const Text('차단 풀기')),
+                    trailing: OutlinedButton(onPressed: () => _unblock(u), child: Text(t('차단 풀기'))),
                   ),
               ],
             ),

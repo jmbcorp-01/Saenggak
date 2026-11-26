@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../l10n/l10n.dart';
 import '../models/publish_outcome.dart';
 import '../theme/tokens.dart';
 import '../widgets/post_tile.dart';
@@ -29,7 +30,11 @@ class PublishResultScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: SgColors.surface,
         surfaceTintColor: Colors.transparent,
-        leading: IconButton(tooltip: '닫기', icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop()),
+        leading: IconButton(
+          tooltip: t('닫기'),
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
       body: SafeArea(
         top: false,
@@ -39,7 +44,7 @@ class PublishResultScreen extends StatelessWidget {
             Row(
               children: [
                 Text(
-                  edited ? '고쳐서 올렸어요' : '올렸어요',
+                  edited ? t('고쳐서 올렸어요') : t('올렸어요'),
                   style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.6),
                 ),
                 const Spacer(),
@@ -64,9 +69,9 @@ class PublishResultScreen extends StatelessWidget {
             _SimilarCard(outcome: outcome),
             if (outcome.firstPhrases.isNotEmpty) ...[
               const SizedBox(height: 28),
-              const Text('처음 쓴 표현', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              Text(t('처음 쓴 표현'), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
               const SizedBox(height: 4),
-              Text('지금까지 아무도 쓰지 않았던 표현이에요.', style: SgText.small),
+              Text(t('지금까지 아무도 쓰지 않았던 표현이에요.'), style: SgText.small),
               const SizedBox(height: 8),
               for (final phrase in outcome.firstPhrases)
                 Container(
@@ -86,7 +91,7 @@ class PublishResultScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
-                          '처음 씀',
+                          t('처음 씀'),
                           style: SgText.label(size: 12, weight: FontWeight.w500).copyWith(color: SgColors.accentText),
                         ),
                       ),
@@ -96,7 +101,7 @@ class PublishResultScreen extends StatelessWidget {
             ],
             const SizedBox(height: 28),
             if (outcome.followUnlocked)
-              Text('팔로우가 열려 있어요. 마음에 드는 글쓴이를 팔로우해보세요.', style: SgText.small)
+              Text(t('팔로우가 열려 있어요. 마음에 드는 글쓴이를 팔로우해보세요.'), style: SgText.small)
             else
               FollowProgress(days: outcome.writingDays, total: daysToFollow),
             const SizedBox(height: 28),
@@ -110,7 +115,7 @@ class PublishResultScreen extends StatelessWidget {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
                 textStyle: SgText.label(size: 16, weight: FontWeight.w700),
               ),
-              child: const Text('피드로'),
+              child: Text(t('피드로')),
             ),
           ],
         ),
@@ -146,32 +151,32 @@ class _SimilarCard extends StatelessWidget {
                           letterSpacing: -1,
                         ),
                       ),
-                      const TextSpan(
-                        text: ' 명',
+                      TextSpan(
+                        text: t(' 명'),
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                       ),
                     ],
                   ),
-                  semanticsLabel: '비슷한 생각을 한 사람 ${outcome.similarPeople}명',
+                  semanticsLabel: t('비슷한 생각을 한 사람 {0}명', [outcome.similarPeople]),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '비슷한 생각을 한 사람이 있어요',
+                  t('비슷한 생각을 한 사람이 있어요'),
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: SgColors.ink),
                 ),
                 const SizedBox(height: 8),
-                Text('뜻이 가까운 글을 쓴 다른 사람 수예요. 누가 썼는지는 보여주지 않아요.', style: SgText.small),
+                Text(t('뜻이 가까운 글을 쓴 다른 사람 수예요. 누가 썼는지는 보여주지 않아요.'), style: SgText.small),
               ],
             )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '아직 비슷한 생각이 없어요',
+                  t('아직 비슷한 생각이 없어요'),
                   style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: SgColors.ink),
                 ),
                 SizedBox(height: 8),
-                Text('비슷한 글을 쓴 사람이 3명이 넘으면 여기에 숫자로 보여드려요.', style: SgText.small),
+                Text(t('비슷한 글을 쓴 사람이 3명이 넘으면 여기에 숫자로 보여드려요.'), style: SgText.small),
               ],
             ),
     );

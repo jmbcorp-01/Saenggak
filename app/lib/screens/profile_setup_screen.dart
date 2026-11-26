@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../api/backend.dart';
 import '../data/app_state.dart';
+import '../l10n/l10n.dart';
 import '../theme/tokens.dart';
 
 /// Name, @handle and a short bio. Shown once after sign-up, and from
@@ -38,11 +39,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     final handle = _handle.text.trim().toLowerCase();
     final name = _name.text.trim();
     if (name.isEmpty || name.length > 30) {
-      setState(() => _error = '이름은 1자에서 30자 사이로 써주세요.');
+      setState(() => _error = t('이름은 1자에서 30자 사이로 써주세요.'));
       return;
     }
     if (!_handlePattern.hasMatch(handle)) {
-      setState(() => _error = '아이디는 영문 소문자, 숫자, _ 로 3자에서 20자 사이예요.');
+      setState(() => _error = t('아이디는 영문 소문자, 숫자, _ 로 3자에서 20자 사이예요.'));
       return;
     }
     setState(() {
@@ -55,14 +56,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     } on ApiException catch (e) {
       setState(
         () => _error = switch (e.code) {
-          'handle_taken' => '이미 쓰고 있는 아이디예요.',
-          'profile_blocked' => '이름이나 소개에 쓸 수 없는 표현이 있어요.',
-          'rate_limited' => '잠시 후 다시 저장해주세요.',
-          _ => '저장하지 못했어요. 다시 시도해주세요.',
+          'handle_taken' => t('이미 쓰고 있는 아이디예요.'),
+          'profile_blocked' => t('이름이나 소개에 쓸 수 없는 표현이 있어요.'),
+          'rate_limited' => t('잠시 후 다시 저장해주세요.'),
+          _ => t('저장하지 못했어요. 다시 시도해주세요.'),
         },
       );
     } catch (_) {
-      setState(() => _error = '저장하지 못했어요. 다시 시도해주세요.');
+      setState(() => _error = t('저장하지 못했어요. 다시 시도해주세요.'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -76,7 +77,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         surfaceTintColor: Colors.transparent,
         automaticallyImplyLeading: !widget.firstTime,
         title: Text(
-          widget.firstTime ? '프로필 만들기' : '프로필 수정',
+          widget.firstTime ? t('프로필 만들기') : t('프로필 수정'),
           style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
         ),
         actions: [
@@ -84,7 +85,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             key: const Key('profile-save'),
             onPressed: _busy ? null : _save,
             style: TextButton.styleFrom(foregroundColor: SgColors.ink),
-            child: const Text('저장', style: TextStyle(fontWeight: FontWeight.w700)),
+            child: Text(t('저장'), style: TextStyle(fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -92,21 +93,21 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         padding: formPadding(context, side: 24),
         children: [
           if (widget.firstTime) ...[
-            Text('다른 사람에게 보이는 이름이에요.', style: TextStyle(fontSize: 15, color: SgColors.muted)),
+            Text(t('다른 사람에게 보이는 이름이에요.'), style: TextStyle(fontSize: 15, color: SgColors.muted)),
             const SizedBox(height: 20),
           ],
           TextField(
             key: const Key('name'),
             controller: _name,
             maxLength: 30,
-            decoration: const InputDecoration(labelText: '이름'),
+            decoration: InputDecoration(labelText: t('이름')),
           ),
           TextField(
             key: const Key('handle'),
             controller: _handle,
             maxLength: 20,
             autocorrect: false,
-            decoration: const InputDecoration(labelText: '아이디', prefixText: '@'),
+            decoration: InputDecoration(labelText: t('아이디'), prefixText: '@'),
           ),
           TextField(
             key: const Key('bio'),
@@ -114,7 +115,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             maxLength: 160,
             maxLines: 3,
             minLines: 1,
-            decoration: const InputDecoration(labelText: '소개 (선택)'),
+            decoration: InputDecoration(labelText: t('소개 (선택)')),
           ),
           if (_error != null) Text(_error!, style: TextStyle(fontSize: 14, color: SgColors.accentText)),
         ],

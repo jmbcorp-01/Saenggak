@@ -112,6 +112,45 @@ void main() {
     );
   });
 
+  test('a post held for a typing check is reported as such, and other calls throw 428', () async {
+    api = (_) => http.Response(jsonEncode({'error': 'human_check'}), 428);
+    final session = TypingSession()..record(inserted: 1, deleted: 0);
+    final out = await backend.publish(text: '글', session: session, localDate: '2026-11-25');
+    expect((out as Rejected).reason, RejectReason.humanCheck);
+    await expectLater(backend.toggleEmpathy('p1'), throwsA(predicate(isHumanCheck)));
+  });
+
+  test('search, bookmarks and the typing check use their routes', () async {
+    api = (req) => http.Response.bytes(
+      utf8.encode(
+        jsonEncode(
+          req.url.path.endsWith('human-check') && req.method == 'GET'
+              ? {'phrase': '창밖으로 바람 소리가 들린다'}
+              : {
+                  'items': req.url.path.endsWith('users')
+                      ? [
+                          {'id': 'u1', 'handle': 'mina', 'displayName': '미나', 'bio': '', 'photoUrl': null},
+                        ]
+                      : [],
+                },
+        ),
+      ),
+      200,
+    );
+    expect((await backend.searchPeople('미나')).single.handle, 'mina');
+    expect(await backend.searchPosts('비 오는 날', lang: 'ko'), isEmpty);
+    await backend.setBookmark('p1', true);
+    await backend.setBookmark('p1', false);
+    expect(await backend.humanCheckPhrase('ko'), '창밖으로 바람 소리가 들린다');
+    expect(apiCalls.map((r) => '${r.method} ${r.url.path}'), [
+      'GET /search/users',
+      'GET /search/posts',
+      'PUT /posts/p1/bookmark',
+      'DELETE /posts/p1/bookmark',
+      'GET /me/human-check',
+    ]);
+  });
+
   test('publishes with the session and parses the extras', () async {
     api = (_) => http.Response.bytes(
       utf8.encode(

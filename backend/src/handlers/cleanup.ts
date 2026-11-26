@@ -4,6 +4,8 @@ import { AuroraRepository } from '../services/repository.js';
 export const CLEANUP_SQL = [
   // Only the last hour matters for the write limit.
   `DELETE FROM write_log WHERE at < now() - interval '1 day'`,
+  // The activity risk score looks back one hour.
+  `DELETE FROM action_log WHERE at < now() - interval '1 day'`,
   `DELETE FROM admin_actions WHERE at < now() - interval '1 year'`,
   `DELETE FROM reports WHERE resolved_at < now() - interval '1 year'`,
 ];

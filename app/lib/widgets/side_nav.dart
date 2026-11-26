@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../data/app_state.dart';
+import '../l10n/l10n.dart';
 import '../theme/tokens.dart';
 import 'post_tile.dart' show Avatar;
 import 'pressable.dart';
@@ -53,7 +54,7 @@ class SideNav extends StatelessWidget {
           crossAxisAlignment: expanded ? CrossAxisAlignment.start : CrossAxisAlignment.center,
           children: [
             Tooltip(
-              message: '홈',
+              message: t('홈'),
               child: Pressable(
                 onTap: () => onSelect(0),
                 pressScale: 0.92,
@@ -182,7 +183,7 @@ class _WriteButton extends StatelessWidget {
                 foregroundColor: SgColors.onAccent,
                 textStyle: SgText.label(size: 17),
               ),
-              child: const Text('생각 쓰기'),
+              child: Text(t('생각 쓰기')),
             ),
           )
         : SizedBox.square(
@@ -198,6 +199,6 @@ class _WriteButton extends StatelessWidget {
               child: const Icon(SgIcons.write),
             ),
           );
-    return Tooltip(message: '생각 쓰기', child: button);
+    return Tooltip(message: t('생각 쓰기'), child: button);
   }
 }

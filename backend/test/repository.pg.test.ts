@@ -136,6 +136,72 @@ describe.skipIf(!url)('AuroraRepository on Postgres', () => {
     expect(again.kind === 'published' && again.firstPhrases.length).toBeGreaterThan(0);
   });
 
+  it('stores a thought score for each published post', async () => {
+    const rows = await client.query(`SELECT thought_score, process_score, content_score FROM posts WHERE status = 'published'`);
+    expect(rows.rows.length).toBeGreaterThan(0);
+    for (const r of rows.rows) {
+      expect(r.thought_score).toBeGreaterThanOrEqual(0);
+      expect(r.thought_score).toBeLessThanOrEqual(100);
+    }
+  });
+
+  it('ranks the 추천 feed by score, 공감 and the reader\'s taste, and pages by offset', async () => {
+    const ranked = await repo.feed(B, { following: false, ranked: true, limit: 30 });
+    expect(ranked.length).toBeGreaterThan(0);
+    // A post with a much higher score comes first.
+    const low = ranked.at(-1)!;
+    await client.query(`UPDATE posts SET thought_score = 100 WHERE id = $1`, [low.id]);
+    await client.query(`UPDATE posts SET thought_score = 0 WHERE id <> $1`, [low.id]);
+    const again = await repo.feed(B, { following: false, ranked: true, limit: 30 });
+    expect(again[0]!.id).toBe(low.id);
+    expect(await repo.feed(B, { following: false, ranked: true, offset: again.length, limit: 30 })).toEqual([]);
+  });
+
+  it('saves and lists bookmarks', async () => {
+    const [post] = await repo.feed(B, { following: false, limit: 1 });
+    expect(await repo.setBookmark(B, post!.id, true)).toBe(true);
+    expect(await repo.setBookmark(B, post!.id, true)).toBe(true);
+    const saved = await repo.feed(B, { following: false, saved: true, limit: 30 });
+    expect(saved.map((p) => p.id)).toEqual([post!.id]);
+    expect(saved[0]!.bookmarkedByMe).toBe(true);
+    expect((await repo.post(B, post!.id))!.bookmarkedByMe).toBe(true);
+    expect(await repo.setBookmark(B, '00000000-0000-4000-8000-000000000999', true)).toBe(false);
+    expect(await repo.setBookmark(B, post!.id, false)).toBe(true);
+    expect(await repo.feed(B, { following: false, saved: true, limit: 30 })).toEqual([]);
+  });
+
+  it('finds people by handle or name, and posts by meaning', async () => {
+    expect((await repo.findUsers(C, '@b', 10)).map((u) => u.handle)).toEqual(['bb']);
+    expect((await repo.findUsers(C, '%', 10))).toEqual([]);
+    const hits = await repo.searchPosts(C, vec(1), 0.5, 10);
+    expect(hits.length).toBeGreaterThan(0);
+    const unrelated = Array(1024).fill(0);
+    unrelated[2] = 1;
+    expect(await repo.searchPosts(C, unrelated, 0.5, 10)).toEqual([]);
+  });
+
+  it('counts recent actions and clears failed checks once a check passes', async () => {
+    await repo.recordAction(C, 'empathy');
+    await repo.recordAction(C, 'empathy');
+    await repo.recordAction(C, 'check_failed');
+    const a = await repo.activity(C);
+    expect(a.last10m.empathy).toBe(2);
+    expect(a.lastHour.check_failed).toBe(1);
+    expect(a.hoursSinceCheck).toBeNull();
+    await repo.setHumanChecked(C);
+    const b = await repo.activity(C);
+    expect(b.lastHour.check_failed).toBeUndefined();
+    expect(b.hoursSinceCheck).toBeLessThan(1);
+  });
+
+  it('exports what is stored about a person', async () => {
+    const data = await repo.exportData(C);
+    expect(data).not.toBeNull();
+    expect((data!.profile as { handle: string }).handle).toBe('cc');
+    expect(Array.isArray(data!.posts)).toBe(true);
+    expect(await repo.exportData('00000000-0000-4000-8000-000000000999')).toBeNull();
+  });
+
   it('follows with permission and hides follows after 3 blocks', async () => {
     // Writing days come from the server clock, so earlier days are seeded directly.
     for (let d = 1; d <= 9; d++) {

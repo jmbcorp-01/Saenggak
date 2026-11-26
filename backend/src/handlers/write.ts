@@ -2,6 +2,7 @@ import { isLang } from '../posts/feed.js';
 import { savePhoto, type PhotoDeps } from '../posts/photo.js';
 import { editPost, publishPost, WRITES_PER_HOUR, type EditResult, type PublishDeps } from '../posts/publish.js';
 import { DAYS_TO_FOLLOW } from '../rules/follow.js';
+import { needsHumanCheck } from '../rules/risk.js';
 import { ClaudeContentFilter } from '../services/contentFilter.js';
 import { TitanEmbedder } from '../services/embedder.js';
 import { photoUrl, RekognitionPhotoChecker, S3PhotoStore } from '../services/photos.js';
@@ -31,6 +32,9 @@ export const writeHandler = (deps: WriteDeps) =>
     const body = parseBody(event);
     if (!body || typeof body.text !== 'string') return json(400, { error: 'bad_request' });
     const input = { authorId: userId(event), text: body.text, session: body.session };
+    // Posting that looks automated (bursts, or posts that keep scoring as
+    // copied) waits for a passed typing check.
+    if (needsHumanCheck(await deps.repo.activity(input.authorId))) return json(428, { error: 'human_check' });
 
     let result: EditResult;
     if (event.routeKey === 'PATCH /posts/{id}') {
@@ -59,6 +63,7 @@ export const writeHandler = (deps: WriteDeps) =>
       case 'filter_unavailable':
         return json(503, { error: 'filter_unavailable' });
       case 'published':
+        await deps.repo.recordAction(input.authorId, 'post');
         return json(event.routeKey === 'POST /posts' ? 201 : 200, {
           id: result.postId,
           typingMs: result.typingMs,
@@ -77,7 +82,7 @@ async function saveProfile({ repo, filter }: PublishDeps, event: Event) {
   const handle = typeof b?.handle === 'string' ? b.handle.trim().toLowerCase() : '';
   const displayName = typeof b?.displayName === 'string' ? b.displayName.trim() : '';
   const bio = typeof b?.bio === 'string' ? b.bio.trim() : '';
-  const locale = isLang(b?.locale) ? b.locale : 'ko';
+  const locale = isLang(b?.locale) ? b.locale : 'en';
   const timeZone = typeof b?.timeZone === 'string' && validTimeZone(b.timeZone) ? b.timeZone : 'Asia/Seoul';
   if (!HANDLE.test(handle) || displayName.length === 0 || [...displayName].length > 30 || [...bio].length > 160) {
     return json(400, { error: 'bad_request' });

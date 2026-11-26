@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../l10n/l10n.dart';
 import '../theme/tokens.dart';
 
 /// The ㅅ symbol: two brush strokes like a walking person, and a dot above
@@ -23,7 +24,7 @@ class SymbolMark extends StatelessWidget {
       painter: _SymbolPainter(strokeColor ?? SgColors.accent, dotColor ?? SgColors.ink),
     );
     if (semanticLabel == null) return ExcludeSemantics(child: mark);
-    return Semantics(label: semanticLabel, image: true, child: mark);
+    return Semantics(label: t(semanticLabel!), image: true, child: mark);
   }
 }
 

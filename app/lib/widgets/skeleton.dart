@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../l10n/l10n.dart';
 import '../theme/tokens.dart';
 
 /// Grey shapes in the layout of a timeline row, with a light sweeping
@@ -26,7 +27,7 @@ class _PostSkeletonListState extends State<PostSkeletonList> with SingleTickerPr
   Widget build(BuildContext context) {
     final reduce = MediaQuery.disableAnimationsOf(context);
     return Semantics(
-      label: '글을 불러오는 중',
+      label: t('글을 불러오는 중'),
       child: ExcludeSemantics(
         child: AnimatedBuilder(
           animation: _c,

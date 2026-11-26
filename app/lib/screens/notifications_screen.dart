@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../core/nav.dart';
 import '../data/app_state.dart';
+import '../l10n/l10n.dart';
 import '../models/post.dart' show avatarPalette, timeAgo;
 import '../theme/tokens.dart';
 import '../widgets/post_tile.dart' show Avatar;
@@ -26,9 +27,9 @@ class NotificationsScreen extends StatelessWidget {
               ? ListView(
                   children: [
                     SizedBox(height: 160),
-                    Center(child: Text('아직 알림이 없어요.', style: SgText.small)),
+                    Center(child: Text(t('아직 알림이 없어요.'), style: SgText.small)),
                     SizedBox(height: 8),
-                    Center(child: Text('누군가 공감하거나 팔로우하면 여기에 보여요.', style: SgText.small)),
+                    Center(child: Text(t('누군가 공감하거나 팔로우하면 여기에 보여요.'), style: SgText.small)),
                   ],
                 )
               : ListView.separated(
@@ -36,7 +37,7 @@ class NotificationsScreen extends StatelessWidget {
                   separatorBuilder: (_, _) => Divider(height: 1, color: SgColors.line),
                   itemBuilder: (context, i) {
                     final n = items[i];
-                    final what = n.kind == 'follow' ? '님이 나를 팔로우해요.' : '님이 내 생각에 공감했어요.';
+                    final what = n.kind == 'follow' ? t('님이 나를 팔로우해요.') : t('님이 내 생각에 공감했어요.');
                     return ListTile(
                       leading: Avatar(
                         initial: n.actorName.isEmpty ? '?' : n.actorName.substring(0, 1),
@@ -71,7 +72,7 @@ class NotificationsScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 border: Border(bottom: BorderSide(color: SgColors.line)),
               ),
-              child: Semantics(header: true, child: Text('알림', style: SgText.title)),
+              child: Semantics(header: true, child: Text(t('알림'), style: SgText.title)),
             ),
             Expanded(child: list),
           ],

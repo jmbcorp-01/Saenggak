@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { apiHandler } from '../src/handlers/api.js';
 import type { Event } from '../src/handlers/http.js';
 import { writeHandler } from '../src/handlers/write.js';
+import { handler as preSignUp } from '../src/handlers/preSignUp.js';
+import type { PreSignUpTriggerEvent } from 'aws-lambda';
 import type { FeedPost } from '../src/services/ports.js';
 import { editSession, humanSession, MemoryRepo, MemorySocial } from './helpers.js';
 
@@ -36,6 +38,7 @@ const noStores = {
   social: new MemorySocial(),
   photoStore: { put: async () => {}, remove: async () => {} },
   users: { deleteUser: async () => {} },
+  embedder: { embed: async () => [0.5] },
 };
 
 function setup() {
@@ -67,6 +70,7 @@ function setup() {
     translator: { translate: async (t: string) => `번역: ${t}` },
     photoStore: { put: async () => {}, remove: async (key: string) => void stored.delete(key) },
     users: { deleteUser: async (id: string) => void deletedUsers.push(id) },
+    embedder: { embed: async () => [0.5] },
   });
   return { repo, write, api, stored, deletedUsers, social };
 }
@@ -256,7 +260,7 @@ describe('PUT /me/photo', () => {
 describe('GET /feed', () => {
   const item = (id: string, lang: string): FeedPost => ({
     id, authorId: 'a', authorHandle: 'a', authorName: 'A', photoKey: null, body: `body ${id}`, lang,
-    typingMs: 1000, empathyCount: 0, empathizedByMe: false, createdAt: '2026-11-25T00:00:00Z', editedAt: null,
+    typingMs: 1000, empathyCount: 0, empathizedByMe: false, bookmarkedByMe: false, createdAt: '2026-11-25T00:00:00Z', editedAt: null,
   });
 
   it('translates other-language posts once and caches them', async () => {
@@ -270,6 +274,15 @@ describe('GET /feed', () => {
     expect(r.body.items[1].translation).toBeNull();
     await run();
     expect(calls).toBe(1);
+  });
+
+  it('translates into English when the reader gives no language', async () => {
+    const { repo } = setup();
+    repo.feedPosts = [item('p1', 'en'), item('p2', 'ko')];
+    const api = apiHandler({ repo, translator: { translate: async (t: string) => `EN: ${t}` }, ...noStores });
+    const r = parse(await api(event('GET /feed')));
+    expect(r.body.items[0].translation).toBeNull();
+    expect(r.body.items[1].translation).toEqual({ lang: 'en', body: 'EN: body p2' });
   });
 
   it('shows the original when translation fails', async () => {
@@ -360,5 +373,112 @@ describe('reports, blocks and notifications', () => {
     expect(r.body.items[0].actorPhotoKey).toBeUndefined();
     await api(event('POST /notifications/seen'));
     expect(parse(await api(event('GET /notifications'))).body.unread).toBe(0);
+  });
+});
+
+describe('the 추천 feed, search, bookmarks and export', () => {
+  const item = (id: string, authorId: string): FeedPost => ({
+    id, authorId, authorHandle: 'a', authorName: 'A', photoKey: null, body: `body ${id}`, lang: 'en',
+    typingMs: 1000, empathyCount: 0, empathizedByMe: false, bookmarkedByMe: false, createdAt: '2026-11-25T00:00:00Z', editedAt: null,
+  });
+
+  it('ranks the default tab, pages it by offset, and keeps one writer from filling a page', async () => {
+    const { api, repo } = setup();
+    repo.feedPosts = Array.from({ length: 30 }, (_, k) => item(`p${k}`, k < 4 ? 'same' : `w${k}`));
+    const r = parse(await api(event('GET /feed', { queryStringParameters: { tab: 'all', cursor: '30' } })));
+    expect(repo.feedCalls.at(-1)).toMatchObject({ ranked: true, offset: 30 });
+    expect(r.body.next).toBe('60');
+    // The third and fourth post by the same writer move to the end.
+    expect(r.body.items.slice(0, 3).map((p: FeedPost) => p.id)).toEqual(['p0', 'p1', 'p4']);
+    expect(r.body.items.slice(-2).map((p: FeedPost) => p.id)).toEqual(['p2', 'p3']);
+
+    await api(event('GET /feed', { queryStringParameters: { tab: 'following' } }));
+    expect(repo.feedCalls.at(-1)).toMatchObject({ following: true });
+    expect(repo.feedCalls.at(-1)!.ranked).toBeUndefined();
+    await api(event('GET /feed', { queryStringParameters: { author: U2 } }));
+    expect(repo.feedCalls.at(-1)!.ranked).toBeUndefined();
+  });
+
+  it('finds people and posts, skipping empty searches', async () => {
+    const { api, repo } = setup();
+    repo.users.set(U2, { handle: 'seoha', displayName: 'Seoha', bio: '', locale: 'ko', timeZone: 'Asia/Seoul' });
+    repo.feedPosts = [item('p1', U2)];
+    expect(parse(await api(event('GET /search/users', { queryStringParameters: { q: 'seo' } }))).body.items).toEqual([
+      { id: U2, handle: 'seoha', displayName: 'Seoha', bio: '', photoUrl: null },
+    ]);
+    expect(parse(await api(event('GET /search/users', { queryStringParameters: { q: '@' } }))).body.items).toEqual([]);
+    expect(parse(await api(event('GET /search/posts', { queryStringParameters: { q: '바다' } }))).body.items).toHaveLength(1);
+    expect(repo.searchCalls).toHaveLength(1);
+    expect(parse(await api(event('GET /search/posts', { queryStringParameters: { q: 'a' } }))).body.items).toEqual([]);
+    expect(repo.searchCalls).toHaveLength(1);
+  });
+
+  it('opens one post, saves it and exports the reader\'s records', async () => {
+    const { api, repo } = setup();
+    const id = '00000000-0000-4000-8000-000000000001';
+    repo.feedPosts = [item(id, U2)];
+    expect(parse(await api(event('GET /posts/{id}', { pathParameters: { id } }))).body.id).toBe(id);
+    expect(parse(await api(event('GET /posts/{id}', { pathParameters: { id: U2 } }))).status).toBe(404);
+    expect(parse(await api(event('PUT /posts/{id}/bookmark', { pathParameters: { id } }))).body).toEqual({ saved: true });
+    expect(repo.bookmarks.has(`${U1}:${id}`)).toBe(true);
+    await api(event('DELETE /posts/{id}/bookmark', { pathParameters: { id } }));
+    expect(repo.bookmarks.size).toBe(0);
+    expect(parse(await api(event('GET /me/export'))).status).toBe(404);
+    repo.users.set(U1, { handle: 'one', displayName: 'One', bio: '', locale: 'ko', timeZone: 'Asia/Seoul' });
+    expect(parse(await api(event('GET /me/export'))).body.profile.handle).toBe('one');
+  });
+});
+
+describe('human checks', () => {
+  const burst = { last10m: { empathy: 50 }, lastHour: { empathy: 150 }, accountAgeHours: 100, lowScorePosts: 0, hoursSinceCheck: null };
+
+  it('stops automated-looking activity until a typed check passes', async () => {
+    const { api, repo, write } = setup();
+    const id = '00000000-0000-4000-8000-000000000001';
+    repo.recentActivity = burst;
+    expect(parse(await api(event('POST /posts/{id}/empathy', { pathParameters: { id } })))).toEqual({
+      status: 428,
+      body: { error: 'human_check' },
+    });
+    expect(parse(await write(event('POST /posts', { body: post(TEXT) }))).status).toBe(428);
+
+    const { phrase } = parse(await api(event('GET /me/human-check', { queryStringParameters: { lang: 'en' } }))).body;
+    expect(typeof phrase).toBe('string');
+    // A pasted or wrong answer fails and is counted.
+    const pasted = { text: phrase, session: { events: [{ t: 0, i: phrase.length, d: 0, s: 'keyboard' }] } };
+    expect(parse(await api(event('POST /me/human-check', { body: JSON.stringify(pasted) }))).status).toBe(400);
+    expect(parse(await api(event('POST /me/human-check', { body: post('something else entirely typed') }))).status).toBe(400);
+    expect(repo.actions.filter((a) => a.kind === 'check_failed')).toHaveLength(2);
+
+    expect(parse(await api(event('POST /me/human-check', { body: post(phrase) }))).status).toBe(204);
+    expect(repo.humanChecked.has(U1)).toBe(true);
+    expect(parse(await write(event('POST /posts', { body: post(TEXT) }))).status).toBe(201);
+    expect(repo.actions.at(-1)).toEqual({ userId: U1, kind: 'post' });
+  });
+
+  it('counts ordinary actions without asking', async () => {
+    const { api, repo } = setup();
+    await api(event('PUT /users/{id}/block', { pathParameters: { id: U2 } }));
+    expect(repo.actions).toEqual([{ userId: U1, kind: 'block' }]);
+  });
+});
+
+describe('entry checks', () => {
+  it('answers only requests that came through CloudFront', async () => {
+    const { api } = setup();
+    process.env.ORIGIN_SECRET = 'from-cdn';
+    try {
+      expect(parse(await api(event('GET /me/blocks'))).status).toBe(403);
+      const through = event('GET /me/blocks', { headers: { 'x-origin-verify': 'from-cdn' } });
+      expect(parse(await api(through)).status).toBe(200);
+    } finally {
+      delete process.env.ORIGIN_SECRET;
+    }
+  });
+
+  it('refuses sign-ups from throwaway mail services', async () => {
+    const signUp = (email: string) => ({ request: { userAttributes: { email } } }) as unknown as PreSignUpTriggerEvent;
+    await expect(preSignUp(signUp('bot@Mailinator.com'))).rejects.toThrow('disposable_email');
+    await expect(preSignUp(signUp('me@gmail.com'))).resolves.toBeTruthy();
   });
 });

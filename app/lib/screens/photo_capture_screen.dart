@@ -7,6 +7,7 @@ import 'package:material_ui/material_ui.dart';
 import '../api/backend.dart';
 import '../core/photo_prep.dart';
 import '../data/app_state.dart';
+import '../l10n/l10n.dart';
 import '../theme/tokens.dart';
 
 /// Takes the profile photo with the camera. There is deliberately no way to
@@ -62,7 +63,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> with WidgetsBin
     try {
       final cameras = await (widget.cameras ?? availableCameras)();
       if (cameras.isEmpty) {
-        setState(() => _error = '이 기기에서 카메라를 찾지 못했어요. 카메라가 있는 기기에서 사진을 찍어주세요.');
+        setState(() => _error = t('이 기기에서 카메라를 찾지 못했어요. 카메라가 있는 기기에서 사진을 찍어주세요.'));
         return;
       }
       final camera = cameras.firstWhere(
@@ -84,8 +85,8 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> with WidgetsBin
       if (!mounted) return;
       setState(
         () => _error = e.code.contains('ccess') || e.code.contains('ermission')
-            ? '카메라 권한이 필요해요. 설정에서 카메라 사용을 허용한 뒤 다시 열어주세요.'
-            : '카메라를 열지 못했어요. 다시 시도해주세요.',
+            ? t('카메라 권한이 필요해요. 설정에서 카메라 사용을 허용한 뒤 다시 열어주세요.')
+            : t('카메라를 열지 못했어요. 다시 시도해주세요.'),
       );
     }
   }
@@ -107,7 +108,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> with WidgetsBin
         _error = prepared == null ? photoProblemMessage('bad_image') : null;
       });
     } on CameraException {
-      if (mounted) setState(() => _error = '사진을 찍지 못했어요. 다시 시도해주세요.');
+      if (mounted) setState(() => _error = t('사진을 찍지 못했어요. 다시 시도해주세요.'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -143,7 +144,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> with WidgetsBin
     final ready = c != null && c.value.isInitialized;
     final Widget view;
     if (_taken != null) {
-      view = Image.memory(_taken!, fit: BoxFit.cover, semanticLabel: '방금 찍은 사진');
+      view = Image.memory(_taken!, fit: BoxFit.cover, semanticLabel: t('방금 찍은 사진'));
     } else if (ready) {
       view = FittedBox(
         fit: BoxFit.cover,
@@ -159,13 +160,13 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> with WidgetsBin
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('프로필 사진 찍기')),
+      appBar: AppBar(title: Text(t('프로필 사진 찍기'))),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
-            const Text(
-              '생각은 사람이 직접 쓰는 곳이라, 프로필 사진도 지금 카메라로 찍은 본인 얼굴만 쓸 수 있어요. 앨범 사진이나 그림, AI 이미지는 올릴 수 없어요.',
+            Text(
+              t('생각은 사람이 직접 쓰는 곳이라, 프로필 사진도 지금 카메라로 찍은 본인 얼굴만 쓸 수 있어요. 앨범 사진이나 그림, AI 이미지는 올릴 수 없어요.'),
               style: TextStyle(fontSize: 15, height: 1.5),
             ),
             const SizedBox(height: 24),
@@ -184,7 +185,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> with WidgetsBin
               )
             else
               Text(
-                _taken == null ? '밝은 곳에서 얼굴이 원 안에 오도록 정면을 봐주세요.' : '이 사진으로 할까요?',
+                _taken == null ? t('밝은 곳에서 얼굴이 원 안에 오도록 정면을 봐주세요.') : t('이 사진으로 할까요?'),
                 textAlign: TextAlign.center,
                 style: SgText.small,
               ),
@@ -193,7 +194,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> with WidgetsBin
               Center(
                 child: Semantics(
                   button: true,
-                  label: '사진 찍기',
+                  label: t('사진 찍기'),
                   child: InkResponse(
                     onTap: ready && !_busy ? _shoot : null,
                     radius: 40,
@@ -222,7 +223,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> with WidgetsBin
                     child: OutlinedButton(
                       onPressed: _busy ? null : _retake,
                       style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
-                      child: const Text('다시 찍기'),
+                      child: Text(t('다시 찍기')),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -232,7 +233,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> with WidgetsBin
                       style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
                       child: _busy
                           ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Text('이 사진 쓰기'),
+                          : Text(t('이 사진 쓰기')),
                     ),
                   ),
                 ],

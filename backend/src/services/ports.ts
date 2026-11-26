@@ -4,9 +4,11 @@
  */
 import type { TypingSession } from '../rules/humanCheck.js';
 import type { Phrase } from '../rules/phrases.js';
+import type { ActionKind, Activity } from '../rules/risk.js';
+import type { TextSignals } from '../rules/thoughtScore.js';
 
 export type ModerationVerdict =
-  | { allowed: true }
+  | { allowed: true; signals?: TextSignals }
   | { allowed: false; reason: ModerationReason };
 
 export type ModerationReason =
@@ -81,8 +83,24 @@ export interface FeedPost {
   typingMs: number;
   empathyCount: number;
   empathizedByMe: boolean;
+  bookmarkedByMe: boolean;
   createdAt: string;
   editedAt: string | null;
+}
+
+/** A person found by search. */
+export interface UserHit {
+  id: string;
+  handle: string;
+  displayName: string;
+  bio: string;
+  photoKey: string | null;
+}
+
+export interface ThoughtScores {
+  process: number;
+  content: number;
+  thought: number;
 }
 
 export interface Profile {
@@ -130,6 +148,14 @@ export interface FeedOptions {
   following: boolean;
   /** Only posts by this author. */
   authorId?: string;
+  /** Only posts the viewer saved, newest saved first. */
+  saved?: boolean;
+  /**
+   * The 추천 order: thought score, 공감 and the reader's taste, fading with
+   * age. Paged by [offset] instead of [before].
+   */
+  ranked?: boolean;
+  offset?: number;
   before?: string;
   limit: number;
 }
@@ -201,6 +227,27 @@ export interface Repository {
 
   cachedTranslation(postId: string, lang: string): Promise<string | null>;
   saveTranslation(postId: string, lang: string, body: string): Promise<void>;
+
+  /** Stores a published post's thought score. */
+  setThoughtScores(postId: string, scores: ThoughtScores): Promise<void>;
+
+  /** Recent activity for the risk score. */
+  activity(userId: string): Promise<Activity>;
+  recordAction(userId: string, kind: ActionKind): Promise<void>;
+  setHumanChecked(userId: string): Promise<void>;
+
+  /** One published post as the viewer would see it in the feed, or null. */
+  post(viewerId: string, postId: string): Promise<FeedPost | null>;
+  /** Saves or unsaves a published post. False if there is no such post. */
+  setBookmark(userId: string, postId: string, saved: boolean): Promise<boolean>;
+
+  /** People whose handle or name matches, not suspended and not blocked either way. */
+  findUsers(viewerId: string, query: string, limit: number): Promise<UserHit[]>;
+  /** Published posts closest in meaning to the embedding. */
+  searchPosts(viewerId: string, embedding: number[], maxDistance: number, limit: number): Promise<FeedPost[]>;
+
+  /** Everything stored about the person, for them to keep. Null without a profile. */
+  exportData(userId: string): Promise<Record<string, unknown> | null>;
 }
 
 export interface AdminStats {

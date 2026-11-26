@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/typing_session.dart';
+import '../l10n/l10n.dart';
 import '../models/post.dart';
 import '../theme/tokens.dart';
 import 'pressable.dart';
@@ -105,7 +106,7 @@ class TypingTimeLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = formatTypingDuration(duration);
     return Semantics(
-      label: '직접 타이핑 $text',
+      label: t('직접 타이핑 {0}', [text]),
       child: ExcludeSemantics(
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -133,6 +134,8 @@ class PostTile extends StatefulWidget {
     this.onAdminRemove,
     this.onReport,
     this.onBlock,
+    this.onBookmark,
+    this.onCopyLink,
   });
 
   final Post post;
@@ -155,6 +158,10 @@ class PostTile extends StatefulWidget {
   final VoidCallback? onReport;
   final VoidCallback? onBlock;
 
+  /// Saves the post to read again, or takes it off the saved list.
+  final VoidCallback? onBookmark;
+  final VoidCallback? onCopyLink;
+
   @override
   State<PostTile> createState() => _PostTileState();
 }
@@ -167,11 +174,14 @@ class _PostTileState extends State<PostTile> {
   List<({String value, String label, bool danger})> _actions() {
     final post = widget.post;
     return [
-      if (!post.isMine && widget.onReport != null) (value: 'report', label: '신고', danger: false),
-      if (!post.isMine && widget.onBlock != null) (value: 'block', label: '@${post.authorHandle} 차단', danger: false),
-      if (!post.isMine && widget.onAdminRemove != null) (value: 'admin-remove', label: '관리자: 글 내리기', danger: true),
-      if (post.editable && widget.onEdit != null) (value: 'edit', label: '수정', danger: false),
-      if (post.isMine && widget.onDelete != null) (value: 'delete', label: '삭제', danger: true),
+      if (widget.onBookmark != null) (value: 'bookmark', label: post.bookmarked ? t('저장 취소') : t('저장'), danger: false),
+      if (widget.onCopyLink != null) (value: 'link', label: t('링크 복사'), danger: false),
+      if (!post.isMine && widget.onReport != null) (value: 'report', label: t('신고'), danger: false),
+      if (!post.isMine && widget.onBlock != null)
+        (value: 'block', label: t('@{0} 차단', [post.authorHandle]), danger: false),
+      if (!post.isMine && widget.onAdminRemove != null) (value: 'admin-remove', label: t('관리자: 글 내리기'), danger: true),
+      if (post.editable && widget.onEdit != null) (value: 'edit', label: t('수정'), danger: false),
+      if (post.isMine && widget.onDelete != null) (value: 'delete', label: t('삭제'), danger: true),
     ];
   }
 
@@ -180,6 +190,8 @@ class _PostTileState extends State<PostTile> {
     'delete' => widget.onDelete!(),
     'report' => widget.onReport!(),
     'block' => widget.onBlock!(),
+    'bookmark' => widget.onBookmark!(),
+    'link' => widget.onCopyLink!(),
     _ => widget.onAdminRemove!(),
   };
 
@@ -249,7 +261,7 @@ class _PostTileState extends State<PostTile> {
                           button: widget.onOpenAuthor != null,
                           child: _AuthorLine(
                             name: post.authorName,
-                            rest: ' @${post.authorHandle} · $ago${post.editedAt != null ? ' · 수정됨' : ''}',
+                            rest: ' @${post.authorHandle} · $ago${post.editedAt != null ? t(' · 수정됨') : ''}',
                             onTap: widget.onOpenAuthor,
                           ),
                         ),
@@ -257,7 +269,7 @@ class _PostTileState extends State<PostTile> {
                       if (actions.isNotEmpty)
                         PopupMenuButton<String>(
                           key: ValueKey('menu-${post.id}'),
-                          tooltip: '더보기',
+                          tooltip: t('더보기'),
                           iconSize: 18,
                           icon: Icon(SgIcons.more, color: SgColors.muted),
                           onSelected: _run,
@@ -294,7 +306,10 @@ class _PostTileState extends State<PostTile> {
                   if (post.translation != null)
                     Row(
                       children: [
-                        Text(translated ? '${languageName(post.lang)}에서 번역됨 · ' : '원문 · ', style: SgText.small),
+                        Text(
+                          translated ? t('{0}에서 번역됨 · ', [languageName(post.lang)]) : t('원문 · '),
+                          style: SgText.small,
+                        ),
                         TextButton(
                           onPressed: () => setState(() => _showOriginal = !_showOriginal),
                           style: TextButton.styleFrom(
@@ -303,7 +318,7 @@ class _PostTileState extends State<PostTile> {
                             minimumSize: const Size(48, 44),
                             textStyle: SgText.label(size: 13, weight: FontWeight.w500),
                           ),
-                          child: Text(translated ? '원문 보기' : '번역 보기'),
+                          child: Text(translated ? t('원문 보기') : t('번역 보기')),
                         ),
                       ],
                     ),
@@ -439,7 +454,7 @@ class _EmpathyButtonState extends State<EmpathyButton> with SingleTickerProvider
     return Semantics(
       container: true,
       button: widget.onTap != null,
-      label: '공감 ${widget.count}${active ? ', 공감함' : ''}',
+      label: t('공감 {0}{1}', [widget.count, active ? t(', 공감함') : '']),
       child: ExcludeSemantics(
         child: MouseRegion(
           cursor: widget.onTap != null ? SystemMouseCursors.click : MouseCursor.defer,

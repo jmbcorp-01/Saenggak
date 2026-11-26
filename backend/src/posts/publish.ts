@@ -3,6 +3,13 @@ import { evaluate, parseSession, type HumanCheckIssue, type TypingSession } from
 import { extractPhrases, pickFirstPhrases, type Phrase } from '../rules/phrases.js';
 import { MAX_COSINE_DISTANCE, summarizeSimilar, type SimilarSummary } from '../rules/similar.js';
 import { BLOCK_WINDOW_DAYS, followUnlocked } from '../rules/follow.js';
+import {
+  NEAR_DUPLICATE_DISTANCE,
+  contentScore,
+  processScore,
+  thoughtScore,
+  type TextSignals,
+} from '../rules/thoughtScore.js';
 import type { ContentFilter, Embedder, ModerationReason, Repository } from '../services/ports.js';
 
 /** Posts, edits and profile changes a writer can send per hour. Each one costs a filter call. */
@@ -106,7 +113,11 @@ async function prepare(
  * Runs the content filter. A blocked text is stored as a blocked post, so
  * blocked edits count toward losing follow permission just like new posts.
  */
-async function moderate(deps: PublishDeps, input: PublishInput, s: Screened): Promise<Rejected | null> {
+async function moderate(
+  deps: PublishDeps,
+  input: PublishInput,
+  s: Screened,
+): Promise<Rejected | { signals: TextSignals | null }> {
   let verdict;
   try {
     verdict = await deps.filter.moderate(s.body);
@@ -114,7 +125,7 @@ async function moderate(deps: PublishDeps, input: PublishInput, s: Screened): Pr
     console.error('content filter failed', e);
     return { kind: 'filter_unavailable' };
   }
-  if (verdict.allowed) return null;
+  if (verdict.allowed) return { signals: verdict.signals ?? null };
   await deps.repo.insertPost({
     authorId: input.authorId,
     body: s.body,
@@ -130,15 +141,29 @@ async function moderate(deps: PublishDeps, input: PublishInput, s: Screened): Pr
   return { kind: 'blocked', reason: verdict.reason, followUnlocked: unlocked };
 }
 
-/** Similar thoughts, first-used phrases and follow status for a stored post. */
-async function extras(repo: Repository, postId: string, authorId: string, s: Screened, embedding: number[]): Promise<Published> {
-  const [people, firsts, showFirsts, writingDays, unlocked] = await Promise.all([
+/**
+ * Similar thoughts, first-used phrases and follow status for a stored post,
+ * and its thought score.
+ */
+async function extras(
+  repo: Repository,
+  postId: string,
+  authorId: string,
+  s: Screened,
+  embedding: number[],
+  signals: TextSignals | null,
+): Promise<Published> {
+  const [people, duplicates, firsts, showFirsts, writingDays, unlocked] = await Promise.all([
     repo.countSimilarAuthors(postId, embedding, MAX_COSINE_DISTANCE),
+    repo.countSimilarAuthors(postId, embedding, NEAR_DUPLICATE_DISTANCE),
     repo.claimPhrases(postId, authorId, extractPhrases(s.body)),
     repo.hasPublished(firstPhrasesMinPosts()),
     repo.writingDays(authorId),
     refreshFollow(repo, authorId),
   ]);
+  const process = processScore(s.session);
+  const content = contentScore({ signals, nearDuplicate: duplicates > 0, firstPhrases: firsts.length });
+  await repo.setThoughtScores(postId, { process, content, thought: thoughtScore(process, content) });
   return {
     kind: 'published',
     postId,
@@ -157,8 +182,8 @@ async function extras(repo: Repository, postId: string, authorId: string, s: Scr
 export async function publishPost(deps: PublishDeps, input: PublishInput): Promise<PublishResult> {
   const s = await prepare(deps.repo, input, screen(input));
   if ('kind' in s) return s;
-  const rejected = await moderate(deps, input, s);
-  if (rejected) return rejected;
+  const moderated = await moderate(deps, input, s);
+  if ('kind' in moderated) return moderated;
 
   const embedding = await deps.embedder.embed(s.body);
   const postId = await deps.repo.insertPost({
@@ -172,7 +197,7 @@ export async function publishPost(deps: PublishDeps, input: PublishInput): Promi
     session: s.session,
     issues: [],
   });
-  return extras(deps.repo, postId, input.authorId, s, embedding);
+  return extras(deps.repo, postId, input.authorId, s, embedding, moderated.signals);
 }
 
 /**
@@ -190,8 +215,8 @@ export async function editPost(deps: PublishDeps, input: EditInput): Promise<Edi
   const s = await prepare(deps.repo, input, screen(input, current.body));
   if ('kind' in s) return s;
 
-  const rejected = await moderate(deps, input, s);
-  if (rejected) return rejected;
+  const moderated = await moderate(deps, input, s);
+  if ('kind' in moderated) return moderated;
 
   const embedding = await deps.embedder.embed(s.body);
   const updated = await deps.repo.updatePost(input.postId, input.authorId, {
@@ -203,7 +228,7 @@ export async function editPost(deps: PublishDeps, input: EditInput): Promise<Edi
   });
   // Someone may have sent the first 공감 while the filter was running.
   if (!updated) return { kind: 'locked' };
-  return extras(deps.repo, input.postId, input.authorId, s, embedding);
+  return extras(deps.repo, input.postId, input.authorId, s, embedding, moderated.signals);
 }
 
 /** Deletes the author's post and rechecks follow permission, since writing days may drop. */

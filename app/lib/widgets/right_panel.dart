@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../core/links.dart';
 import '../data/app_state.dart';
+import '../l10n/l10n.dart';
 import '../models/post.dart';
 import '../screens/profile_screen.dart' show FollowProgress;
 import '../theme/tokens.dart';
@@ -37,7 +38,7 @@ class RightPanel extends StatelessWidget {
             children: [
               if (me != null)
                 _Card(
-                  title: '나의 생각',
+                  title: t('나의 생각'),
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(SgSpace.lg, 0, SgSpace.lg, SgSpace.lg),
                     child: Column(
@@ -45,9 +46,9 @@ class RightPanel extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            _Stat(value: '${me.writingDays}', label: '쓴 날'),
-                            _Stat(value: '${state.mine.length}', label: '쓴 글'),
-                            _Stat(value: '$received', label: '받은 공감'),
+                            _Stat(value: '${me.writingDays}', label: t('쓴 날')),
+                            _Stat(value: '${state.mine.length}', label: t('쓴 글')),
+                            _Stat(value: '$received', label: t('받은 공감')),
                           ],
                         ),
                         if (!me.followUnlocked) ...[
@@ -61,7 +62,7 @@ class RightPanel extends StatelessWidget {
               if (popular.isNotEmpty) ...[
                 const SizedBox(height: SgSpace.lg),
                 _Card(
-                  title: '많이 공감받은 생각',
+                  title: t('많이 공감받은 생각'),
                   child: Column(
                     children: [
                       for (final p in popular.take(4)) _PopularRow(post: p, onTap: () => onOpenAuthor(p.authorId)),
@@ -77,10 +78,10 @@ class RightPanel extends StatelessWidget {
                   spacing: SgSpace.md,
                   runSpacing: SgSpace.xs,
                   children: [
-                    _FooterLink('이용약관', () => openPage('terms.html')),
-                    _FooterLink('개인정보 처리방침', () => openPage('privacy.html')),
-                    _FooterLink('문의하기', () => openPage('support.html')),
-                    Text('© ${now.year} 생각', style: SgText.small),
+                    _FooterLink(t('이용약관'), () => openPage('terms.html')),
+                    _FooterLink(t('개인정보 처리방침'), () => openPage('privacy.html')),
+                    _FooterLink(t('문의하기'), () => openPage('support.html')),
+                    Text(t('© {0} 생각', [now.year]), style: SgText.small),
                   ],
                 ),
               ),
@@ -145,7 +146,7 @@ class _PopularRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      semanticLabel: '${post.authorName}의 생각, 공감 ${post.empathyCount}',
+      semanticLabel: t('{0}의 생각, 공감 {1}', [post.authorName, post.empathyCount]),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: SgSpace.lg, vertical: SgSpace.md),
         child: Row(

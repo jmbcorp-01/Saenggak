@@ -1,5 +1,7 @@
 import type { Phrase } from '../src/rules/phrases.js';
+import type { ActionKind, Activity } from '../src/rules/risk.js';
 import type {
+  FeedOptions,
   FeedPost,
   FollowResult,
   NewPost,
@@ -10,6 +12,7 @@ import type {
   ProfileInput,
   Repository,
   SocialRepository,
+  ThoughtScores,
 } from '../src/services/ports.js';
 
 /** One keystroke per character at uneven, human-like intervals. */
@@ -168,8 +171,52 @@ export class MemoryRepo implements Repository {
     else this.empathies.delete(k);
     return { empathized, count: [...this.empathies].filter((e) => e.startsWith(`${postId}:`)).length };
   }
-  async feed() {
+  feedCalls: FeedOptions[] = [];
+  async feed(_v: string, opts: FeedOptions) {
+    this.feedCalls.push(opts);
     return this.feedPosts;
+  }
+  scores = new Map<string, ThoughtScores>();
+  async setThoughtScores(postId: string, sc: ThoughtScores) {
+    this.scores.set(postId, sc);
+  }
+  /** What activity() reports; tests set it to simulate bursts. */
+  recentActivity: Activity = { last10m: {}, lastHour: {}, accountAgeHours: 100, lowScorePosts: 0, hoursSinceCheck: null };
+  actions: { userId: string; kind: ActionKind }[] = [];
+  humanChecked = new Set<string>();
+  async activity() {
+    return this.recentActivity;
+  }
+  async recordAction(userId: string, kind: ActionKind) {
+    this.actions.push({ userId, kind });
+  }
+  async setHumanChecked(userId: string) {
+    this.humanChecked.add(userId);
+    this.recentActivity = { ...this.recentActivity, hoursSinceCheck: 0, lastHour: { ...this.recentActivity.lastHour, check_failed: 0 } };
+  }
+  async post(_v: string, postId: string) {
+    return this.feedPosts.find((p) => p.id === postId) ?? null;
+  }
+  bookmarks = new Set<string>();
+  async setBookmark(userId: string, postId: string, saved: boolean) {
+    if (!this.feedPosts.some((p) => p.id === postId)) return false;
+    if (saved) this.bookmarks.add(`${userId}:${postId}`);
+    else this.bookmarks.delete(`${userId}:${postId}`);
+    return true;
+  }
+  async findUsers(_v: string, query: string) {
+    return [...this.users.entries()]
+      .filter(([, u]) => u.handle.includes(query) || u.displayName.includes(query))
+      .map(([id, u]) => ({ id, handle: u.handle, displayName: u.displayName, bio: u.bio, photoKey: null }));
+  }
+  searchCalls: number[][] = [];
+  async searchPosts(_v: string, embedding: number[]) {
+    this.searchCalls.push(embedding);
+    return this.feedPosts;
+  }
+  async exportData(userId: string) {
+    const u = this.users.get(userId);
+    return u ? { profile: u, posts: this.posts.filter((p) => p.authorId === userId) } : null;
   }
   async cachedTranslation(postId: string, lang: string) {
     return this.translations.get(`${postId}:${lang}`) ?? null;

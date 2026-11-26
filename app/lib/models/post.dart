@@ -1,3 +1,5 @@
+import '../l10n/l10n.dart';
+
 /// A published thought, as the reader sees it.
 class Post {
   const Post({
@@ -13,6 +15,7 @@ class Post {
     this.translation,
     this.editedAt,
     this.empathizedByMe = false,
+    this.bookmarked = false,
     this.isMine = false,
     this.authorPhotoUrl,
   });
@@ -32,6 +35,7 @@ class Post {
       typingTime: Duration(milliseconds: (j['typingMs'] as num).toInt()),
       empathyCount: (j['empathyCount'] as num).toInt(),
       empathizedByMe: j['empathizedByMe'] as bool? ?? false,
+      bookmarked: j['bookmarkedByMe'] as bool? ?? false,
       isMine: j['authorId'] == myId,
       authorPhotoUrl: j['photoUrl'] as String?,
     );
@@ -54,6 +58,9 @@ class Post {
   final Duration typingTime;
   final int empathyCount;
   final bool empathizedByMe;
+
+  /// Saved by the reader to read again.
+  final bool bookmarked;
   final bool isMine;
 
   /// The author's profile photo, or null when they have none.
@@ -70,7 +77,7 @@ class Post {
   /// Behind the initial when the author has no photo.
   int get avatarColor => avatarPalette[authorId.hashCode.abs() % avatarPalette.length];
 
-  Post copyWith({int? empathyCount, bool? empathizedByMe}) => Post(
+  Post copyWith({int? empathyCount, bool? empathizedByMe, bool? bookmarked}) => Post(
     id: id,
     authorId: authorId,
     authorName: authorName,
@@ -83,6 +90,7 @@ class Post {
     typingTime: typingTime,
     empathyCount: empathyCount ?? this.empathyCount,
     empathizedByMe: empathizedByMe ?? this.empathizedByMe,
+    bookmarked: bookmarked ?? this.bookmarked,
     isMine: isMine,
     authorPhotoUrl: authorPhotoUrl,
   );
@@ -99,19 +107,22 @@ DateTime parseServerTime(String s) {
 }
 
 /// "방금", "5분", "3시간", "2일", or a date for older posts.
-String timeAgo(DateTime t, DateTime now) {
-  final d = now.difference(t);
-  if (d.inMinutes < 1) return '방금';
-  if (d.inHours < 1) return '${d.inMinutes}분';
-  if (d.inDays < 1) return '${d.inHours}시간';
-  if (d.inDays < 7) return '${d.inDays}일';
-  final local = t.toLocal();
-  return '${local.month}월 ${local.day}일';
+String timeAgo(DateTime at, DateTime now) {
+  final d = now.difference(at);
+  if (d.inMinutes < 1) return t('방금');
+  if (d.inHours < 1) return t('{0}분', [d.inMinutes]);
+  if (d.inDays < 1) return t('{0}시간', [d.inHours]);
+  if (d.inDays < 7) return t('{0}일', [d.inDays]);
+  final local = at.toLocal();
+  if (AppLang.instance.value == 'en') return '${_months[local.month - 1]} ${local.day}';
+  return t('{0}월 {1}일', [local.month, local.day]);
 }
 
+const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 String languageName(String code) => switch (code) {
-  'en' => '영어',
-  'ko' => '한국어',
+  'en' => t('영어'),
+  'ko' => t('한국어'),
   _ => code,
 };
 

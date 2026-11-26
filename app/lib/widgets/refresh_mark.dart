@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../l10n/l10n.dart';
 import '../theme/tokens.dart';
 import 'symbol_mark.dart';
 
@@ -52,7 +53,7 @@ class _RefreshMarkState extends State<RefreshMark> with SingleTickerProviderStat
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: widget.spinning ? '새로고침 중' : null,
+      label: widget.spinning ? t('새로고침 중') : null,
       child: AnimatedBuilder(
         animation: _c,
         builder: (context, _) {
