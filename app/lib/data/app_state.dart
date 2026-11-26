@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_timezone/flutter_timezone.dart';
@@ -206,7 +207,7 @@ class AppState extends ChangeNotifier {
     final outcome = await _checked(
       () => backend.publish(text: text, session: session, localDate: localDateOf(clock())),
     );
-    await _afterWrite(outcome);
+    unawaited(_afterWrite(outcome));
     return outcome;
   }
 
@@ -214,7 +215,7 @@ class AppState extends ChangeNotifier {
     final outcome = await _checked(
       () => backend.edit(post.id, text: text, session: session, localDate: localDateOf(clock())),
     );
-    await _afterWrite(outcome);
+    unawaited(_afterWrite(outcome));
     return outcome;
   }
 
@@ -283,9 +284,17 @@ class AppState extends ChangeNotifier {
   Future<void> report({String? postId, String? userId, required String reason}) =>
       guarded(() => backend.report(postId: postId, userId: userId, reason: reason));
 
+  /// Brings the profile and lists up to date after a post. The writer sees
+  /// the result at once: the profile takes the new counts from the answer,
+  /// and the lists reload behind the result screen.
   Future<void> _afterWrite(PublishOutcome outcome) async {
     // A blocked post can take follow permission away, so refresh then too.
     if (outcome is Rejected && outcome.reason != RejectReason.blocked) return;
+    final current = me;
+    if (outcome is Published && current != null) {
+      me = current.copyWith(writingDays: outcome.writingDays, followUnlocked: outcome.followUnlocked);
+      notifyListeners();
+    }
     try {
       me = await backend.me();
     } catch (_) {

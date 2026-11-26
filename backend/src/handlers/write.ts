@@ -24,17 +24,24 @@ export type WriteDeps = PublishDeps & PhotoDeps;
 
 export const writeHandler = (deps: WriteDeps) =>
   safely(async (event: Event) => {
+    const me = userId(event);
+    const posting = event.routeKey !== 'PUT /me' && event.routeKey !== 'PUT /me/photo';
+    // Both lookups at once: they are independent and each is a database round trip.
+    const [suspended, activity] = await Promise.all([
+      deps.repo.isSuspended(me),
+      posting ? deps.repo.activity(me) : null,
+    ]);
     // Suspended people keep reading but cannot post, edit or change their profile.
-    if (await deps.repo.isSuspended(userId(event))) return json(403, { error: 'suspended' });
+    if (suspended) return json(403, { error: 'suspended' });
     if (event.routeKey === 'PUT /me') return saveProfile(deps, event);
     if (event.routeKey === 'PUT /me/photo') return putPhoto(deps, event);
 
     const body = parseBody(event);
     if (!body || typeof body.text !== 'string') return json(400, { error: 'bad_request' });
-    const input = { authorId: userId(event), text: body.text, session: body.session };
+    const input = { authorId: me, text: body.text, session: body.session };
     // Posting that looks automated (bursts, or posts that keep scoring as
     // copied) waits for a passed typing check.
-    if (needsHumanCheck(await deps.repo.activity(input.authorId))) return json(428, { error: 'human_check' });
+    if (activity && needsHumanCheck(activity)) return json(428, { error: 'human_check' });
 
     let result: EditResult;
     if (event.routeKey === 'PATCH /posts/{id}') {

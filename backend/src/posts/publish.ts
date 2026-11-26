@@ -103,9 +103,12 @@ async function prepare(
   screened: Omit<Screened, 'localDate'> | Rejected,
 ): Promise<Screened | Rejected> {
   if ('kind' in screened) return screened;
-  const localDate = await repo.localDate(input.authorId);
+  const [localDate, allowed] = await Promise.all([
+    repo.localDate(input.authorId),
+    repo.recordWrite(input.authorId, WRITES_PER_HOUR),
+  ]);
   if (!localDate) return { kind: 'profile_required' };
-  if (!(await repo.recordWrite(input.authorId, WRITES_PER_HOUR))) return { kind: 'rate_limited' };
+  if (!allowed) return { kind: 'rate_limited' };
   return { ...screened, localDate };
 }
 
@@ -139,6 +142,24 @@ async function moderate(
   });
   const unlocked = await refreshFollow(deps.repo, input.authorId);
   return { kind: 'blocked', reason: verdict.reason, followUnlocked: unlocked };
+}
+
+/**
+ * The content filter and the embedding run side by side, since the filter is
+ * the slow step and most posts pass it. An embedding error only matters when
+ * the post is allowed.
+ */
+async function moderateAndEmbed(
+  deps: PublishDeps,
+  input: PublishInput,
+  s: Screened,
+): Promise<Rejected | { signals: TextSignals | null; embedding: number[] }> {
+  const embedding = deps.embedder.embed(s.body);
+  // Keep an early failure from being reported as unhandled while the filter runs.
+  embedding.catch(() => {});
+  const moderated = await moderate(deps, input, s);
+  if ('kind' in moderated) return moderated;
+  return { signals: moderated.signals, embedding: await embedding };
 }
 
 /**
@@ -182,10 +203,10 @@ async function extras(
 export async function publishPost(deps: PublishDeps, input: PublishInput): Promise<PublishResult> {
   const s = await prepare(deps.repo, input, screen(input));
   if ('kind' in s) return s;
-  const moderated = await moderate(deps, input, s);
+  const moderated = await moderateAndEmbed(deps, input, s);
   if ('kind' in moderated) return moderated;
 
-  const embedding = await deps.embedder.embed(s.body);
+  const { embedding } = moderated;
   const postId = await deps.repo.insertPost({
     authorId: input.authorId,
     body: s.body,
@@ -215,10 +236,10 @@ export async function editPost(deps: PublishDeps, input: EditInput): Promise<Edi
   const s = await prepare(deps.repo, input, screen(input, current.body));
   if ('kind' in s) return s;
 
-  const moderated = await moderate(deps, input, s);
+  const moderated = await moderateAndEmbed(deps, input, s);
   if ('kind' in moderated) return moderated;
 
-  const embedding = await deps.embedder.embed(s.body);
+  const { embedding } = moderated;
   const updated = await deps.repo.updatePost(input.postId, input.authorId, {
     body: s.body,
     lang: s.lang,

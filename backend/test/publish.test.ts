@@ -30,6 +30,39 @@ describe('publishPost', () => {
     expect(r.typingMs).toBeGreaterThan(0);
   });
 
+  it('works out the embedding while the filter runs, not after it', async () => {
+    const order: string[] = [];
+    const filter: ContentFilter = {
+      moderate: async () => {
+        order.push('filter start');
+        await new Promise((r) => setTimeout(r, 20));
+        order.push('filter end');
+        return { allowed: true };
+      },
+      moderateProfile: allowProfile,
+    };
+    const repo = new MemoryRepo();
+    const embed = async () => {
+      order.push('embed');
+      return Array(1024).fill(0.01);
+    };
+    const r = await publishPost({ repo, filter, embedder: { embed } }, { authorId: 'u1', text: TEXT, session: humanSession(TEXT) });
+    expect(r.kind).toBe('published');
+    expect(order.indexOf('embed')).toBeLessThan(order.indexOf('filter end'));
+  });
+
+  it('a failed embedding does not matter when the filter blocks the post', async () => {
+    const repo = new MemoryRepo();
+    const embed = async (): Promise<number[]> => {
+      throw new Error('embedder down');
+    };
+    const r = await publishPost(
+      { repo, filter: block({ allowed: false, reason: 'spam' }), embedder: { embed } },
+      { authorId: 'u1', text: TEXT, session: humanSession(TEXT) },
+    );
+    expect(r).toMatchObject({ kind: 'blocked', reason: 'spam' });
+  });
+
   it('gives first phrases only to the first writer', async () => {
     const { deps } = setup();
     const input = { text: TEXT, session: humanSession(TEXT) };
