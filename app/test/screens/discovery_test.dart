@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:saenggak/api/backend.dart';
 import 'package:saenggak/api/demo_backend.dart';
 import 'package:saenggak/core/links.dart';
 import 'package:saenggak/core/typing_session.dart';
@@ -17,7 +20,39 @@ Future<void> openHome(WidgetTester tester, AppState state) async {
   await tester.pumpAndSettle();
 }
 
+/// A backend whose feed answers only when [gate] completes.
+class SlowFeedBackend extends DemoBackend {
+  Completer<void>? gate;
+
+  @override
+  Future<FeedPage> feed({required String lang, bool following = false, String? authorId, String? before}) async {
+    await gate?.future;
+    return super.feed(lang: lang, following: following, authorId: authorId, before: before);
+  }
+}
+
 void main() {
+  test('a post returns its result without waiting for the lists to reload', () async {
+    final backend = SlowFeedBackend();
+    final state = AppState(backend: backend);
+    await state.start();
+    final days = state.me!.writingDays;
+    backend.gate = Completer<void>();
+    final outcome = await state.publish(
+      '비가 오면 약속을 미루고 싶어진다. 사실 비 때문이 아니라 핑계가 필요했다.',
+      TypingSession()..record(inserted: 1, deleted: 0),
+    );
+    expect(outcome, isA<Published>());
+    // The profile already has the new count; the feed is still on its way.
+    expect(state.me!.writingDays, (outcome as Published).writingDays);
+    expect(state.me!.writingDays, greaterThanOrEqualTo(days));
+    expect(state.feed.any((p) => p.id == outcome.postId), isFalse);
+    backend.gate!.complete();
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+    expect(state.feed.any((p) => p.id == outcome.postId), isTrue);
+  });
+
   testWidgets('a typing check appears when asked for, and the 공감 goes through after it', (tester) async {
     final backend = DemoBackend()..wantsHumanCheck = true;
     await openHome(tester, AppState(backend: backend));

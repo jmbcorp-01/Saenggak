@@ -43,7 +43,9 @@ class _PostScreenState extends State<PostScreen> {
         builder: (context, _) {
           final post = state.opened.where((p) => p.id == widget.postId).firstOrNull;
           if (post != null) {
-            return ListView(children: [ConnectedPostTile(state: state, post: post)]);
+            return ListView(
+              children: [ConnectedPostTile(state: state, post: post)],
+            );
           }
           if (_missing) {
             return Center(child: Text(t('글을 찾을 수 없어요. 이미 삭제됐을 수 있어요.'), style: SgText.small));
