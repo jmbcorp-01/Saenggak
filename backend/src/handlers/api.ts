@@ -50,7 +50,7 @@ export const apiHandler = (deps: Deps) => safely(async (event: Event) => {
   switch (event.routeKey) {
     case 'GET /feed': {
       const q = event.queryStringParameters ?? {};
-      const lang = isLang(q.lang) ? q.lang : 'ko';
+      const lang = isLang(q.lang) ? q.lang : 'en';
       const before = q.before && !Number.isNaN(Date.parse(q.before)) ? q.before : undefined;
       if (q.author !== undefined && !isUuid(q.author)) return json(400, { error: 'bad_request' });
       const posts = await repo.feed(me, { following: q.tab === 'following', authorId: q.author, before, limit: PAGE_SIZE });

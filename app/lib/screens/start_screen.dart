@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
+import '../l10n/l10n.dart';
 import '../theme/tokens.dart';
 import '../widgets/appear.dart';
 import '../widgets/drawn_symbol.dart';
@@ -58,17 +59,26 @@ class StartScreen extends StatelessWidget {
             return Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 440),
-                child: Padding(
+                // Scrolls only when the words do not fit, as on a short
+                // screen or with large text.
+                child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(32, 40, 32, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Center(child: DrawnSymbol(size: 44, breaths: 0, delay: Duration(milliseconds: 400))),
-                      const Spacer(),
-                      Appear(delay: const Duration(milliseconds: 400), child: _headline(34)),
-                      const Spacer(),
-                      Appear(delay: const Duration(milliseconds: 600), child: _actions()),
-                    ],
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: math.max(0, c.maxHeight - 64)),
+                    child: IntrinsicHeight(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Center(child: DrawnSymbol(size: 44, breaths: 0, delay: Duration(milliseconds: 400))),
+                          const Spacer(),
+                          const SizedBox(height: SgSpace.xl),
+                          Appear(delay: const Duration(milliseconds: 400), child: _headline(34)),
+                          const SizedBox(height: SgSpace.xl),
+                          const Spacer(),
+                          Appear(delay: const Duration(milliseconds: 600), child: _actions()),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -83,7 +93,7 @@ class StartScreen extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(
-        '사람이 직접 쓴\n생각만 있는 곳.',
+        t('사람이 직접 쓴\n생각만 있는 곳.'),
         style: TextStyle(
           fontSize: size,
           height: 1.3,
@@ -95,7 +105,7 @@ class StartScreen extends StatelessWidget {
       const SizedBox(height: 16),
       Text(
         // On a wide screen the two sentences sit on their own lines.
-        size > 40 ? 'AI도, 붙여넣기도 없이.\n하루에 한 생각이라도 당신의 손으로.' : 'AI도, 붙여넣기도 없이. 하루에 한 생각이라도 당신의 손으로.',
+        size > 40 ? t('AI도, 붙여넣기도 없이.\n하루에 한 생각이라도 당신의 손으로.') : t('AI도, 붙여넣기도 없이. 하루에 한 생각이라도 당신의 손으로.'),
         style: TextStyle(fontSize: size > 40 ? 18 : 16, height: 1.6, color: SgColors.muted),
       ),
     ],
@@ -116,7 +126,7 @@ class StartScreen extends StatelessWidget {
               shape: pill,
               textStyle: SgText.label(size: 16, weight: FontWeight.w700),
             ),
-            child: const Text('계정 만들기'),
+            child: Text(t('계정 만들기')),
           ),
         ),
         const SizedBox(height: 12),
@@ -125,7 +135,7 @@ class StartScreen extends StatelessWidget {
             Expanded(child: Divider()),
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 12),
-              child: Text('이미 계정이 있나요?', style: SgText.small),
+              child: Text(t('이미 계정이 있나요?'), style: SgText.small),
             ),
             Expanded(child: Divider()),
           ],
@@ -141,23 +151,27 @@ class StartScreen extends StatelessWidget {
               shape: pill,
               textStyle: SgText.label(size: 16, weight: FontWeight.w700),
             ),
-            child: const Text('로그인'),
+            child: Text(t('로그인')),
           ),
         ),
         const SizedBox(height: 12),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            TextButton(
-              onPressed: () {},
-              style: TextButton.styleFrom(foregroundColor: SgColors.ink),
-              child: const Text('한국어', style: TextStyle(fontWeight: FontWeight.w700)),
-            ),
-            TextButton(
-              onPressed: () {},
-              style: TextButton.styleFrom(foregroundColor: SgColors.muted),
-              child: const Text('English'),
-            ),
+            for (final (code, name) in const [('ko', '한국어'), ('en', 'English')])
+              TextButton(
+                onPressed: () => AppLang.instance.set(code),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppLang.instance.value == code ? SgColors.ink : SgColors.muted,
+                ),
+                child: Semantics(
+                  selected: AppLang.instance.value == code,
+                  child: Text(
+                    name,
+                    style: TextStyle(fontWeight: AppLang.instance.value == code ? FontWeight.w700 : FontWeight.w400),
+                  ),
+                ),
+              ),
           ],
         ),
       ],

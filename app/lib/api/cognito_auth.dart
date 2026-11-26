@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../l10n/l10n.dart';
 import 'config.dart';
 import 'token_store.dart';
 
@@ -164,16 +165,16 @@ class AuthException implements Exception {
   final String type;
 
   String get message => switch (type) {
-    'UsernameExistsException' => '이미 가입한 이메일이에요. 로그인해주세요.',
-    'NotAuthorizedException' => '이메일이나 비밀번호가 맞지 않아요.',
-    'UserNotFoundException' => '이메일이나 비밀번호가 맞지 않아요.',
-    'UserNotConfirmedException' => '이메일 인증을 마쳐주세요.',
-    'CodeMismatchException' => '인증 코드가 맞지 않아요.',
-    'ExpiredCodeException' => '인증 코드가 만료됐어요. 새 코드를 받아주세요.',
-    'InvalidPasswordException' => '비밀번호는 10자 이상이고 대문자, 소문자, 숫자를 섞어야 해요.',
-    'InvalidParameterException' => '이메일 형식을 확인해주세요.',
-    'LimitExceededException' || 'TooManyRequestsException' => '시도가 너무 많아요. 잠시 후 다시 해주세요.',
-    _ => '로그인 중 문제가 생겼어요. 잠시 후 다시 해주세요.',
+    'UsernameExistsException' => t('이미 가입한 이메일이에요. 로그인해주세요.'),
+    'NotAuthorizedException' => t('이메일이나 비밀번호가 맞지 않아요.'),
+    'UserNotFoundException' => t('이메일이나 비밀번호가 맞지 않아요.'),
+    'UserNotConfirmedException' => t('이메일 인증을 마쳐주세요.'),
+    'CodeMismatchException' => t('인증 코드가 맞지 않아요.'),
+    'ExpiredCodeException' => t('인증 코드가 만료됐어요. 새 코드를 받아주세요.'),
+    'InvalidPasswordException' => t('비밀번호는 10자 이상이고 대문자, 소문자, 숫자를 섞어야 해요.'),
+    'InvalidParameterException' => t('이메일 형식을 확인해주세요.'),
+    'LimitExceededException' || 'TooManyRequestsException' => t('시도가 너무 많아요. 잠시 후 다시 해주세요.'),
+    _ => t('로그인 중 문제가 생겼어요. 잠시 후 다시 해주세요.'),
   };
 
   @override

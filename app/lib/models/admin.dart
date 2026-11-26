@@ -1,3 +1,4 @@
+import '../l10n/l10n.dart';
 import 'post.dart' show parseServerTime;
 
 class AdminStats {
@@ -99,13 +100,13 @@ class AdminUser {
 
 /// Why the content filter held a post, in words.
 String blockedReasonName(String? reason) => switch (reason) {
-  'profanity' => '욕설·비하',
-  'sexual' => '선정적',
-  'crime' => '범죄',
-  'spam' => '광고·스팸',
-  'not_a_thought' => '생각이 아님',
-  'classifier_declined' => '필터가 판단 보류',
-  _ => '기타',
+  'profanity' => t('욕설·비하'),
+  'sexual' => t('선정적'),
+  'crime' => t('범죄'),
+  'spam' => t('광고·스팸'),
+  'not_a_thought' => t('생각이 아님'),
+  'classifier_declined' => t('필터가 판단 보류'),
+  _ => t('기타'),
 };
 
 class OpenReport {

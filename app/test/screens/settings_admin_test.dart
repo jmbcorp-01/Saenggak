@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:saenggak/api/demo_backend.dart';
 import 'package:saenggak/data/app_state.dart';
+import 'package:saenggak/l10n/l10n.dart';
 import 'package:saenggak/main.dart';
 import 'package:saenggak/models/admin.dart';
 import 'package:saenggak/models/social.dart';
@@ -23,15 +24,20 @@ Future<AppState> openSettings(WidgetTester tester, {DemoBackend? backend}) async
 }
 
 void main() {
-  testWidgets('settings change the feed language and time zone', (tester) async {
+  testWidgets('settings switch the whole app to English, and the time zone', (tester) async {
+    addTearDown(() => AppLang.instance.value = 'ko');
     final state = await openSettings(tester);
     await tester.tap(find.text('English'));
     await tester.pumpAndSettle();
     expect(state.me!.locale, 'en');
+    expect(state.lang, 'en');
+    // The screen itself is in English now, not only the feed.
+    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Language'), findsOneWidget);
 
-    await tester.tap(find.text('시간대'));
+    await tester.tap(find.text('Time zone'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Europe/Paris (이 기기)'));
+    await tester.tap(find.text('Europe/Paris (this device)'));
     await tester.pumpAndSettle();
     expect(state.me!.timeZone, 'Europe/Paris');
   });
@@ -109,7 +115,8 @@ void main() {
   testWidgets('a post can be reported, its author blocked, and the report handled by an admin', (tester) async {
     final backend = DemoBackend();
     final state = await openSettings(tester, backend: backend);
-    await tester.pageBack();
+    // The app runs in Korean here, so the back button says 뒤로.
+    await tester.tap(find.byTooltip('뒤로'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('홈').last);
     await tester.pumpAndSettle();

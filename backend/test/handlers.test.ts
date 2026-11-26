@@ -272,6 +272,15 @@ describe('GET /feed', () => {
     expect(calls).toBe(1);
   });
 
+  it('translates into English when the reader gives no language', async () => {
+    const { repo } = setup();
+    repo.feedPosts = [item('p1', 'en'), item('p2', 'ko')];
+    const api = apiHandler({ repo, translator: { translate: async (t: string) => `EN: ${t}` }, ...noStores });
+    const r = parse(await api(event('GET /feed')));
+    expect(r.body.items[0].translation).toBeNull();
+    expect(r.body.items[1].translation).toEqual({ lang: 'en', body: 'EN: body p2' });
+  });
+
   it('shows the original when translation fails', async () => {
     const { repo } = setup();
     repo.feedPosts = [item('p1', 'en')];

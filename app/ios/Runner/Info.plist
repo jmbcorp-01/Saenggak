@@ -10,6 +10,11 @@
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
 		<key>ITSAppUsesNonExemptEncryption</key>
 		<false/>
+		<key>CFBundleLocalizations</key>
+		<array>
+			<string>en</string>
+			<string>ko</string>
+		</array>
 		<key>CFBundleDisplayName</key>
 		<string>생각</string>
 		<key>CFBundleExecutable</key>

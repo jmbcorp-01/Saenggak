@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../api/cognito_auth.dart';
 import '../core/links.dart';
+import '../l10n/l10n.dart';
 import '../theme/tokens.dart';
 import '../widgets/symbol_mark.dart';
 import 'reset_password_screen.dart';
@@ -52,7 +53,7 @@ class _AuthScreenState extends State<AuthScreen> {
         setState(() => _error = e.message);
       }
     } catch (_) {
-      setState(() => _error = '연결이 불안정해요. 잠시 후 다시 해주세요.');
+      setState(() => _error = t('연결이 불안정해요. 잠시 후 다시 해주세요.'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -74,7 +75,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final title = _needsCode ? '이메일을 확인해주세요' : (_signUp ? '계정 만들기' : '로그인');
+    final title = _needsCode ? t('이메일을 확인해주세요') : (_signUp ? t('계정 만들기') : t('로그인'));
     final pill = RoundedRectangleBorder(borderRadius: BorderRadius.circular(25));
     return Scaffold(
       appBar: AppBar(
@@ -90,7 +91,9 @@ class _AuthScreenState extends State<AuthScreen> {
             Text(title, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.5)),
             const SizedBox(height: 8),
             Text(
-              _needsCode ? '${_email.text.trim()}로 보낸 6자리 코드를 입력해주세요.' : '이메일과 비밀번호로 ${_signUp ? '시작해요' : '들어가요'}.',
+              _needsCode
+                  ? t('{0}로 보낸 6자리 코드를 입력해주세요.', [_email.text.trim()])
+                  : (_signUp ? t('이메일과 비밀번호로 시작해요.') : t('이메일과 비밀번호로 들어가요.')),
               style: TextStyle(fontSize: 15, color: SgColors.muted),
             ),
             const SizedBox(height: 28),
@@ -100,7 +103,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 controller: _email,
                 keyboardType: TextInputType.emailAddress,
                 autofillHints: const [AutofillHints.email],
-                decoration: _field('이메일'),
+                decoration: _field(t('이메일')),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -108,7 +111,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 controller: _password,
                 obscureText: true,
                 autofillHints: [_signUp ? AutofillHints.newPassword : AutofillHints.password],
-                decoration: _field(_signUp ? '비밀번호 (10자 이상)' : '비밀번호'),
+                decoration: _field(_signUp ? t('비밀번호 (10자 이상)') : t('비밀번호')),
                 onSubmitted: (_) => _submit(),
               ),
             ] else
@@ -117,7 +120,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 controller: _code,
                 keyboardType: TextInputType.number,
                 autofillHints: const [AutofillHints.oneTimeCode],
-                decoration: _field('인증 코드'),
+                decoration: _field(t('인증 코드')),
                 onSubmitted: (_) => _submit(),
               ),
             if (_error != null) ...[
@@ -141,7 +144,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2, color: SgColors.onInk),
                     )
-                  : Text(_needsCode ? '인증하기' : (_signUp ? '다음' : '로그인')),
+                  : Text(_needsCode ? t('인증하기') : (_signUp ? t('다음') : t('로그인'))),
             ),
             if (_signUp && !_needsCode)
               Padding(
@@ -150,20 +153,17 @@ class _AuthScreenState extends State<AuthScreen> {
                   alignment: WrapAlignment.center,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Text('가입하면 ', style: SgText.small),
+                    Text(t('가입하면 '), style: SgText.small),
                     InkWell(
                       onTap: () => openPage('terms.html'),
-                      child: const Text('이용약관', style: TextStyle(fontSize: 13, decoration: TextDecoration.underline)),
+                      child: Text(t('이용약관'), style: TextStyle(fontSize: 13, decoration: TextDecoration.underline)),
                     ),
-                    Text('과 ', style: SgText.small),
+                    Text(t('과 '), style: SgText.small),
                     InkWell(
                       onTap: () => openPage('privacy.html'),
-                      child: const Text(
-                        '개인정보 처리방침',
-                        style: TextStyle(fontSize: 13, decoration: TextDecoration.underline),
-                      ),
+                      child: Text(t('개인정보 처리방침'), style: TextStyle(fontSize: 13, decoration: TextDecoration.underline)),
                     ),
-                    Text('에 동의하게 돼요. 만 14세 이상만 가입할 수 있어요.', style: SgText.small),
+                    Text(t('에 동의하게 돼요. 만 14세 이상만 가입할 수 있어요.'), style: SgText.small),
                   ],
                 ),
               ),
@@ -172,7 +172,7 @@ class _AuthScreenState extends State<AuthScreen> {
               TextButton(
                 onPressed: _busy ? null : () => _run(() => widget.auth.resendCode(_email.text.trim())),
                 style: TextButton.styleFrom(foregroundColor: SgColors.muted),
-                child: const Text('코드 다시 받기'),
+                child: Text(t('코드 다시 받기')),
               )
             else
               TextButton(
@@ -181,7 +181,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   _error = null;
                 }),
                 style: TextButton.styleFrom(foregroundColor: SgColors.accentText),
-                child: Text(_signUp ? '이미 계정이 있어요' : '새 계정 만들기'),
+                child: Text(_signUp ? t('이미 계정이 있어요') : t('새 계정 만들기')),
               ),
             if (!_needsCode && !_signUp)
               TextButton(
@@ -193,7 +193,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                       ),
                 style: TextButton.styleFrom(foregroundColor: SgColors.muted),
-                child: const Text('비밀번호를 잊었어요'),
+                child: Text(t('비밀번호를 잊었어요')),
               ),
           ],
         ),

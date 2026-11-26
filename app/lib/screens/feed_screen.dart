@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../data/app_state.dart';
+import '../l10n/l10n.dart';
 import '../models/post.dart';
 import '../theme/tokens.dart';
 import '../widgets/appear.dart';
@@ -118,7 +119,7 @@ class _FeedScreenState extends State<FeedScreen> with SingleTickerProviderStateM
                   controller: _scrolls[1],
                   top: headerHeight,
                   posts: state.following,
-                  empty: '아직 팔로우한 사람이 없어요. 글쓴이 이름을 눌러 프로필에서 팔로우할 수 있어요.',
+                  empty: t('아직 팔로우한 사람이 없어요. 글쓴이 이름을 눌러 프로필에서 팔로우할 수 있어요.'),
                 )
               else
                 _FollowingLocked(
@@ -186,7 +187,7 @@ class _FeedHeader extends StatelessWidget {
                       children: [
                         Semantics(
                           button: true,
-                          label: '내 프로필',
+                          label: t('내 프로필'),
                           child: GestureDetector(
                             behavior: HitTestBehavior.opaque,
                             onTap: onOpenProfile,
@@ -233,9 +234,9 @@ class _FeedHeader extends StatelessWidget {
                         : null,
                   ),
                   dividerColor: SgColors.line,
-                  tabs: const [
-                    Tab(text: '추천'),
-                    Tab(text: '팔로잉'),
+                  tabs: [
+                    Tab(text: t('추천')),
+                    Tab(text: t('팔로잉')),
                   ],
                 ),
               ),
@@ -307,7 +308,10 @@ class _NewPostsPill extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: SgSpace.sm),
-                    Text('새 생각 ${posts.length}개', style: SgText.label(size: 14).copyWith(color: SgColors.onAccent)),
+                    Text(
+                      t('새 생각 {0}개', [posts.length]),
+                      style: SgText.label(size: 14).copyWith(color: SgColors.onAccent),
+                    ),
                   ],
                 ),
               ),
@@ -387,7 +391,7 @@ class _PostListState extends State<_PostList> {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(SgSpace.xxl),
-                  child: Text(widget.empty, textAlign: TextAlign.center, style: SgText.small),
+                  child: Text(t(widget.empty), textAlign: TextAlign.center, style: SgText.small),
                 ),
               ),
             SliverList.builder(
@@ -468,9 +472,9 @@ class _FollowingLocked extends StatelessWidget {
         children: [
           const SymbolMark(size: 48, semanticLabel: null),
           const SizedBox(height: SgSpace.lg),
-          Text('${total - days}일 더 쓰면 팔로우할 수 있어요', style: SgText.title.copyWith(fontSize: 17)),
+          Text(t('{0}일 더 쓰면 팔로우할 수 있어요', [total - days]), style: SgText.title.copyWith(fontSize: 17)),
           const SizedBox(height: SgSpace.sm),
-          Text('글을 쓴 날이 $total일이 되면 팔로우가 열려요. 연속이 아니어도 돼요.', textAlign: TextAlign.center, style: SgText.small),
+          Text(t('글을 쓴 날이 {0}일이 되면 팔로우가 열려요. 연속이 아니어도 돼요.', [total]), textAlign: TextAlign.center, style: SgText.small),
         ],
       ),
     );

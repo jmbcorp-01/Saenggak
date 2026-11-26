@@ -10,6 +10,7 @@ import 'api/http_backend.dart';
 import 'api/token_store.dart';
 import 'core/appearance.dart';
 import 'data/app_state.dart';
+import 'l10n/l10n.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_shell.dart';
 import 'screens/profile_setup_screen.dart';
@@ -20,6 +21,7 @@ import 'widgets/symbol_mark.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Appearance.instance.load();
+  await AppLang.instance.load();
   final config = await ApiConfig.load();
   if (config.isDemo) {
     runApp(SaenggakApp(state: AppState(backend: DemoBackend())));
@@ -61,18 +63,23 @@ class _SaenggakAppState extends State<SaenggakApp> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     Appearance.instance.addListener(_applyPalette);
+    AppLang.instance.addListener(_rebuildAll);
     SgColors.use(_palette());
   }
 
   @override
   void dispose() {
     Appearance.instance.removeListener(_applyPalette);
+    AppLang.instance.removeListener(_rebuildAll);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   void didChangePlatformBrightness() => _applyPalette();
+
+  @override
+  void didChangeLocales(List<Locale>? locales) => AppLang.instance.deviceChanged();
 
   SgPalette _palette() {
     final dark = switch (Appearance.instance.value) {
@@ -89,6 +96,12 @@ class _SaenggakAppState extends State<SaenggakApp> with WidgetsBindingObserver {
     final next = _palette();
     if (next == SgColors.palette) return;
     SgColors.use(next);
+    _rebuildAll();
+  }
+
+  /// Text is looked up with [t] during build, like colors, so a new language
+  /// rebuilds every widget in place.
+  void _rebuildAll() {
     setState(() {});
     void visit(Element e) {
       e.markNeedsBuild();
@@ -140,7 +153,10 @@ class _SaenggakAppState extends State<SaenggakApp> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final palette = SgColors.palette;
     return MaterialApp(
-      title: '생각',
+      title: t('생각'),
+      locale: Locale(AppLang.instance.value),
+      supportedLocales: [for (final l in supportedLangs) Locale(l)],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       debugShowCheckedModeBanner: false,
       theme: buildTheme(palette),
       // Widgets take their colors straight from the palette, so the theme

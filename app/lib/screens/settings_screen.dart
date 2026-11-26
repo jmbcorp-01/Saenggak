@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../core/appearance.dart';
 import '../core/links.dart';
 import '../data/app_state.dart';
+import '../l10n/l10n.dart';
 import '../theme/tokens.dart';
 import 'admin_screen.dart';
 import 'blocked_screen.dart';
@@ -51,14 +52,14 @@ class SettingsScreen extends StatelessWidget {
     final picked = await showDialog<String>(
       context: context,
       builder: (context) => SimpleDialog(
-        title: const Text('시간대'),
+        title: Text(t('시간대')),
         children: [
           for (final z in zones)
             SimpleDialogOption(
               onPressed: () => Navigator.pop(context, z),
               child: Row(
                 children: [
-                  Expanded(child: Text(z == device ? '$z (이 기기)' : z)),
+                  Expanded(child: Text(z == device ? t('{0} (이 기기)', [z]) : z)),
                   if (z == current) const Icon(Icons.check, size: 18),
                 ],
               ),
@@ -67,7 +68,7 @@ class SettingsScreen extends StatelessWidget {
       ),
     );
     if (picked != null && picked != current && context.mounted) {
-      await _run(context, () => state.saveSettings(timeZone: picked), '시간대를 바꾸지 못했어요.');
+      await _run(context, () => state.saveSettings(timeZone: picked), t('시간대를 바꾸지 못했어요.'));
     }
   }
 
@@ -80,17 +81,17 @@ class SettingsScreen extends StatelessWidget {
     final sure = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('계정을 삭제할까요?'),
-        content: const Text(
-          '쓴 글, 받은 공감, 팔로우, 프로필 사진이 모두 지워지고 되돌릴 수 없어요. 같은 이메일로 다시 가입하면 처음부터 시작해요.',
+        title: Text(t('계정을 삭제할까요?')),
+        content: Text(
+          t('쓴 글, 받은 공감, 팔로우, 프로필 사진이 모두 지워지고 되돌릴 수 없어요. 같은 이메일로 다시 가입하면 처음부터 시작해요.'),
           style: TextStyle(height: 1.5),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(t('취소'))),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: SgColors.accentText),
-            child: const Text('삭제'),
+            child: Text(t('삭제')),
           ),
         ],
       ),
@@ -100,10 +101,10 @@ class SettingsScreen extends StatelessWidget {
       await state.deleteAccount();
       if (!context.mounted) return;
       Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil('/', (_) => false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('계정을 삭제했어요.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t('계정을 삭제했어요.'))));
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('계정을 삭제하지 못했어요. 잠시 후 다시 시도해주세요.')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t('계정을 삭제하지 못했어요. 잠시 후 다시 시도해주세요.'))));
       }
     }
   }
@@ -111,7 +112,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('설정')),
+      appBar: AppBar(title: Text(t('설정'))),
       body: ListenableBuilder(
         listenable: state,
         builder: (context, _) {
@@ -119,26 +120,26 @@ class SettingsScreen extends StatelessWidget {
           if (me == null) return const SizedBox.shrink();
           return ListView(
             children: [
-              const _Header('계정'),
+              _Header(t('계정')),
               ListTile(
                 leading: const Icon(Icons.person_outline),
-                title: const Text('프로필 수정'),
+                title: Text(t('프로필 수정')),
                 onTap: () =>
                     _push(context, (c) => ProfileSetupScreen(state: state, onDone: () => Navigator.of(c).pop())),
               ),
               ListTile(
                 leading: const Icon(Icons.photo_camera_outlined),
-                title: const Text('프로필 사진 찍기'),
+                title: Text(t('프로필 사진 찍기')),
                 onTap: () => Navigator.of(
                   context,
                   rootNavigator: true,
                 ).push(MaterialPageRoute<void>(builder: (_) => PhotoCaptureScreen(state: state))),
               ),
-              const _Header('화면'),
+              _Header(t('화면')),
               ListTile(
                 leading: const Icon(Icons.contrast_rounded),
-                title: const Text('화면 모드'),
-                subtitle: const Text('밝게, 어둡게, 또는 기기 설정을 따라요.'),
+                title: Text(t('화면 모드')),
+                subtitle: Text(t('밝게, 어둡게, 또는 기기 설정을 따라요.')),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(72, 0, 16, 8),
@@ -147,21 +148,21 @@ class SettingsScreen extends StatelessWidget {
                   builder: (context, mode, _) => SegmentedButton<ThemeMode>(
                     key: const Key('theme-mode'),
                     showSelectedIcon: false,
-                    segments: const [
-                      ButtonSegment(value: ThemeMode.system, label: Text('기기 설정')),
-                      ButtonSegment(value: ThemeMode.light, label: Text('밝게')),
-                      ButtonSegment(value: ThemeMode.dark, label: Text('어둡게')),
+                    segments: [
+                      ButtonSegment(value: ThemeMode.system, label: Text(t('기기 설정'))),
+                      ButtonSegment(value: ThemeMode.light, label: Text(t('밝게'))),
+                      ButtonSegment(value: ThemeMode.dark, label: Text(t('어둡게'))),
                     ],
                     selected: {mode},
                     onSelectionChanged: (v) => Appearance.instance.set(v.first),
                   ),
                 ),
               ),
-              const _Header('피드'),
+              _Header(t('언어와 지역')),
               ListTile(
                 leading: const Icon(Icons.translate),
-                title: const Text('글을 읽을 언어'),
-                subtitle: const Text('다른 언어로 쓴 글은 이 언어로 번역해서 보여드려요.'),
+                title: Text(t('언어')),
+                subtitle: Text(t('화면에 쓰는 언어예요. 다른 언어로 쓴 글도 이 언어로 번역해서 보여드려요.')),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(72, 0, 16, 8),
@@ -171,50 +172,50 @@ class SettingsScreen extends StatelessWidget {
                     ButtonSegment(value: 'ko', label: Text('한국어')),
                     ButtonSegment(value: 'en', label: Text('English')),
                   ],
-                  selected: {me.locale},
-                  onSelectionChanged: (v) => _run(context, () => state.saveSettings(locale: v.first), '언어를 바꾸지 못했어요.'),
+                  selected: {AppLang.instance.value},
+                  onSelectionChanged: (v) => _run(context, () => state.setLanguage(v.first), t('언어를 바꾸지 못했어요.')),
                 ),
               ),
               ListTile(
                 leading: const Icon(Icons.schedule),
-                title: const Text('시간대'),
-                subtitle: Text('${me.timeZone} · 쓴 날은 이 시간대의 날짜로 세요.'),
+                title: Text(t('시간대')),
+                subtitle: Text(t('{0} · 쓴 날은 이 시간대의 날짜로 세요.', [me.timeZone])),
                 onTap: () => _pickTimeZone(context),
               ),
               if (me.isAdmin) ...[
-                const _Header('운영'),
+                _Header(t('운영')),
                 ListTile(
                   leading: const Icon(Icons.admin_panel_settings_outlined),
-                  title: const Text('관리자 페이지'),
+                  title: Text(t('관리자 페이지')),
                   onTap: () => _push(context, (_) => AdminScreen(state: state)),
                 ),
               ],
               ListTile(
                 leading: const Icon(Icons.block),
-                title: const Text('차단한 사람'),
+                title: Text(t('차단한 사람')),
                 onTap: () => _push(context, (_) => BlockedScreen(state: state)),
               ),
-              const _Header('정보'),
+              _Header(t('정보')),
               ListTile(
                 leading: const Icon(Icons.description_outlined),
-                title: const Text('이용약관'),
+                title: Text(t('이용약관')),
                 onTap: () => openPage('terms.html'),
               ),
               ListTile(
                 leading: const Icon(Icons.privacy_tip_outlined),
-                title: const Text('개인정보 처리방침'),
+                title: Text(t('개인정보 처리방침')),
                 onTap: () => openPage('privacy.html'),
               ),
               ListTile(
                 leading: const Icon(Icons.mail_outline),
-                title: const Text('문의하기'),
+                title: Text(t('문의하기')),
                 onTap: () => openPage('support.html'),
               ),
               const Divider(height: 32),
-              ListTile(leading: const Icon(Icons.logout), title: const Text('로그아웃'), onTap: () => _signOut(context)),
+              ListTile(leading: const Icon(Icons.logout), title: Text(t('로그아웃')), onTap: () => _signOut(context)),
               ListTile(
                 leading: Icon(Icons.delete_outline, color: SgColors.accentText),
-                title: Text('계정 삭제', style: TextStyle(color: SgColors.accentText)),
+                title: Text(t('계정 삭제'), style: TextStyle(color: SgColors.accentText)),
                 onTap: () => _deleteAccount(context),
               ),
               const SizedBox(height: 24),

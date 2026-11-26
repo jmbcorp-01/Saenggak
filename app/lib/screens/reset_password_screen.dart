@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../api/cognito_auth.dart';
+import '../l10n/l10n.dart';
 import '../theme/tokens.dart';
 
 /// Sets a new password with a code sent to the account's email.
@@ -43,13 +44,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       } else {
         await widget.auth.resetPassword(email, _code.text.trim(), _password.text);
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('새 비밀번호로 로그인해주세요.')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t('새 비밀번호로 로그인해주세요.'))));
         Navigator.of(context).pop();
       }
     } on AuthException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (_) {
-      if (mounted) setState(() => _error = '연결이 불안정해요. 잠시 후 다시 해주세요.');
+      if (mounted) setState(() => _error = t('연결이 불안정해요. 잠시 후 다시 해주세요.'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -59,13 +60,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   Widget build(BuildContext context) {
     final border = OutlineInputBorder(borderRadius: BorderRadius.circular(10));
     return Scaffold(
-      appBar: AppBar(title: const Text('비밀번호 다시 만들기')),
+      appBar: AppBar(title: Text(t('비밀번호 다시 만들기'))),
       body: SafeArea(
         child: ListView(
           padding: formPadding(context),
           children: [
             Text(
-              _codeSent ? '${_email.text.trim()}로 보낸 6자리 코드와 새 비밀번호를 입력해주세요.' : '가입한 이메일로 코드를 보내드려요.',
+              _codeSent ? t('{0}로 보낸 6자리 코드와 새 비밀번호를 입력해주세요.', [_email.text.trim()]) : t('가입한 이메일로 코드를 보내드려요.'),
               style: TextStyle(fontSize: 15, color: SgColors.muted, height: 1.5),
             ),
             const SizedBox(height: 24),
@@ -75,7 +76,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               enabled: !_codeSent,
               keyboardType: TextInputType.emailAddress,
               autofillHints: const [AutofillHints.email],
-              decoration: InputDecoration(labelText: '이메일', border: border),
+              decoration: InputDecoration(labelText: t('이메일'), border: border),
             ),
             if (_codeSent) ...[
               const SizedBox(height: 12),
@@ -84,7 +85,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 controller: _code,
                 keyboardType: TextInputType.number,
                 autofillHints: const [AutofillHints.oneTimeCode],
-                decoration: InputDecoration(labelText: '인증 코드', border: border),
+                decoration: InputDecoration(labelText: t('인증 코드'), border: border),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -92,7 +93,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 controller: _password,
                 obscureText: true,
                 autofillHints: const [AutofillHints.newPassword],
-                decoration: InputDecoration(labelText: '새 비밀번호 (10자 이상)', border: border),
+                decoration: InputDecoration(labelText: t('새 비밀번호 (10자 이상)'), border: border),
                 onSubmitted: (_) => _submit(),
               ),
             ],
@@ -109,7 +110,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 foregroundColor: SgColors.onInk,
                 minimumSize: const Size.fromHeight(50),
               ),
-              child: Text(_codeSent ? '비밀번호 바꾸기' : '코드 받기'),
+              child: Text(_codeSent ? t('비밀번호 바꾸기') : t('코드 받기')),
             ),
           ],
         ),

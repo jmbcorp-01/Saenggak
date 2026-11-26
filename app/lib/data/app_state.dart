@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../api/backend.dart';
 import '../core/typing_session.dart';
+import '../l10n/l10n.dart';
 import '../models/post.dart';
 import '../models/profile.dart';
 import '../models/publish_outcome.dart';
@@ -52,7 +53,7 @@ class AppState extends ChangeNotifier {
   Set<String> fresh = const {};
 
   /// Feed translations go into the reader's language.
-  String get lang => me?.locale ?? 'ko';
+  String get lang => AppLang.instance.value;
   bool get hasMore => _feedNext != null;
 
   /// Loads the profile and the first page of each list.
@@ -64,6 +65,9 @@ class AppState extends ChangeNotifier {
   /// The reader's own profile; null for a new account.
   Future<void> loadMe() async {
     me = await backend.me();
+    // The language saved on the account follows the person to new devices.
+    final saved = me?.locale;
+    if (saved != null && saved != AppLang.instance.value) AppLang.instance.set(saved);
     notifyListeners();
   }
 
@@ -95,7 +99,7 @@ class AppState extends ChangeNotifier {
       following = unlocked ? results[k++].items : const [];
       mine = me != null ? results[k].items : const [];
     } catch (_) {
-      error = '글을 불러오지 못했어요. 당겨서 다시 시도해주세요.';
+      error = t('글을 불러오지 못했어요. 당겨서 다시 시도해주세요.');
     } finally {
       loading = false;
       notifyListeners();
@@ -140,7 +144,7 @@ class AppState extends ChangeNotifier {
       feed = [...feed, ...page.items];
       _feedNext = page.next;
     } catch (_) {
-      error = '글을 더 불러오지 못했어요.';
+      error = t('글을 더 불러오지 못했어요.');
     } finally {
       loading = false;
       notifyListeners();
@@ -200,15 +204,14 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// A new profile takes the device's language and time zone.
+  /// A new profile takes the app's language and the device's time zone.
   Future<void> saveProfile({required String handle, required String displayName, String bio = ''}) async {
     final current = me;
-    final deviceLang = WidgetsBinding.instance.platformDispatcher.locale.languageCode == 'ko' ? 'ko' : 'en';
     me = await backend.saveProfile(
       handle: handle,
       displayName: displayName,
       bio: bio,
-      locale: current?.locale ?? deviceLang,
+      locale: current?.locale ?? AppLang.instance.value,
       timeZone: current?.timeZone ?? await deviceTimeZone(),
     );
     notifyListeners();
@@ -226,6 +229,14 @@ class AppState extends ChangeNotifier {
     );
     notifyListeners();
     if (locale != null && locale != current.locale) await refresh();
+  }
+
+  /// Switches the app's language at once, then saves it on the account so
+  /// the feed is translated into it.
+  Future<void> setLanguage(String lang) async {
+    AppLang.instance.set(lang);
+    notifyListeners();
+    if (me != null && me!.locale != lang) await saveSettings(locale: lang);
   }
 
   /// Erases the account on the server and signs out.

@@ -1,3 +1,5 @@
+import '../l10n/l10n.dart';
+
 /// Where a change to the draft came from.
 enum InputSource { keyboard, voice }
 
@@ -97,6 +99,6 @@ String formatTypingDuration(Duration d) {
   final minutes = d.inMinutes;
   final seconds = d.inSeconds % 60;
   final ss = seconds.toString().padLeft(2, '0');
-  if (minutes == 0) return '$seconds초';
-  return '$minutes분 $ss초';
+  if (minutes == 0) return t('{0}초', [seconds]);
+  return t('{0}분 {1}초', [minutes, ss]);
 }

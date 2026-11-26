@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../core/nav.dart';
 import '../data/app_state.dart';
+import '../l10n/l10n.dart';
 import '../theme/tokens.dart';
 import '../widgets/right_panel.dart';
 import '../widgets/shell_chrome.dart';
@@ -100,9 +101,9 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   }
 
   List<NavItem> _items() => [
-    const NavItem(icon: SgIcons.home, activeIcon: SgIcons.homeActive, label: '홈'),
-    NavItem(icon: SgIcons.bell, activeIcon: SgIcons.bellActive, label: '알림', badge: state.unreadNotifications),
-    const NavItem(icon: SgIcons.person, activeIcon: SgIcons.personActive, label: '프로필'),
+    NavItem(icon: SgIcons.home, activeIcon: SgIcons.homeActive, label: t('홈')),
+    NavItem(icon: SgIcons.bell, activeIcon: SgIcons.bellActive, label: t('알림'), badge: state.unreadNotifications),
+    NavItem(icon: SgIcons.person, activeIcon: SgIcons.personActive, label: t('프로필')),
   ];
 
   Widget _tabs() {
@@ -160,7 +161,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           child: AnimatedScale(scale: visible ? 1 : 0.9, duration: SgMotion.medium, curve: SgMotion.ease, child: child),
         ),
         child: FloatingActionButton(
-          tooltip: '생각 쓰기',
+          tooltip: t('생각 쓰기'),
           onPressed: _compose,
           backgroundColor: SgColors.accent,
           foregroundColor: SgColors.onAccent,

@@ -77,7 +77,7 @@ async function saveProfile({ repo, filter }: PublishDeps, event: Event) {
   const handle = typeof b?.handle === 'string' ? b.handle.trim().toLowerCase() : '';
   const displayName = typeof b?.displayName === 'string' ? b.displayName.trim() : '';
   const bio = typeof b?.bio === 'string' ? b.bio.trim() : '';
-  const locale = isLang(b?.locale) ? b.locale : 'ko';
+  const locale = isLang(b?.locale) ? b.locale : 'en';
   const timeZone = typeof b?.timeZone === 'string' && validTimeZone(b.timeZone) ? b.timeZone : 'Asia/Seoul';
   if (!HANDLE.test(handle) || displayName.length === 0 || [...displayName].length > 30 || [...bio].length > 160) {
     return json(400, { error: 'bad_request' });

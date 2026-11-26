@@ -2,6 +2,8 @@ import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
 
+import '../l10n/l10n.dart';
+
 /// The longest side, in pixels, of the photo sent to the server.
 const photoSize = 512;
 
@@ -22,12 +24,12 @@ Uint8List? preparePhoto(Uint8List captured, {bool mirror = false}) {
 
 /// What to tell the person when the server turns a photo down.
 String photoProblemMessage(String code) => switch (code) {
-  'no_face' => '얼굴이 보이지 않아요. 얼굴이 화면 가운데 오도록 다시 찍어주세요.',
-  'many_faces' => '한 사람의 얼굴만 나오게 찍어주세요.',
-  'unclear' => '얼굴이 흐리거나 어둡거나 너무 작아요. 밝은 곳에서 정면으로 다시 찍어주세요.',
-  'inappropriate' => '프로필 사진으로 쓸 수 없는 사진이에요.',
-  'bad_image' => '사진을 읽지 못했어요. 다시 찍어주세요.',
-  'rate_limited' => '잠시 후에 다시 시도해주세요.',
-  'profile_required' => '프로필을 먼저 만들어주세요.',
-  _ => '사진을 올리지 못했어요. 다시 시도해주세요.',
+  'no_face' => t('얼굴이 보이지 않아요. 얼굴이 화면 가운데 오도록 다시 찍어주세요.'),
+  'many_faces' => t('한 사람의 얼굴만 나오게 찍어주세요.'),
+  'unclear' => t('얼굴이 흐리거나 어둡거나 너무 작아요. 밝은 곳에서 정면으로 다시 찍어주세요.'),
+  'inappropriate' => t('프로필 사진으로 쓸 수 없는 사진이에요.'),
+  'bad_image' => t('사진을 읽지 못했어요. 다시 찍어주세요.'),
+  'rate_limited' => t('잠시 후에 다시 시도해주세요.'),
+  'profile_required' => t('프로필을 먼저 만들어주세요.'),
+  _ => t('사진을 올리지 못했어요. 다시 시도해주세요.'),
 };

@@ -10,6 +10,7 @@ import '../core/nav.dart';
 import '../core/typing_session.dart';
 import '../core/weighted_length.dart';
 import '../data/app_state.dart';
+import '../l10n/l10n.dart';
 import '../models/post.dart';
 import '../models/publish_outcome.dart';
 import '../theme/tokens.dart';
@@ -63,7 +64,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
   void _onPasteRejected() {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(content: Text('붙여넣기는 할 수 없어요. 한 글자씩 직접 써주세요.')));
+      ..showSnackBar(SnackBar(content: Text(t('붙여넣기는 할 수 없어요. 한 글자씩 직접 써주세요.'))));
   }
 
   void _say(String message) {
@@ -76,7 +77,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
     final text = _controller.text;
     if (!WeightedLength.status(text).postable || _sending) return;
     if (_session.events.isEmpty) {
-      _say('바뀐 내용이 없어요.');
+      _say(t('바뀐 내용이 없어요.'));
       return;
     }
     if (!HumanCheck.evaluate(_session).passed) {
@@ -141,7 +142,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
                       style: TextButton.styleFrom(foregroundColor: SgColors.ink),
-                      child: const Text('취소', style: TextStyle(fontSize: 15)),
+                      child: Text(t('취소'), style: TextStyle(fontSize: 15)),
                     ),
                     FilledButton(
                       key: const Key('submit'),
@@ -161,7 +162,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
                               height: 16,
                               child: CircularProgressIndicator(strokeWidth: 2, color: SgColors.onInk),
                             )
-                          : Text(widget.editing == null ? '게시하기' : '수정하기'),
+                          : Text(widget.editing == null ? t('게시하기') : t('수정하기')),
                     ),
                   ],
                 ),
@@ -176,7 +177,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
                     Avatar(
                       initial: widget.state.me?.initial ?? '?',
                       color: avatarPalette[(widget.state.me?.id.hashCode ?? 0).abs() % avatarPalette.length],
-                      label: '내 프로필 사진',
+                      label: t('내 프로필 사진'),
                       photoUrl: widget.state.me?.photoUrl,
                     ),
                     const SizedBox(width: 12),
@@ -199,7 +200,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
                           style: TextStyle(fontSize: 19, height: 1.6, color: SgColors.ink),
                           decoration: InputDecoration(
                             border: InputBorder.none,
-                            hintText: '지금 어떤 생각을 하고 있나요?',
+                            hintText: t('지금 어떤 생각을 하고 있나요?'),
                             hintStyle: TextStyle(fontSize: 19, color: SgColors.muted),
                           ),
                         ),
@@ -217,12 +218,12 @@ class _ComposeScreenState extends State<ComposeScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    tooltip: _voice ? '음성 입력 끄기' : '음성으로 입력',
+                    tooltip: _voice ? t('음성 입력 끄기') : t('음성으로 입력'),
                     onPressed: () => setState(() => _voice = !_voice),
                     icon: Icon(_voice ? Icons.mic : Icons.mic_none),
                     color: SgColors.accent,
                   ),
-                  Text(_voice ? '음성 입력 중' : '붙여넣기 불가', style: SgText.small),
+                  Text(_voice ? t('음성 입력 중') : t('붙여넣기 불가'), style: SgText.small),
                   const Spacer(),
                   Container(
                     width: 7,
@@ -264,15 +265,15 @@ class LengthRing extends StatelessWidget {
     final String? hint = status.units == 0
         ? null
         : status.tooShort
-        ? '조금 더 써주세요'
+        ? t('조금 더 써주세요')
         : status.tooLong
-        ? '조금 줄여주세요'
+        ? t('조금 줄여주세요')
         : null;
     final label = status.tooShort
-        ? '길이 부족'
+        ? t('길이 부족')
         : status.tooLong
-        ? '최대 길이 넘음'
-        : '최대까지 ${status.remaining}';
+        ? t('최대 길이 넘음')
+        : t('최대까지 {0}', [status.remaining]);
     return Semantics(
       label: label,
       child: Row(

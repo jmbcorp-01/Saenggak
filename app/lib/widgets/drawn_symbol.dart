@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../l10n/l10n.dart';
 import '../theme/tokens.dart';
 import 'symbol_mark.dart';
 
@@ -61,7 +62,7 @@ class _DrawnSymbolState extends State<DrawnSymbol> with TickerProviderStateMixin
   Widget build(BuildContext context) {
     final still = MediaQuery.disableAnimationsOf(context);
     return Semantics(
-      label: '생각',
+      label: t('생각'),
       image: true,
       child: AnimatedBuilder(
         animation: Listenable.merge([_progress, _breath]),

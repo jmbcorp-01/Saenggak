@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../api/backend.dart';
 import '../data/app_state.dart';
+import '../l10n/l10n.dart';
 import '../models/post.dart';
 import '../models/profile.dart';
 import '../core/nav.dart';
@@ -67,7 +68,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _otherPosts = (results[1] as FeedPage).items;
       });
     } catch (_) {
-      if (mounted) setState(() => _error = '프로필을 불러오지 못했어요.');
+      if (mounted) setState(() => _error = t('프로필을 불러오지 못했어요.'));
     }
   }
 
@@ -80,7 +81,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.code == 'not_allowed' ? '팔로우는 두 사람 모두 글을 쓴 날이 10일이 되면 열려요.' : '팔로우하지 못했어요. 다시 시도해주세요.'),
+            content: Text(
+              e.code == 'not_allowed' ? t('팔로우는 두 사람 모두 글을 쓴 날이 10일이 되면 열려요.') : t('팔로우하지 못했어요. 다시 시도해주세요.'),
+            ),
           ),
         );
       }
@@ -106,7 +109,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       rootNavigator: true,
     ).push<bool>(MaterialPageRoute(builder: (context) => PhotoCaptureScreen(state: widget.state)));
     if (saved == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('프로필 사진을 바꿨어요.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t('프로필 사진을 바꿨어요.'))));
     }
   }
 
@@ -158,7 +161,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         initial: profile.initial,
                         color: profile.avatarColor,
                         size: 80,
-                        label: '${profile.displayName} 프로필 사진',
+                        label: t('{0} 프로필 사진', [profile.displayName]),
                         photoUrl: profile.photoUrl,
                       ),
                     ),
@@ -172,7 +175,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         shape: CircleBorder(side: BorderSide(color: SgColors.surface, width: 2)),
                         child: IconButton(
                           onPressed: _takePhoto,
-                          tooltip: profile.photoUrl == null ? '프로필 사진 찍기' : '프로필 사진 다시 찍기',
+                          tooltip: profile.photoUrl == null ? t('프로필 사진 찍기') : t('프로필 사진 다시 찍기'),
                           icon: Icon(Icons.photo_camera_outlined, size: 18, color: SgColors.onInk),
                           constraints: const BoxConstraints.tightFor(width: 44, height: 44),
                           padding: EdgeInsets.zero,
@@ -184,7 +187,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       right: 4,
                       top: 4,
                       child: IconButton(
-                        tooltip: '설정',
+                        tooltip: t('설정'),
                         icon: Icon(Icons.settings_outlined, color: SgColors.ink),
                         onPressed: () => pushPage<void>(context, (_) => SettingsScreen(state: widget.state)),
                       ),
@@ -206,7 +209,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               minimumSize: const Size(0, 40),
                               textStyle: SgText.label(size: 14),
                             ),
-                            child: const Text('프로필 수정'),
+                            child: Text(t('프로필 수정')),
                           )
                         : Row(
                             children: [
@@ -218,14 +221,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   onPressed: () => _toggleFollow(profile),
                                 ),
                               PopupMenuButton<String>(
-                                tooltip: '더보기',
+                                tooltip: t('더보기'),
                                 icon: const Icon(Icons.more_horiz),
                                 onSelected: (v) => v == 'report'
                                     ? reportFlow(context, widget.state, userId: profile.id, handle: profile.handle)
                                     : _toggleBlock(profile),
                                 itemBuilder: (_) => [
-                                  const PopupMenuItem(value: 'report', child: Text('신고')),
-                                  PopupMenuItem(value: 'block', child: Text(profile.blockedByMe ? '차단 풀기' : '차단')),
+                                  PopupMenuItem(value: 'report', child: Text(t('신고'))),
+                                  PopupMenuItem(
+                                    value: 'block',
+                                    child: Text(profile.blockedByMe ? t('차단 풀기') : t('차단')),
+                                  ),
                                 ],
                               ),
                             ],
@@ -253,12 +259,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         if (profile.followUnlocked) ...[
                           _count('${profile.following}'),
-                          const TextSpan(text: ' 팔로잉    '),
+                          TextSpan(text: t(' 팔로잉    ')),
                           _count('${profile.followers}'),
-                          const TextSpan(text: ' 팔로워    '),
+                          TextSpan(text: t(' 팔로워    ')),
                         ],
                         _count('$received'),
-                        const TextSpan(text: ' 받은 공감'),
+                        TextSpan(text: t(' 받은 공감')),
                       ],
                     ),
                   ),
@@ -272,9 +278,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 10),
                     Text(
                       (widget.state.me?.followUnlocked ?? false)
-                          ? '${profile.displayName}님이 글을 쓴 날이 ${profile.daysToFollow}일이 되면 팔로우할 수 있어요.'
-                          : '내가 글을 쓴 날이 ${widget.state.me?.daysToFollow ?? 10}일이 되면 팔로우할 수 있어요. '
-                                '지금 ${widget.state.me?.writingDays ?? 0}일째예요.',
+                          ? t('{0}님이 글을 쓴 날이 {1}일이 되면 팔로우할 수 있어요.', [profile.displayName, profile.daysToFollow])
+                          : t('내가 글을 쓴 날이 {0}일이 되면 팔로우할 수 있어요. 지금 {1}일째예요.', [
+                              widget.state.me?.daysToFollow ?? 10,
+                              widget.state.me?.writingDays ?? 0,
+                            ]),
                       style: SgText.small,
                     ),
                   ],
@@ -285,7 +293,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             if (shown.isEmpty)
               Padding(
                 padding: EdgeInsets.all(32),
-                child: Text('아직 쓴 글이 없어요.', textAlign: TextAlign.center, style: SgText.small),
+                child: Text(t('아직 쓴 글이 없어요.'), textAlign: TextAlign.center, style: SgText.small),
               ),
             for (final p in shown)
               ConnectedPostTile(key: ValueKey(p.id), state: widget.state, post: p, openAuthor: false),
@@ -330,7 +338,7 @@ class _FollowButton extends StatelessWidget {
       key: const Key('follow'),
       onPressed: busy || (!following && !canFollow) ? null : onPressed,
       style: style,
-      child: Text(following ? '팔로잉' : '팔로우'),
+      child: Text(following ? t('팔로잉') : t('팔로우')),
     );
     return button;
   }
@@ -358,13 +366,13 @@ class FollowProgress extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('팔로우까지 ${total - done}일', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+              Text(t('팔로우까지 {0}일', [total - done]), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
               Text('$done / $total', style: SgText.mono.copyWith(fontSize: 13)),
             ],
           ),
           const SizedBox(height: 10),
           Semantics(
-            label: '$total일 중 $done일 작성',
+            label: t('{0}일 중 {1}일 작성', [total, done]),
             child: Row(
               children: [
                 for (var i = 0; i < total; i++)
@@ -382,7 +390,7 @@ class FollowProgress extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          Text('글을 쓴 날이 $total일이 되면 팔로우가 열려요. 연속이 아니어도 돼요.', style: SgText.small),
+          Text(t('글을 쓴 날이 {0}일이 되면 팔로우가 열려요. 연속이 아니어도 돼요.', [total]), style: SgText.small),
         ],
       ),
     );

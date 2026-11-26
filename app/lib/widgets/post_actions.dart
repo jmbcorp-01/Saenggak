@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../core/nav.dart';
 import '../data/app_state.dart';
+import '../l10n/l10n.dart';
 import '../models/post.dart';
 import '../screens/admin_screen.dart' show askNote;
 import '../screens/compose_screen.dart';
@@ -38,14 +39,14 @@ class ConnectedPostTile extends StatelessWidget {
   }
 
   Future<void> _adminRemove(BuildContext context) async {
-    final note = await askNote(context, title: '이 글을 내릴까요?', action: '내리기');
+    final note = await askNote(context, title: t('이 글을 내릴까요?'), action: t('내리기'));
     if (note == null || !context.mounted) return;
     try {
       await state.adminRemove(post, note);
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('글을 내렸어요.')));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t('글을 내렸어요.'))));
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('글을 내리지 못했어요.')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t('글을 내리지 못했어요.'))));
       }
     }
   }
@@ -55,15 +56,15 @@ Future<void> confirmDelete(BuildContext context, AppState state, Post post) asyn
   final yes = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('이 글을 삭제할까요?'),
-      content: const Text('삭제한 글은 되돌릴 수 없어요. 받은 공감과 처음 쓴 표현 기록도 함께 사라져요.'),
+      title: Text(t('이 글을 삭제할까요?')),
+      content: Text(t('삭제한 글은 되돌릴 수 없어요. 받은 공감과 처음 쓴 표현 기록도 함께 사라져요.')),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
+        TextButton(onPressed: () => Navigator.pop(context, false), child: Text(t('취소'))),
         TextButton(
           key: const Key('confirm-delete'),
           onPressed: () => Navigator.pop(context, true),
           style: TextButton.styleFrom(foregroundColor: SgColors.accentText),
-          child: const Text('삭제'),
+          child: Text(t('삭제')),
         ),
       ],
     ),
@@ -73,7 +74,7 @@ Future<void> confirmDelete(BuildContext context, AppState state, Post post) asyn
     await state.delete(post);
   } catch (_) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('삭제하지 못했어요. 다시 시도해주세요.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t('삭제하지 못했어요. 다시 시도해주세요.'))));
     }
   }
 }

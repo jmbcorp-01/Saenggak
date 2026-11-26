@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../l10n/l10n.dart';
 import '../theme/tokens.dart';
 
 /// Opens [builder] as a page in the current column. On a computer that keeps
@@ -19,7 +20,7 @@ Route<T> modalRoute<T>(BuildContext context, WidgetBuilder builder, {double maxH
   if (!wide) return _RiseRoute<T>(builder: builder);
   return RawDialogRoute<T>(
     barrierDismissible: true,
-    barrierLabel: '닫기',
+    barrierLabel: t('닫기'),
     barrierColor: Colors.black.withValues(alpha: SgColors.isDark ? 0.6 : 0.4),
     transitionDuration: SgMotion.medium,
     pageBuilder: (context, _, _) => SafeArea(
