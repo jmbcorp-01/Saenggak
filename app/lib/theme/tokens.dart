@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoPageTransitionsBuilder;
 import 'package:material_ui/material_ui.dart';
 
@@ -175,6 +177,13 @@ class SgBreakpoints {
 
   /// The timeline column on tablets and computers.
   static const column = 600.0;
+}
+
+/// Padding for a form page: [side] on a phone, and on a wider screen enough
+/// to keep the form 440px wide in the middle.
+EdgeInsets formPadding(BuildContext context, {double side = 32, double vertical = 24}) {
+  final inset = math.max(side, (MediaQuery.sizeOf(context).width - 440) / 2);
+  return EdgeInsets.fromLTRB(inset, vertical, inset, vertical);
 }
 
 class SgFonts {

@@ -62,7 +62,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       appBar: AppBar(title: const Text('비밀번호 다시 만들기')),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
+          padding: formPadding(context),
           children: [
             Text(
               _codeSent ? '${_email.text.trim()}로 보낸 6자리 코드와 새 비밀번호를 입력해주세요.' : '가입한 이메일로 코드를 보내드려요.',

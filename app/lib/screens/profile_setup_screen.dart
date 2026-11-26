@@ -89,7 +89,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: formPadding(context, side: 24),
         children: [
           if (widget.firstTime) ...[
             Text('다른 사람에게 보이는 이름이에요.', style: TextStyle(fontSize: 15, color: SgColors.muted)),
