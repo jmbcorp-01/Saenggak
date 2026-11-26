@@ -56,7 +56,7 @@ class FeedScreen extends StatelessWidget {
                 ),
               ),
             ),
-            const TabBar(
+            TabBar(
               labelColor: SgColors.ink,
               unselectedLabelColor: SgColors.muted,
               labelStyle: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),

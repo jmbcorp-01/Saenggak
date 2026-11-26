@@ -18,7 +18,7 @@ class Avatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bg = Color(color);
-    final fg = bg.computeLuminance() > 0.4 ? SgColors.ink : Colors.white;
+    final fg = bg.computeLuminance() > 0.4 ? const Color(0xFF151515) : Colors.white;
     final letter = Text(
       initial,
       style: TextStyle(color: fg, fontSize: size * 0.38, fontWeight: FontWeight.w500),
@@ -108,7 +108,7 @@ class TypingTimeLabel extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.keyboard_outlined, size: 15, color: SgColors.muted),
+            Icon(Icons.keyboard_outlined, size: 15, color: SgColors.muted),
             const SizedBox(width: 5),
             Text(text, style: SgText.mono),
           ],
@@ -175,7 +175,7 @@ class _PostTileState extends State<PostTile> {
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: SgColors.line)),
       ),
       child: Row(
@@ -232,7 +232,7 @@ class _PostTileState extends State<PostTile> {
                         key: ValueKey('menu-${post.id}'),
                         tooltip: '더보기',
                         iconSize: 18,
-                        icon: const Icon(Icons.more_horiz, color: SgColors.muted),
+                        icon: Icon(Icons.more_horiz, color: SgColors.muted),
                         onSelected: (v) => switch (v) {
                           'edit' => widget.onEdit!(),
                           'delete' => widget.onDelete!(),
@@ -244,13 +244,13 @@ class _PostTileState extends State<PostTile> {
                           if (canReport) const PopupMenuItem(value: 'report', child: Text('신고')),
                           if (canBlock) PopupMenuItem(value: 'block', child: Text('@${post.authorHandle} 차단')),
                           if (canRemove)
-                            const PopupMenuItem(
+                            PopupMenuItem(
                               value: 'admin-remove',
                               child: Text('관리자: 글 내리기', style: TextStyle(color: SgColors.accentText)),
                             ),
                           if (canEdit) const PopupMenuItem(value: 'edit', child: Text('수정')),
                           if (canDelete)
-                            const PopupMenuItem(
+                            PopupMenuItem(
                               value: 'delete',
                               child: Text('삭제', style: TextStyle(color: SgColors.accentText)),
                             ),

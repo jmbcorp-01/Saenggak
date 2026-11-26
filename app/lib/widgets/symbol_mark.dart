@@ -8,19 +8,22 @@ class SymbolMark extends StatelessWidget {
   const SymbolMark({
     super.key,
     this.size = 30,
-    this.strokeColor = SgColors.accent,
-    this.dotColor = SgColors.ink,
+    this.strokeColor,
+    this.dotColor,
     this.semanticLabel = '생각',
   });
 
   final double size;
-  final Color strokeColor;
-  final Color dotColor;
+  /// Defaults to the accent.
+  final Color? strokeColor;
+
+  /// Defaults to the ink color.
+  final Color? dotColor;
   final String? semanticLabel;
 
   @override
   Widget build(BuildContext context) {
-    final mark = CustomPaint(size: Size.square(size), painter: _SymbolPainter(strokeColor, dotColor));
+    final mark = CustomPaint(size: Size.square(size), painter: _SymbolPainter(strokeColor ?? SgColors.accent, dotColor ?? SgColors.ink));
     if (semanticLabel == null) return ExcludeSemantics(child: mark);
     return Semantics(label: semanticLabel, image: true, child: mark);
   }

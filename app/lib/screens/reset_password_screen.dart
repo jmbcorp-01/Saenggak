@@ -66,7 +66,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           children: [
             Text(
               _codeSent ? '${_email.text.trim()}로 보낸 6자리 코드와 새 비밀번호를 입력해주세요.' : '가입한 이메일로 코드를 보내드려요.',
-              style: const TextStyle(fontSize: 15, color: SgColors.muted, height: 1.5),
+              style: TextStyle(fontSize: 15, color: SgColors.muted, height: 1.5),
             ),
             const SizedBox(height: 24),
             TextField(
@@ -98,7 +98,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             ],
             if (_error != null) ...[
               const SizedBox(height: 12),
-              Text(_error!, style: const TextStyle(fontSize: 14, color: SgColors.accentText)),
+              Text(_error!, style: TextStyle(fontSize: 14, color: SgColors.accentText)),
             ],
             const SizedBox(height: 24),
             FilledButton(
@@ -106,7 +106,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               onPressed: _busy ? null : _submit,
               style: FilledButton.styleFrom(
                 backgroundColor: SgColors.ink,
-                foregroundColor: Colors.white,
+                foregroundColor: SgColors.onInk,
                 minimumSize: const Size.fromHeight(50),
               ),
               child: Text(_codeSent ? '비밀번호 바꾸기' : '코드 받기'),

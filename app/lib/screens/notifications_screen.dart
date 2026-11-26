@@ -23,7 +23,7 @@ class NotificationsScreen extends StatelessWidget {
           onRefresh: state.loadNotifications,
           child: items.isEmpty
               ? ListView(
-                  children: const [
+                  children: [
                     SizedBox(height: 160),
                     Center(child: Text('아직 알림이 없어요.', style: SgText.small)),
                     SizedBox(height: 8),
@@ -32,7 +32,7 @@ class NotificationsScreen extends StatelessWidget {
                 )
               : ListView.separated(
                   itemCount: items.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1, color: SgColors.line),
+                  separatorBuilder: (_, _) => Divider(height: 1, color: SgColors.line),
                   itemBuilder: (context, i) {
                     final n = items[i];
                     final what = n.kind == 'follow' ? '님이 나를 팔로우해요.' : '님이 내 생각에 공감했어요.';

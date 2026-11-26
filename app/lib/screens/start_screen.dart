@@ -22,7 +22,7 @@ class StartScreen extends StatelessWidget {
             children: [
               const Center(child: SymbolMark(size: 44)),
               const Spacer(),
-              const Text(
+              Text(
                 '사람이 직접 쓴\n생각만 있는 곳.',
                 style: TextStyle(
                   fontSize: 34,
@@ -33,7 +33,7 @@ class StartScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'AI도, 붙여넣기도 없이. 하루에 한 생각이라도 당신의 손으로.',
                 style: TextStyle(fontSize: 16, height: 1.6, color: SgColors.muted),
               ),
@@ -42,7 +42,7 @@ class StartScreen extends StatelessWidget {
                 onPressed: onSignUp,
                 style: FilledButton.styleFrom(
                   backgroundColor: SgColors.ink,
-                  foregroundColor: Colors.white,
+                  foregroundColor: SgColors.onInk,
                   minimumSize: const Size.fromHeight(50),
                   shape: pill,
                   textStyle: SgText.label(size: 16, weight: FontWeight.w700),
@@ -50,7 +50,7 @@ class StartScreen extends StatelessWidget {
                 child: const Text('계정 만들기'),
               ),
               const SizedBox(height: 12),
-              const Row(
+              Row(
                 children: [
                   Expanded(child: Divider()),
                   Padding(
@@ -65,7 +65,7 @@ class StartScreen extends StatelessWidget {
                 onPressed: onSignIn,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: SgColors.accentText,
-                  side: const BorderSide(color: SgColors.outline),
+                  side: BorderSide(color: SgColors.outline),
                   minimumSize: const Size.fromHeight(50),
                   shape: pill,
                   textStyle: SgText.label(size: 16, weight: FontWeight.w700),

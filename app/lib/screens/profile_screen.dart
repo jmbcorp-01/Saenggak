@@ -121,10 +121,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   Container(
                     height: 104,
-                    decoration: const BoxDecoration(color: SgColors.band),
+                    decoration: BoxDecoration(color: SgColors.band),
                     alignment: Alignment.topRight,
                     clipBehavior: Clip.hardEdge,
-                    child: const SymbolMark(
+                    child: SymbolMark(
                       size: 150,
                       strokeColor: SgColors.bandMark,
                       dotColor: SgColors.bandMark,
@@ -135,7 +135,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     left: 16,
                     top: 104 - 44,
                     child: Container(
-                      decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: SgColors.surface),
                       padding: const EdgeInsets.all(4),
                       child: Avatar(
                         initial: profile.initial,
@@ -152,11 +152,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       top: 104 + 44 - 30,
                       child: Material(
                         color: SgColors.ink,
-                        shape: const CircleBorder(side: BorderSide(color: Colors.white, width: 2)),
+                        shape: CircleBorder(side: BorderSide(color: SgColors.surface, width: 2)),
                         child: IconButton(
                           onPressed: _takePhoto,
                           tooltip: profile.photoUrl == null ? '프로필 사진 찍기' : '프로필 사진 다시 찍기',
-                          icon: const Icon(Icons.photo_camera_outlined, size: 18, color: Colors.white),
+                          icon: Icon(Icons.photo_camera_outlined, size: 18, color: SgColors.onInk),
                           constraints: const BoxConstraints.tightFor(width: 44, height: 44),
                           padding: EdgeInsets.zero,
                         ),
@@ -168,7 +168,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       top: 4,
                       child: IconButton(
                         tooltip: '설정',
-                        icon: const Icon(Icons.settings_outlined, color: SgColors.ink),
+                        icon: Icon(Icons.settings_outlined, color: SgColors.ink),
                         onPressed: () =>
                             Navigator.of(context)
                                 .push(MaterialPageRoute<void>(builder: (_) => SettingsScreen(state: widget.state))),
@@ -187,7 +187,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: SgColors.ink,
-                              side: const BorderSide(color: SgColors.outline),
+                              side: BorderSide(color: SgColors.outline),
                               minimumSize: const Size(0, 40),
                               textStyle: SgText.label(size: 14),
                             ),
@@ -268,7 +268,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const Divider(height: 1),
             if (shown.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.all(32),
                 child: Text('아직 쓴 글이 없어요.', textAlign: TextAlign.center, style: SgText.small),
               ),
@@ -282,7 +282,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   TextSpan _count(String n) => TextSpan(
     text: n,
-    style: const TextStyle(color: SgColors.ink, fontWeight: FontWeight.w700),
+    style: TextStyle(color: SgColors.ink, fontWeight: FontWeight.w700),
   );
 }
 
@@ -300,12 +300,12 @@ class _FollowButton extends StatelessWidget {
     final style = following
         ? OutlinedButton.styleFrom(
             foregroundColor: SgColors.ink,
-            side: const BorderSide(color: SgColors.outline),
+            side: BorderSide(color: SgColors.outline),
             textStyle: SgText.label(size: 14, weight: FontWeight.w700),
           )
         : OutlinedButton.styleFrom(
             backgroundColor: SgColors.ink,
-            foregroundColor: Colors.white,
+            foregroundColor: SgColors.onInk,
             disabledBackgroundColor: SgColors.line,
             disabledForegroundColor: SgColors.muted,
             side: BorderSide.none,

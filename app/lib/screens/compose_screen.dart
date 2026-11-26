@@ -143,7 +143,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
                       onPressed: status.postable && !_sending ? _submit : null,
                       style: FilledButton.styleFrom(
                         backgroundColor: SgColors.ink,
-                        foregroundColor: Colors.white,
+                        foregroundColor: SgColors.onInk,
                         // Muted text on a light fill stays readable while disabled.
                         disabledBackgroundColor: SgColors.line,
                         disabledForegroundColor: SgColors.muted,
@@ -151,10 +151,10 @@ class _ComposeScreenState extends State<ComposeScreen> {
                         textStyle: SgText.label(size: 15, weight: FontWeight.w700),
                       ),
                       child: _sending
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 16,
                               height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              child: CircularProgressIndicator(strokeWidth: 2, color: SgColors.onInk),
                             )
                           : Text(widget.editing == null ? '게시하기' : '수정하기'),
                     ),
@@ -191,8 +191,8 @@ class _ComposeScreenState extends State<ComposeScreen> {
                           enableIMEPersonalizedLearning: false,
                           inputFormatters: [_formatter],
                           contextMenuBuilder: _menuWithoutPaste,
-                          style: const TextStyle(fontSize: 19, height: 1.6, color: SgColors.ink),
-                          decoration: const InputDecoration(
+                          style: TextStyle(fontSize: 19, height: 1.6, color: SgColors.ink),
+                          decoration: InputDecoration(
                             border: InputBorder.none,
                             hintText: '지금 어떤 생각을 하고 있나요?',
                             hintStyle: TextStyle(fontSize: 19, color: SgColors.muted),
@@ -206,7 +206,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(top: BorderSide(color: SgColors.line)),
               ),
               child: Row(
@@ -222,7 +222,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
                   Container(
                     width: 7,
                     height: 7,
-                    decoration: const BoxDecoration(color: SgColors.accent, shape: BoxShape.circle),
+                    decoration: BoxDecoration(color: SgColors.accent, shape: BoxShape.circle),
                   ),
                   const SizedBox(width: 6),
                   Text(timer, style: SgText.mono.copyWith(fontSize: 12, color: SgColors.ink)),

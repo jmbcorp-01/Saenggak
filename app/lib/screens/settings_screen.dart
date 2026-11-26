@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../core/appearance.dart';
 import '../core/links.dart';
 import '../data/app_state.dart';
 import '../theme/tokens.dart';
@@ -130,6 +131,29 @@ class SettingsScreen extends StatelessWidget {
                 title: const Text('프로필 사진 찍기'),
                 onTap: () => _push(context, (_) => PhotoCaptureScreen(state: state)),
               ),
+              const _Header('화면'),
+              ListTile(
+                leading: const Icon(Icons.contrast_rounded),
+                title: const Text('화면 모드'),
+                subtitle: const Text('밝게, 어둡게, 또는 기기 설정을 따라요.'),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(72, 0, 16, 8),
+                child: ValueListenableBuilder(
+                  valueListenable: Appearance.instance,
+                  builder: (context, mode, _) => SegmentedButton<ThemeMode>(
+                    key: const Key('theme-mode'),
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(value: ThemeMode.system, label: Text('기기 설정')),
+                      ButtonSegment(value: ThemeMode.light, label: Text('밝게')),
+                      ButtonSegment(value: ThemeMode.dark, label: Text('어둡게')),
+                    ],
+                    selected: {mode},
+                    onSelectionChanged: (v) => Appearance.instance.set(v.first),
+                  ),
+                ),
+              ),
               const _Header('피드'),
               ListTile(
                 leading: const Icon(Icons.translate),
@@ -186,8 +210,8 @@ class SettingsScreen extends StatelessWidget {
               const Divider(height: 32),
               ListTile(leading: const Icon(Icons.logout), title: const Text('로그아웃'), onTap: () => _signOut(context)),
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: SgColors.accentText),
-                title: const Text('계정 삭제', style: TextStyle(color: SgColors.accentText)),
+                leading: Icon(Icons.delete_outline, color: SgColors.accentText),
+                title: Text('계정 삭제', style: TextStyle(color: SgColors.accentText)),
                 onTap: () => _deleteAccount(context),
               ),
               const SizedBox(height: 24),
