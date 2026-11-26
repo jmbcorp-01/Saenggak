@@ -215,6 +215,7 @@ class DemoBackend implements Backend {
       followUnlocked: true,
       followers: _following.contains(id) ? 1 : 0,
       followedByMe: _following.contains(id),
+      alertsOn: _alerts.contains(id),
       blockedByMe: _blocked.containsKey(id),
     );
   }
@@ -323,7 +324,38 @@ class DemoBackend implements Backend {
   }
 
   @override
-  Future<void> unfollow(String userId) async => _following.remove(userId);
+  Future<void> unfollow(String userId) async {
+    _following.remove(userId);
+    _alerts.remove(userId);
+  }
+
+  final Set<String> _alerts = {};
+
+  @override
+  Future<void> setPostAlerts(String userId, bool on) async {
+    if (!_following.contains(userId)) throw const ApiException(404, 'not_following');
+    on ? _alerts.add(userId) : _alerts.remove(userId);
+  }
+
+  /// A new post by someone else, as if they just wrote it. For trying out the
+  /// new-posts button and alerts.
+  void arrive(Post post) {
+    _posts.insert(0, post);
+    if (_alerts.contains(post.authorId)) {
+      notificationItems.insert(
+        0,
+        AppNotification(
+          kind: 'post',
+          at: post.createdAt,
+          actorId: post.authorId,
+          actorHandle: post.authorHandle,
+          actorName: post.authorName,
+          postId: post.id,
+          excerpt: post.body.length > 60 ? post.body.substring(0, 60) : post.body,
+        ),
+      );
+    }
+  }
 
   /// Set to make the next guarded action ask for a typing check, as the
   /// server does when activity looks automated.

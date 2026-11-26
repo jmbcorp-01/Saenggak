@@ -9,7 +9,7 @@ import 'symbol_mark.dart';
 
 /// One place in the menu.
 class NavItem {
-  const NavItem({required this.icon, required this.activeIcon, required this.label, this.badge = 0});
+  const NavItem({required this.icon, required this.activeIcon, required this.label, this.badge = 0, this.dot = false});
 
   final IconData icon;
   final IconData activeIcon;
@@ -17,6 +17,9 @@ class NavItem {
 
   /// Unread count shown on the icon; 0 hides it.
   final int badge;
+
+  /// A small dot without a number, for new posts waiting.
+  final bool dot;
 }
 
 /// The menu on the left on tablets and computers: icons only on a tablet,
@@ -115,8 +118,8 @@ class _NavButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final icon = Badge(
-      isLabelVisible: item.badge > 0,
-      label: Text(item.badge > 99 ? '99+' : '${item.badge}'),
+      isLabelVisible: item.badge > 0 || item.dot,
+      label: item.badge > 0 ? Text(item.badge > 99 ? '99+' : '${item.badge}') : null,
       backgroundColor: SgColors.accent,
       child: AnimatedSwitcher(
         duration: SgMotion.fast,

@@ -134,7 +134,13 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   }
 
   List<NavItem> _items() => [
-    NavItem(icon: SgIcons.home, activeIcon: SgIcons.homeActive, label: t('홈')),
+    NavItem(
+      icon: SgIcons.home,
+      activeIcon: SgIcons.homeActive,
+      label: t('홈'),
+      // New posts are waiting while the reader is elsewhere.
+      dot: _tab != _home && state.hasIncoming,
+    ),
     NavItem(icon: SgIcons.search, activeIcon: SgIcons.searchActive, label: t('검색')),
     NavItem(icon: SgIcons.bell, activeIcon: SgIcons.bellActive, label: t('알림'), badge: state.unreadNotifications),
     NavItem(icon: SgIcons.person, activeIcon: SgIcons.personActive, label: t('프로필')),
@@ -227,8 +233,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
               for (final item in items)
                 NavigationDestination(
                   icon: Badge(
-                    isLabelVisible: item.badge > 0,
-                    label: Text(item.badge > 99 ? '99+' : '${item.badge}'),
+                    isLabelVisible: item.badge > 0 || item.dot,
+                    label: item.badge > 0 ? Text(item.badge > 99 ? '99+' : '${item.badge}') : null,
                     backgroundColor: SgColors.accent,
                     child: Icon(item.icon),
                   ),

@@ -141,7 +141,7 @@ export class MemoryRepo implements Repository {
     this.users.set(userId, input);
     return 'ok' as const;
   }
-  async profile(userId: string, viewerId: string): Promise<(Profile & { followedByMe: boolean }) | null> {
+  async profile(userId: string, viewerId: string): Promise<(Profile & { followedByMe: boolean; alertsByMe?: boolean }) | null> {
     const u = this.users.get(userId);
     if (!u) return null;
     const count = (side: 0 | 1) => [...this.follows].filter((f) => f.split('>')[side] === userId).length;
@@ -150,6 +150,7 @@ export class MemoryRepo implements Repository {
       locale: u.locale, timeZone: u.timeZone, writingDays: await this.writingDays(userId),
       followUnlocked: this.unlocked.get(userId) ?? false, followers: count(1), following: count(0),
       followedByMe: this.follows.has(`${viewerId}>${userId}`),
+      alertsByMe: this.alerts.has(`${viewerId}>${userId}`),
     };
   }
   async follow(a: string, b: string): Promise<FollowResult> {
@@ -159,8 +160,16 @@ export class MemoryRepo implements Repository {
     this.follows.add(`${a}>${b}`);
     return 'ok';
   }
+  alerts = new Set<string>();
+  async setPostAlerts(a: string, b: string, on: boolean) {
+    if (!this.follows.has(`${a}>${b}`)) return false;
+    if (on) this.alerts.add(`${a}>${b}`);
+    else this.alerts.delete(`${a}>${b}`);
+    return true;
+  }
   async unfollow(a: string, b: string) {
     this.follows.delete(`${a}>${b}`);
+    this.alerts.delete(`${a}>${b}`);
   }
   async toggleEmpathy(postId: string, userId: string) {
     const post = this.posts.find((p) => p.id === postId && p.status === 'published');

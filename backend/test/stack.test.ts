@@ -18,7 +18,7 @@ describe('SaenggakStack', () => {
   });
 
   it('protects every route with the Cognito JWT authorizer', () => {
-    template.resourceCountIs('AWS::ApiGatewayV2::Route', 37);
+    template.resourceCountIs('AWS::ApiGatewayV2::Route', 39);
     template.allResourcesProperties('AWS::ApiGatewayV2::Route', { AuthorizationType: 'JWT' });
   });
 

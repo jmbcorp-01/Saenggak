@@ -326,4 +326,10 @@ const english = <String, String>{
   '저장 취소': 'Unsave',
   '링크 복사': 'Copy link',
   '생각 한 편': 'Thought',
+  '님이 새 생각을 남겼어요.': "shared a new thought.",
+  '@{0} 님이 새 생각을 남기면 알림으로 알려드릴게요.': "We'll let you know when @{0} shares a new thought.",
+  '@{0} 님의 새 생각 알림을 껐어요.': "Turned off new-thought alerts for @{0}.",
+  '알림을 바꾸지 못했어요.': "Couldn't change the alert.",
+  '새 생각 알림 끄기': "Turn off new-thought alerts",
+  '새 생각 알림 받기': "Get new-thought alerts",
 };

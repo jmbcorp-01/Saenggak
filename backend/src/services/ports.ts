@@ -219,11 +219,20 @@ export interface Repository {
 
   /** Creates or updates the signed-in user's profile. */
   saveProfile(userId: string, input: ProfileInput): Promise<'ok' | 'handle_taken'>;
-  profile(userId: string, viewerId: string): Promise<(Profile & { followedByMe: boolean; blockedByMe?: boolean }) | null>;
+  profile(
+    userId: string,
+    viewerId: string,
+  ): Promise<(Profile & { followedByMe: boolean; blockedByMe?: boolean; alertsByMe?: boolean }) | null>;
 
   /** Both people need follow permission. */
   follow(followerId: string, followeeId: string): Promise<FollowResult>;
   unfollow(followerId: string, followeeId: string): Promise<void>;
+
+  /**
+   * Turns alerts for the followee's new posts on or off. Only for someone the
+   * follower follows; false otherwise.
+   */
+  setPostAlerts(followerId: string, followeeId: string, on: boolean): Promise<boolean>;
 
   cachedTranslation(postId: string, lang: string): Promise<string | null>;
   saveTranslation(postId: string, lang: string, body: string): Promise<void>;
@@ -317,7 +326,8 @@ export interface NewReport {
 }
 
 export interface Notification {
-  kind: 'empathy' | 'follow';
+  /** 'post': someone whose bell the reader turned on wrote a new post. */
+  kind: 'empathy' | 'follow' | 'post';
   at: string;
   actorId: string;
   actorHandle: string;

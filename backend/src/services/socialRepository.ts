@@ -56,14 +56,20 @@ export class AuroraSocialRepository extends AuroraRepository implements SocialRe
   }
 
   async notifications(userId: string, limit: number, before?: string) {
-    // Empathies on the person's posts and new followers, minus anyone blocked either way.
+    // Empathies on the person's posts, new followers, and new posts by people
+    // whose bell the person turned on, minus anyone blocked either way.
     const events = `
       SELECT 'empathy' AS kind, e.created_at, e.user_id AS actor, p.id AS post_id, left(p.body, 60) AS excerpt
       FROM empathies e JOIN posts p ON p.id = e.post_id
       WHERE p.author_id = :u::uuid AND p.status = 'published'
       UNION ALL
       SELECT 'follow', f.created_at, f.follower_id, NULL, NULL
-      FROM follows f WHERE f.followee_id = :u::uuid AND NOT f.hidden`;
+      FROM follows f WHERE f.followee_id = :u::uuid AND NOT f.hidden
+      UNION ALL
+      SELECT 'post', p.created_at, p.author_id, p.id, left(p.body, 60)
+      FROM follows f JOIN posts p ON p.author_id = f.followee_id
+      WHERE f.follower_id = :u::uuid AND f.alerts_since IS NOT NULL AND NOT f.hidden
+        AND p.status = 'published' AND p.created_at >= f.alerts_since`;
     const notBlocked = `NOT EXISTS (SELECT 1 FROM blocks b
         WHERE (b.blocker_id = :u::uuid AND b.blocked_id = n.actor) OR (b.blocker_id = n.actor AND b.blocked_id = :u::uuid))`;
     const rows = await this.query(
@@ -85,7 +91,7 @@ export class AuroraSocialRepository extends AuroraRepository implements SocialRe
       { u: userId },
     );
     const items: Notification[] = rows.map((r) => ({
-      kind: r.kind as 'empathy' | 'follow',
+      kind: r.kind as Notification['kind'],
       at: r.created_at as string,
       actorId: r.actor_id as string,
       actorHandle: r.handle as string,

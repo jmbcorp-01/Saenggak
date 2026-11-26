@@ -226,6 +226,8 @@ export class SaenggakStack extends Stack {
       ['/users/{id}', M.GET, apiIntegration],
       ['/users/{id}/follow', M.PUT, apiIntegration],
       ['/users/{id}/follow', M.DELETE, apiIntegration],
+      ['/users/{id}/alerts', M.PUT, apiIntegration],
+      ['/users/{id}/alerts', M.DELETE, apiIntegration],
       ['/users/{id}/block', M.PUT, apiIntegration],
       ['/users/{id}/block', M.DELETE, apiIntegration],
       ['/users/{id}/report', M.POST, apiIntegration],

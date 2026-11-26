@@ -19,6 +19,7 @@ class Profile {
     this.photoUrl,
     this.isAdmin = false,
     this.blockedByMe = false,
+    this.alertsOn = false,
   });
 
   factory Profile.fromJson(Map<String, dynamic> j) => Profile(
@@ -38,6 +39,7 @@ class Profile {
     photoUrl: j['photoUrl'] as String?,
     isAdmin: j['isAdmin'] as bool? ?? false,
     blockedByMe: j['blockedByMe'] as bool? ?? false,
+    alertsOn: j['alertsByMe'] as bool? ?? false,
   );
 
   final String id;
@@ -63,27 +65,37 @@ class Profile {
   /// The reader blocked this person.
   final bool blockedByMe;
 
+  /// The reader turned on alerts for this person's new posts.
+  final bool alertsOn;
+
   int get avatarColor => avatarPalette[id.hashCode.abs() % avatarPalette.length];
 
   String get initial => displayName.isEmpty ? '?' : String.fromCharCode(displayName.runes.first).toUpperCase();
 
-  Profile copyWith({bool? blockedByMe, bool? followedByMe, int? followers, int? writingDays, bool? followUnlocked}) =>
-      Profile(
-        id: id,
-        handle: handle,
-        displayName: displayName,
-        bio: bio,
-        locale: locale,
-        timeZone: timeZone,
-        writingDays: writingDays ?? this.writingDays,
-        daysToFollow: daysToFollow,
-        followUnlocked: followUnlocked ?? this.followUnlocked,
-        followers: followers ?? this.followers,
-        following: following,
-        followedByMe: followedByMe ?? this.followedByMe,
-        isMe: isMe,
-        photoUrl: photoUrl,
-        isAdmin: isAdmin,
-        blockedByMe: blockedByMe ?? this.blockedByMe,
-      );
+  Profile copyWith({
+    bool? blockedByMe,
+    bool? followedByMe,
+    int? followers,
+    int? writingDays,
+    bool? followUnlocked,
+    bool? alertsOn,
+  }) => Profile(
+    id: id,
+    handle: handle,
+    displayName: displayName,
+    bio: bio,
+    locale: locale,
+    timeZone: timeZone,
+    writingDays: writingDays ?? this.writingDays,
+    daysToFollow: daysToFollow,
+    followUnlocked: followUnlocked ?? this.followUnlocked,
+    followers: followers ?? this.followers,
+    following: following,
+    followedByMe: followedByMe ?? this.followedByMe,
+    isMe: isMe,
+    photoUrl: photoUrl,
+    isAdmin: isAdmin,
+    blockedByMe: blockedByMe ?? this.blockedByMe,
+    alertsOn: alertsOn ?? this.alertsOn,
+  );
 }

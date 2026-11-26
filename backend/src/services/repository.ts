@@ -586,7 +586,10 @@ export class AuroraRepository implements Repository {
     return 'ok';
   }
 
-  async profile(userId: string, viewerId: string): Promise<(Profile & { followedByMe: boolean; blockedByMe?: boolean }) | null> {
+  async profile(
+    userId: string,
+    viewerId: string,
+  ): Promise<(Profile & { followedByMe: boolean; blockedByMe?: boolean; alertsByMe?: boolean }) | null> {
     const rows = await this.query(
       `SELECT u.id::text, u.handle, u.display_name, u.bio, u.photo_key, u.locale, u.time_zone, u.follow_unlocked,
               coalesce(w.days, 0) AS days,
@@ -594,6 +597,8 @@ export class AuroraRepository implements Repository {
               (SELECT count(*) FROM follows f WHERE f.follower_id = u.id AND NOT f.hidden) AS following,
               EXISTS (SELECT 1 FROM follows f
                       WHERE f.follower_id = :v::uuid AND f.followee_id = u.id AND NOT f.hidden) AS mine,
+              EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = :v::uuid AND f.followee_id = u.id
+                      AND NOT f.hidden AND f.alerts_since IS NOT NULL) AS alerts,
               EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = :v::uuid AND b.blocked_id = u.id) AS blocked
        FROM users u LEFT JOIN writing_days w ON w.author_id = u.id
        WHERE u.id = :u::uuid`,
@@ -615,6 +620,7 @@ export class AuroraRepository implements Repository {
       following: Number(r.following),
       followedByMe: Boolean(r.mine),
       blockedByMe: Boolean(r.blocked),
+      alertsByMe: Boolean(r.alerts),
     };
   }
 
@@ -636,6 +642,17 @@ export class AuroraRepository implements Repository {
       { a: followerId, b: followeeId },
     );
     return 'ok';
+  }
+
+  async setPostAlerts(followerId: string, followeeId: string, on: boolean): Promise<boolean> {
+    // Turning it on again keeps the original start, so nothing is announced twice.
+    const rows = await this.query(
+      `UPDATE follows SET alerts_since = CASE WHEN :on THEN coalesce(alerts_since, now()) ELSE NULL END
+       WHERE follower_id = :a::uuid AND followee_id = :b::uuid AND NOT hidden
+       RETURNING 1 AS ok`,
+      { a: followerId, b: followeeId, on },
+    );
+    return rows.length > 0;
   }
 
   async unfollow(followerId: string, followeeId: string): Promise<void> {

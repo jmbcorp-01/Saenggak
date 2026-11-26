@@ -122,6 +122,7 @@ class AppState extends ChangeNotifier {
       feed = results[0].items;
       _feedNext = results[0].next;
       incoming = const [];
+      incomingFollowing = const [];
       fresh = before.isEmpty ? const {} : {for (final p in feed.takeWhile((p) => !before.contains(p.id))) p.id};
       var k = 1;
       following = unlocked ? results[k++].items : const [];
@@ -134,20 +135,50 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  /// Looks for posts newer than the top of the feed, without showing them.
+  /// Newer posts from people the reader follows, held for the 팔로잉 tab.
+  List<Post> incomingFollowing = const [];
+
+  /// Whether either tab has newer posts waiting, for the dot on home.
+  bool get hasIncoming => incoming.isNotEmpty || incomingFollowing.isNotEmpty;
+
+  /// Posts in [page] newer than everything in [shown] and [waiting], not the
+  /// reader's own.
+  static List<Post> _newer(List<Post> page, List<Post> shown, List<Post> waiting) {
+    final known = {for (final p in shown) p.id, for (final p in waiting) p.id};
+    // The 추천 tab is not in time order, so compare with its newest post.
+    final newest = shown.map((p) => p.createdAt).reduce((a, b) => a.isAfter(b) ? a : b);
+    return [
+      for (final p in page)
+        if (!known.contains(p.id) && !p.isMine && p.createdAt.isAfter(newest)) p,
+    ];
+  }
+
+  /// Looks for posts newer than the top of each tab, without showing them.
   Future<void> checkForNew() async {
-    if (loading || feed.isEmpty) return;
+    if (loading) return;
+    final unlocked = me?.followUnlocked ?? false;
     try {
-      final page = await backend.feed(lang: lang);
-      final known = {for (final p in feed) p.id, for (final p in incoming) p.id};
-      final newest = feed.first.createdAt;
-      final found = [
-        for (final p in page.items)
-          if (!known.contains(p.id) && !p.isMine && p.createdAt.isAfter(newest)) p,
-      ];
-      if (found.isEmpty) return;
-      incoming = [...found, ...incoming];
-      notifyListeners();
+      final pages = await Future.wait([
+        if (feed.isNotEmpty) backend.feed(lang: lang),
+        if (unlocked && following.isNotEmpty) backend.feed(lang: lang, following: true),
+      ]);
+      var k = 0;
+      var changed = false;
+      if (feed.isNotEmpty) {
+        final found = _newer(pages[k++].items, feed, incoming);
+        if (found.isNotEmpty) {
+          incoming = [...found, ...incoming];
+          changed = true;
+        }
+      }
+      if (unlocked && following.isNotEmpty) {
+        final found = _newer(pages[k].items, following, incomingFollowing);
+        if (found.isNotEmpty) {
+          incomingFollowing = [...found, ...incomingFollowing];
+          changed = true;
+        }
+      }
+      if (changed) notifyListeners();
     } catch (_) {
       // Quietly try again next time.
     }
@@ -159,6 +190,15 @@ class AppState extends ChangeNotifier {
     fresh = {for (final p in incoming) p.id};
     feed = [...incoming, ...feed];
     incoming = const [];
+    notifyListeners();
+  }
+
+  /// The same for the 팔로잉 tab.
+  void showIncomingFollowing() {
+    if (incomingFollowing.isEmpty) return;
+    fresh = {for (final p in incomingFollowing) p.id};
+    following = [...incomingFollowing, ...following];
+    incomingFollowing = const [];
     notifyListeners();
   }
 
@@ -409,7 +449,7 @@ class AppState extends ChangeNotifier {
   Future<void> signOut() async {
     await backend.signOut();
     me = null;
-    feed = following = mine = saved = found = opened = const [];
+    feed = following = mine = saved = found = opened = incoming = incomingFollowing = const [];
     people = const [];
     searchQuery = '';
     notifications = const [];
@@ -417,6 +457,12 @@ class AppState extends ChangeNotifier {
     _feedNext = null;
     error = null;
     notifyListeners();
+  }
+
+  /// Turns alerts for [user]'s new posts on or off and returns the profile.
+  Future<Profile> setPostAlerts(Profile user, bool on) async {
+    await backend.setPostAlerts(user.id, on);
+    return user.copyWith(alertsOn: on);
   }
 
   /// Follows or unfollows and returns the updated profile.

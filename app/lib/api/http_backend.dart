@@ -271,4 +271,8 @@ class HttpBackend implements Backend {
 
   @override
   Future<void> unfollow(String userId) async => _ok(await _send('DELETE', 'users/$userId/follow'));
+
+  @override
+  Future<void> setPostAlerts(String userId, bool on) async =>
+      _ok(await _send(on ? 'PUT' : 'DELETE', 'users/$userId/alerts'));
 }
