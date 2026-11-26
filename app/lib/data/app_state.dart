@@ -209,7 +209,9 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     try {
       final page = await backend.feed(lang: lang, before: before);
-      feed = [...feed, ...page.items];
+      // The 추천 order can shift between pages, so a post may come twice.
+      final shown = {for (final p in feed) p.id};
+      feed = [...feed, ...page.items.where((p) => !shown.contains(p.id))];
       _feedNext = page.next;
     } catch (_) {
       error = t('글을 더 불러오지 못했어요.');

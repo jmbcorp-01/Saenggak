@@ -16,10 +16,15 @@
 <tr><td>Username (handle), name, bio and profile photo</td><td>Showing your profile. We accept only a photo of your own face taken with the app's camera, and automatically check that it shows exactly one clear face and nothing inappropriate.</td></tr>
 <tr><td>Your posts, the days you wrote, relates, follows, reports and blocks</td><td>Running the Service (feed, relates, follows), counting similar thoughts and handling policy violations</td></tr>
 <tr><td>Typing records (when and how many characters were typed or deleted, and paste attempts)</td><td>Confirming that a person typed the post. We do not record which keys you press.</td></tr>
+<tr><td>Saved posts and the people whose alerts you turned on</td><td>Showing your saved posts and alerting you to new posts from people you follow</td></tr>
+<tr><td>Activity records (the time and kind of relates, follows, reports, blocks and posts)</td><td>Detecting automated use (bots). If a lot happens in a short time, we ask you to type a short sentence to confirm you are a person. Deleted after one day.</td></tr>
+<tr><td>Search terms</td><td>Finding people and similar thoughts. Search terms are not stored.</td></tr>
 <tr><td>Language and time zone</td><td>Choosing the translation language and working out the day you wrote</td></tr>
 <tr><td>Access logs (IP address, access time and device information)</td><td>Security, preventing abuse and handling outages. These are created automatically when the servers run.</td></tr>
 </table>
 <p>The Service is only for people 14 or older, and we do not knowingly collect personal information from children under 14.</p>
+
+<p>For each post we automatically work out a "thought score" from the typing record and the text, and use it only to order the 추천 (For you) tab. That order also reflects posts you related to. The score is never shown, and it is never the sole reason a post is removed or an account limited.</p>
 
 <h2>2. How long we keep it</h2>
 <p>We destroy your personal information without delay when you delete your account (Settings &gt; Delete account in the app). Your posts, relates, follows, profile photo and sign-in account are deleted immediately and cannot be recovered. The following is kept for a set period, as required by law or to prevent abuse, and then destroyed:</p>
@@ -33,7 +38,7 @@
 <p>To provide the Service we use the processors below, and in doing so personal information is transferred outside Korea. Transfers happen over encrypted connections while you use the Service, and the retention periods are the same as in section 2. If you do not want your information transferred, you can refuse by deleting your account, but you will then be unable to use the Service.</p>
 <table>
 <tr><th>Recipient</th><th>Country</th><th>Information</th><th>Purpose</th></tr>
-<tr><td>Amazon Web Services, Inc. (privacy@amazon.com)</td><td>United States</td><td>Everything in section 1</td><td>Servers, database, photo storage, sign-in (Cognito), automatic translation (Translate), face checks (Rekognition) and counting similar thoughts (Bedrock)</td></tr>
+<tr><td>Amazon Web Services, Inc. (privacy@amazon.com)</td><td>United States</td><td>Everything in section 1</td><td>Servers, database, photo storage, sign-in (Cognito), automatic translation (Translate), face checks (Rekognition) and counting similar thoughts and search (Bedrock), and blocking abusive traffic (WAF)</td></tr>
 <tr><td>Anthropic, PBC (privacy@anthropic.com)</td><td>United States</td><td>Your posts, name and bio</td><td>Automatic checks for policy violations such as abuse, sexual content and advertising. Anthropic does not use this content to train AI.</td></tr>
 </table>
 
@@ -41,7 +46,7 @@
 <p>We do not give your personal information to third parties, except when law enforcement or other authorities request it through lawful procedures. The posts, name, username and profile photo you make public in the Service are visible to other users.</p>
 
 <h2>5. Your rights</h2>
-<p>You can access, correct, delete or stop the processing of your personal information at any time. You can edit your profile in the app and delete your account in Settings &gt; Delete account. For any other request, email the privacy officer below and we will handle it within 10 days.</p>
+<p>You can access, correct, delete or stop the processing of your personal information at any time. You can edit your profile in the app and delete your account in Settings &gt; Delete account. In Settings &gt; Export my data you can download what we store about you. For any other request, email the privacy officer below and we will handle it within 10 days.</p>
 
 <h2>6. Cookies and similar technology</h2>
 <p>The Service does not use cookies for advertising or tracking. Only the information needed to keep you signed in is kept in your device's secure storage (iOS Keychain, Android encrypted storage or your browser's storage), and it is removed when you sign out.</p>

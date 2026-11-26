@@ -44,13 +44,20 @@ App ids: **`app.saenggak`** on both stores. App name: **생각** (English: Saeng
 
 ## Store listing checklist
 
-- Privacy policy: `https://saenggak.app/privacy.html`. Support: `https://saenggak.app/support.html`.
+- Privacy policy: `https://d2mvhrf2jc4qa9.cloudfront.net/privacy.html` (English: `/en/privacy.html`).
+  Support: `https://d2mvhrf2jc4qa9.cloudfront.net/support.html`. Switch these, and `SITE_URL` in
+  `app/config/production.json`, once a domain such as saenggak.app points at the site.
 - Account deletion: in the app under Profile > Settings > 계정 삭제. On the web, use
   the same URL as support.
 - Content: user-generated, with reports, blocks and moderation. The age rating
   questionnaire should say so. The app is for ages 14 and over.
 - Data safety (Play) and App Privacy (Apple): email, name, photos (profile), user content (posts),
-  and identifiers (user id). Data is linked to the user, not used for tracking,
-  and can be deleted.
+  other user content (typing timings, not keys), product interaction (relates, follows, saves,
+  searches; activity kept a day for bot detection), and identifiers (user id). Data is linked to
+  the user, not used for tracking, and can be deleted (Settings > 계정 삭제) or exported
+  (Settings > 내 기록 내보내기).
+- `API_URL` in `app/config/production.json` must be the CloudFront address ending in `/api`.
+  The API's own execute-api address refuses every request that does not come through
+  CloudFront, so an app built with it cannot sign in or load anything.
 - Review notes: give the reviewers a test account (email and password) with a profile.
   Mention that posts must be typed by hand: paste is blocked by design.

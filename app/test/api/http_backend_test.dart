@@ -112,6 +112,14 @@ void main() {
     );
   });
 
+  test('a firewall page that is not JSON becomes an ApiException with its status', () async {
+    api = (_) => http.Response('<html>Request blocked</html>', 403);
+    await expectLater(backend.toggleEmpathy('p1'), throwsA(isA<ApiException>().having((e) => e.status, 'status', 403)));
+    final session = TypingSession()..record(inserted: 1, deleted: 0);
+    final out = await backend.publish(text: '글', session: session, localDate: '2026-11-25');
+    expect(out, isA<Rejected>());
+  });
+
   test('a post held for a typing check is reported as such, and other calls throw 428', () async {
     api = (_) => http.Response(jsonEncode({'error': 'human_check'}), 428);
     final session = TypingSession()..record(inserted: 1, deleted: 0);
