@@ -6,6 +6,7 @@ import '../l10n/l10n.dart';
 import '../models/post.dart' show avatarPalette, timeAgo;
 import '../theme/tokens.dart';
 import '../widgets/post_tile.dart' show Avatar;
+import 'post_screen.dart';
 import 'profile_screen.dart';
 
 /// 공감 on the reader's posts and new followers.
@@ -37,7 +38,11 @@ class NotificationsScreen extends StatelessWidget {
                   separatorBuilder: (_, _) => Divider(height: 1, color: SgColors.line),
                   itemBuilder: (context, i) {
                     final n = items[i];
-                    final what = n.kind == 'follow' ? t('님이 나를 팔로우해요.') : t('님이 내 생각에 공감했어요.');
+                    final what = switch (n.kind) {
+                      'follow' => t('님이 나를 팔로우해요.'),
+                      'post' => t('님이 새 생각을 남겼어요.'),
+                      _ => t('님이 내 생각에 공감했어요.'),
+                    };
                     return ListTile(
                       leading: Avatar(
                         initial: n.actorName.isEmpty ? '?' : n.actorName.substring(0, 1),
@@ -57,7 +62,10 @@ class NotificationsScreen extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      onTap: () => pushPage<void>(context, (_) => ProfilePage(state: state, userId: n.actorId)),
+                      // A new post opens the post itself; the rest open the person.
+                      onTap: () => n.kind == 'post' && n.postId != null
+                          ? pushPage<void>(context, (_) => PostScreen(state: state, postId: n.postId!))
+                          : pushPage<void>(context, (_) => ProfilePage(state: state, userId: n.actorId)),
                     );
                   },
                 ),

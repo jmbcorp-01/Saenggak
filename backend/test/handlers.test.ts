@@ -221,8 +221,15 @@ describe('profile and follow', () => {
     const seen = parse(await api(event('GET /users/{id}', { pathParameters: { id: U2 } })));
     expect(seen.body).toMatchObject({ followers: 1, followedByMe: true, isMe: false });
 
+    const alerts = (on: boolean) =>
+      api(event(on ? 'PUT /users/{id}/alerts' : 'DELETE /users/{id}/alerts', { pathParameters: { id: U2 } }));
+    expect(parse(await alerts(true))).toEqual({ status: 200, body: { alerts: true } });
+    expect(parse(await api(event('GET /users/{id}', { pathParameters: { id: U2 } }))).body).toMatchObject({ alertsByMe: true });
+    expect(parse(await alerts(false))).toEqual({ status: 200, body: { alerts: false } });
+
     await api(event('DELETE /users/{id}/follow', { pathParameters: { id: U2 } }));
     expect(repo.follows.size).toBe(0);
+    expect(parse(await alerts(true))).toEqual({ status: 404, body: { error: 'not_following' } });
   });
 });
 

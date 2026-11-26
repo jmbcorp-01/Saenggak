@@ -89,6 +89,11 @@ class _FeedScreenState extends State<FeedScreen> with SingleTickerProviderStateM
 
   void _showIncoming() {
     HapticFeedback.lightImpact();
+    if (_tabs.index == 1) {
+      state.showIncomingFollowing();
+      _toTop(_scrolls[1]);
+      return;
+    }
     state.showIncoming();
     _tabs.animateTo(0);
     _toTop(_scrolls[0]);
@@ -100,7 +105,8 @@ class _FeedScreenState extends State<FeedScreen> with SingleTickerProviderStateM
     final headerHeight = (phone ? _FeedHeader.barHeight : 0) + _FeedHeader.tabsHeight;
     final visible = !phone || ShellChrome.visibleOf(context);
     return ListenableBuilder(
-      listenable: state,
+      // The tab decides which tab's new posts the button offers.
+      listenable: Listenable.merge([state, _tabs]),
       builder: (context, _) => Stack(
         children: [
           TabBarView(
@@ -145,7 +151,10 @@ class _FeedScreenState extends State<FeedScreen> with SingleTickerProviderStateM
             left: 0,
             right: 0,
             child: Center(
-              child: _NewPostsPill(posts: state.incoming, onTap: _showIncoming),
+              child: _NewPostsPill(
+                posts: _tabs.index == 1 ? state.incomingFollowing : state.incoming,
+                onTap: _showIncoming,
+              ),
             ),
           ),
         ],
@@ -236,7 +245,24 @@ class _FeedHeader extends StatelessWidget {
                   dividerColor: SgColors.line,
                   tabs: [
                     Tab(text: t('추천')),
-                    Tab(text: t('팔로잉')),
+                    Tab(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(t('팔로잉')),
+                          // New posts from people the reader follows, while on 추천.
+                          if (state.incomingFollowing.isNotEmpty && tabs.index != 1) ...[
+                            const SizedBox(width: SgSpace.xs),
+                            Container(
+                              key: const Key('following-dot'),
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(color: SgColors.accent, shape: BoxShape.circle),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),

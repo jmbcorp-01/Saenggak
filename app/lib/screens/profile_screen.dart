@@ -92,6 +92,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _toggleAlerts(Profile user) async {
+    final on = !user.alertsOn;
+    try {
+      final updated = await widget.state.setPostAlerts(user, on);
+      if (!mounted) return;
+      setState(() => _other = updated);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            on ? t('@{0} 님이 새 생각을 남기면 알림으로 알려드릴게요.', [user.handle]) : t('@{0} 님의 새 생각 알림을 껐어요.', [user.handle]),
+          ),
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t('알림을 바꾸지 못했어요.'))));
+      }
+    }
+  }
+
   Future<void> _toggleBlock(Profile user) async {
     if (user.blockedByMe) {
       try {
@@ -213,6 +233,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           )
                         : Row(
                             children: [
+                              // Alerts for new posts, only for people the reader follows. Off by default.
+                              if (profile.followedByMe && !profile.blockedByMe)
+                                IconButton(
+                                  key: const Key('post-alerts'),
+                                  tooltip: profile.alertsOn ? t('새 생각 알림 끄기') : t('새 생각 알림 받기'),
+                                  isSelected: profile.alertsOn,
+                                  onPressed: () => _toggleAlerts(profile),
+                                  icon: Icon(SgIcons.bell, color: SgColors.ink),
+                                  selectedIcon: Icon(Icons.notifications_active_rounded, color: SgColors.accent),
+                                  style: IconButton.styleFrom(
+                                    side: BorderSide(color: SgColors.outline),
+                                    minimumSize: const Size(40, 40),
+                                  ),
+                                ),
+                              if (profile.followedByMe && !profile.blockedByMe) const SizedBox(width: SgSpace.sm),
                               if (!profile.blockedByMe)
                                 _FollowButton(
                                   profile: profile,

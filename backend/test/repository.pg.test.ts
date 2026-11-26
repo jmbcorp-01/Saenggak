@@ -381,6 +381,35 @@ describe.skipIf(!url)('AuroraRepository on Postgres', () => {
     expect((await repo.feed(C, { following: false, limit: 30 })).some((p) => p.authorId === A)).toBe(true);
   });
 
+  it('announces new posts only from people whose bell is on, and only after it was turned on', async () => {
+    const social = new AuroraSocialRepository('arn:cluster', 'arn:secret', 'test', new PgDataApi(client) as unknown as RDSDataClient);
+    await client.query(`DELETE FROM follows WHERE follower_id = $1`, [B]);
+    expect(await repo.setPostAlerts(B, A, true)).toBe(false); // not following yet
+    await client.query(`INSERT INTO follows (follower_id, followee_id) VALUES ($1, $2)`, [B, A]);
+    const alertsFor = async () => (await social.notifications(B, 30)).items.filter((x) => x.kind === 'post');
+
+    const write = async () => {
+      const id = await repo.insertPost({
+        authorId: A, body: TEXT, lang: 'ko', typingMs: 1, localDate: '2026-11-25', status: 'published',
+        embedding: Array(1024).fill(0.02), session: humanSession(TEXT) as never, issues: [],
+      });
+      return id;
+    };
+    await write(); // before the bell: not announced
+    expect(await alertsFor()).toHaveLength(0);
+
+    expect(await repo.setPostAlerts(B, A, true)).toBe(true);
+    expect((await repo.profile(A, B))?.alertsByMe).toBe(true);
+    const fresh = await write();
+    const alerts = await alertsFor();
+    expect(alerts.map((x) => x.postId)).toEqual([fresh]);
+    expect(alerts[0]).toMatchObject({ actorHandle: 'aa', excerpt: TEXT.slice(0, 60) });
+
+    expect(await repo.setPostAlerts(B, A, false)).toBe(true);
+    expect(await alertsFor()).toHaveLength(0);
+    expect((await repo.profile(A, B))?.alertsByMe).toBe(false);
+  });
+
   it('runs the daily cleanup statements', async () => {
     await client.query(`INSERT INTO write_log (author_id, at) VALUES ($1, now() - interval '2 days'), ($1, now())`, [A]);
     for (const sql of CLEANUP_SQL) await client.query(sql);

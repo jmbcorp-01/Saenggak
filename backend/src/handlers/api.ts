@@ -53,6 +53,7 @@ const isReason = (v: unknown): v is ReportReason => REPORT_REASONS.includes(v as
  *   DELETE /me                  erases the account and everything in it
  *   GET    /users/{id}
  *   PUT    /users/{id}/follow    DELETE /users/{id}/follow
+ *   PUT    /users/{id}/alerts    DELETE /users/{id}/alerts   alerts for their new posts
  *   POST   /posts/{id}/report    POST /users/{id}/report    { reason, note }
  *   PUT    /users/{id}/block     DELETE /users/{id}/block   GET /me/blocks
  *   GET    /notifications?before=<at>    POST /notifications/seen
@@ -253,6 +254,14 @@ export const apiHandler = (deps: Deps) => safely(async (event: Event) => {
       if (result === 'ok') return json(200, { following: true });
       if (result === 'not_found') return json(404, { error: 'not_found' });
       return json(403, { error: result });
+    }
+
+    case 'PUT /users/{id}/alerts':
+    case 'DELETE /users/{id}/alerts': {
+      if (!isUuid(id)) return json(400, { error: 'bad_request' });
+      const on = event.routeKey === 'PUT /users/{id}/alerts';
+      // Only for people the reader follows.
+      return (await repo.setPostAlerts(me, id, on)) ? json(200, { alerts: on }) : json(404, { error: 'not_following' });
     }
 
     case 'DELETE /users/{id}/follow': {

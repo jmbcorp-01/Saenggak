@@ -34,7 +34,7 @@ class AppNotification {
     excerpt: j['excerpt'] as String?,
   );
 
-  /// `empathy` or `follow`.
+  /// `empathy`, `follow`, or `post` for a new post by someone whose alerts are on.
   final String kind;
   final DateTime at;
   final String actorId;

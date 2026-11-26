@@ -105,6 +105,10 @@ abstract class Backend {
   /// Throws [ApiException] with code `not_allowed` unless both people have follow permission.
   Future<void> follow(String userId);
   Future<void> unfollow(String userId);
+
+  /// Alerts for a followed person's new posts. Throws [ApiException]
+  /// `not_following` for someone the reader does not follow.
+  Future<void> setPostAlerts(String userId, bool on);
 }
 
 class FeedPage {
