@@ -44,8 +44,17 @@ class HttpBackend implements Backend {
     return res;
   }
 
-  Map<String, dynamic> _json(http.Response res) =>
-      res.body.isEmpty ? <String, dynamic>{} : jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+  /// The body as JSON. A page that is not JSON, such as the firewall's or
+  /// CloudFront's own error page, reads as empty so the status decides.
+  Map<String, dynamic> _json(http.Response res) {
+    if (res.body.isEmpty) return <String, dynamic>{};
+    try {
+      final j = jsonDecode(utf8.decode(res.bodyBytes));
+      return j is Map<String, dynamic> ? j : <String, dynamic>{};
+    } on FormatException {
+      return <String, dynamic>{};
+    }
+  }
 
   Map<String, dynamic> _ok(http.Response res) {
     final j = _json(res);

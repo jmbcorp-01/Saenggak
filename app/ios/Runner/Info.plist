@@ -3,7 +3,7 @@
 <plist version="1.0">
 	<dict>
 		<key>NSCameraUsageDescription</key>
-		<string>프로필 사진은 지금 카메라로 찍은 본인 얼굴만 쓸 수 있어서 카메라가 필요해요.</string>
+		<string>프로필 사진은 지금 카메라로 찍은 본인 얼굴만 쓸 수 있어서 카메라가 필요해요. The camera is needed because your profile photo must be your own face, taken now.</string>
 		<key>CADisableMinimumFrameDurationOnPhone</key>
 		<true/>
 		<key>CFBundleDevelopmentRegion</key>

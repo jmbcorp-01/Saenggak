@@ -68,6 +68,7 @@ export class AuroraSocialRepository extends AuroraRepository implements SocialRe
       UNION ALL
       SELECT 'post', p.created_at, p.author_id, p.id, left(p.body, 60)
       FROM follows f JOIN posts p ON p.author_id = f.followee_id
+        JOIN users au ON au.id = p.author_id AND au.suspended_at IS NULL
       WHERE f.follower_id = :u::uuid AND f.alerts_since IS NOT NULL AND NOT f.hidden
         AND p.status = 'published' AND p.created_at >= f.alerts_since`;
     const notBlocked = `NOT EXISTS (SELECT 1 FROM blocks b
