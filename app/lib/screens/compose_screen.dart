@@ -14,6 +14,7 @@ import '../l10n/l10n.dart';
 import '../models/post.dart';
 import '../models/publish_outcome.dart';
 import '../theme/tokens.dart';
+import '../widgets/keyboard.dart';
 import '../widgets/post_tile.dart';
 import 'publish_result_screen.dart';
 
@@ -128,6 +129,8 @@ class _ComposeScreenState extends State<ComposeScreen> {
     final timer =
         '${elapsed.inMinutes.toString().padLeft(2, '0')}:${(elapsed.inSeconds % 60).toString().padLeft(2, '0')}';
 
+    final keyboardUp = MediaQuery.viewInsetsOf(context).bottom > 0;
+
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -223,8 +226,15 @@ class _ComposeScreenState extends State<ComposeScreen> {
                     icon: Icon(_voice ? Icons.mic : Icons.mic_none),
                     color: SgColors.accent,
                   ),
-                  Text(_voice ? t('음성 입력 중') : t('붙여넣기 불가'), style: SgText.small),
-                  const Spacer(),
+                  // Gives way first on a narrow phone with the keyboard button showing.
+                  Expanded(
+                    child: Text(
+                      _voice ? t('음성 입력 중') : t('붙여넣기 불가'),
+                      style: SgText.small,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                   Container(
                     width: 7,
                     height: 7,
@@ -235,8 +245,20 @@ class _ComposeScreenState extends State<ComposeScreen> {
                   const SizedBox(width: 14),
                   Container(width: 1, height: 24, color: SgColors.line),
                   const SizedBox(width: 14),
-                  LengthRing(status: status),
+                  // Takes what it needs first; its words shorten on a narrow phone.
+                  Flexible(flex: 3, child: LengthRing(status: status)),
                   const SizedBox(width: 8),
+                  // iOS has no back key, and the return key here starts a new
+                  // line, so the keyboard needs its own way down.
+                  if (keyboardUp)
+                    IconButton(
+                      key: const Key('hide-keyboard'),
+                      tooltip: t('키보드 내리기'),
+                      onPressed: hideKeyboard,
+                      icon: const Icon(Icons.keyboard_hide_outlined),
+                      color: SgColors.ink,
+                      visualDensity: VisualDensity.compact,
+                    ),
                 ],
               ),
             ),
@@ -284,11 +306,15 @@ class LengthRing extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (hint != null) ...[
-            ExcludeSemantics(
-              child: Text(
-                hint,
-                style: SgText.small.copyWith(
-                  color: status.tooLong || status.tooManyLines ? SgColors.accentText : SgColors.muted,
+            Flexible(
+              child: ExcludeSemantics(
+                child: Text(
+                  hint,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: SgText.small.copyWith(
+                    color: status.tooLong || status.tooManyLines ? SgColors.accentText : SgColors.muted,
+                  ),
                 ),
               ),
             ),

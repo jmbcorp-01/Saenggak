@@ -191,6 +191,7 @@ const english = <String, String>{
   '음성 입력 끄기': "Turn off voice input",
   '음성 입력 중': "Voice input on",
   '음성으로 입력': "Voice input",
+  '키보드 내리기': "Hide keyboard",
   '이 글을 내릴까요?': "Take down this post?",
   '이 글을 삭제할까요?': "Delete this post?",
   '이 글을 신고하는 이유': "Why are you reporting this post?",

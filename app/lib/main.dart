@@ -16,6 +16,7 @@ import 'screens/home_shell.dart';
 import 'screens/profile_setup_screen.dart';
 import 'screens/start_screen.dart';
 import 'theme/tokens.dart';
+import 'widgets/keyboard.dart';
 import 'widgets/symbol_mark.dart';
 
 Future<void> main() async {
@@ -164,7 +165,7 @@ class _SaenggakAppState extends State<SaenggakApp> with WidgetsBindingObserver {
       themeAnimationDuration: Duration.zero,
       builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
         value: SgColors.isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
-        child: child!,
+        child: TapToHideKeyboard(child: child!),
       ),
       initialRoute: widget.resumed ? '/resume' : '/',
       routes: {

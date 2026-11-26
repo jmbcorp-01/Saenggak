@@ -90,6 +90,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         ],
       ),
       body: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: formPadding(context, side: 24),
         children: [
           if (widget.firstTime) ...[
@@ -100,6 +101,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             key: const Key('name'),
             controller: _name,
             maxLength: 30,
+            textInputAction: TextInputAction.next,
             decoration: InputDecoration(labelText: t('이름')),
           ),
           TextField(
@@ -107,6 +109,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             controller: _handle,
             maxLength: 20,
             autocorrect: false,
+            textInputAction: TextInputAction.next,
             decoration: InputDecoration(labelText: t('아이디'), prefixText: '@'),
           ),
           TextField(

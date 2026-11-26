@@ -39,11 +39,12 @@ App ids: **`app.saenggak`** on both stores. App name: **생각** (English: Saeng
    first one. Run Mobile builds, download `android-app-bundle`, and upload
    `app-release.aab` in Play Console > Testing > Internal testing > Create new release.
    Accept Play App Signing when asked.
-4. **Service account for later uploads.** In Google Cloud console, create a
-   service account and a JSON key for it. In Play Console > Users and permissions,
-   invite its email with release permissions for this app. Put the JSON as the
-   secret `PLAY_SERVICE_ACCOUNT_JSON`. Later runs then upload to internal
-   testing as a draft.
+4. **Service account for later uploads.** In Google Cloud console, pick or create a project,
+   turn on the **Google Play Android Developer API**, then under IAM & Admin > Service accounts
+   create one (no roles needed) and add a JSON key. In Play Console > Users and permissions,
+   invite the service account's email with access to this app and the release permissions
+   (release to testing tracks). Put the whole JSON as the secret `PLAY_SERVICE_ACCOUNT_JSON`.
+   Later runs then release each build to internal testers on their own.
 
 ## Store listing checklist
 

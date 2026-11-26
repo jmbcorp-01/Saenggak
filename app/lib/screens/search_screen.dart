@@ -104,14 +104,26 @@ class _SearchScreenState extends State<SearchScreen> {
       padding: const EdgeInsets.only(top: 120),
       child: Text(text, textAlign: TextAlign.center, style: SgText.small),
     );
-    if (_failed) return ListView(children: [note(t('검색하지 못했어요. 잠시 후 다시 시도해주세요.'))]);
+    if (_failed) {
+      return ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        children: [note(t('검색하지 못했어요. 잠시 후 다시 시도해주세요.'))],
+      );
+    }
     if (state.searchQuery.isEmpty) {
-      return ListView(children: [note(t('이름이나 @아이디로 사람을, 문장으로 비슷한 생각을 찾아요.'))]);
+      return ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        children: [note(t('이름이나 @아이디로 사람을, 문장으로 비슷한 생각을 찾아요.'))],
+      );
     }
     if (state.people.isEmpty && state.found.isEmpty) {
-      return ListView(children: [note(t('찾는 결과가 없어요.'))]);
+      return ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        children: [note(t('찾는 결과가 없어요.'))],
+      );
     }
     return ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: [
         if (state.people.isNotEmpty) ...[
           _Section(t('사람')),

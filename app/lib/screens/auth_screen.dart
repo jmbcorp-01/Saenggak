@@ -96,6 +96,7 @@ class _AuthScreenState extends State<AuthScreen> {
       ),
       body: SafeArea(
         child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: formPadding(context),
           children: [
             Text(title, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.5)),
@@ -115,6 +116,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 key: const Key('email'),
                 controller: _email,
                 keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
                 autofillHints: const [AutofillHints.email],
                 decoration: _field(t('이메일')),
               ),
@@ -125,6 +127,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 obscureText: true,
                 autofillHints: [_signUp ? AutofillHints.newPassword : AutofillHints.password],
                 decoration: _field(_signUp ? t('비밀번호 (10자 이상)') : t('비밀번호')),
+                textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _submit(),
               ),
             ] else
