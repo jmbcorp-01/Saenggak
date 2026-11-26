@@ -53,6 +53,24 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <!-- Shown at once while the app loads, then removed on its first frame. -->
+  <style>
+    html, body { margin: 0; background: #ffffff; }
+    #splash { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; transition: opacity .25s ease; }
+    #splash img { width: 72px; height: 72px; border-radius: 16px; animation: breathe 1.6s ease-in-out infinite; }
+    @keyframes breathe { 0%, 100% { opacity: .55; transform: scale(.96); } 50% { opacity: 1; transform: scale(1); } }
+    @media (prefers-color-scheme: dark) { html, body { background: #121110; } }
+    @media (prefers-reduced-motion: reduce) { #splash img { animation: none; } }
+  </style>
+  <div id="splash" aria-label="생각"><img src="icons/Icon-192.png" alt=""></div>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var s = document.getElementById('splash');
+      if (!s) return;
+      s.style.opacity = '0';
+      setTimeout(function () { s.remove(); }, 300);
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
