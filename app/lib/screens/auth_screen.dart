@@ -4,10 +4,12 @@ import '../api/cognito_auth.dart';
 import '../core/links.dart';
 import '../l10n/l10n.dart';
 import '../theme/tokens.dart';
+import '../widgets/social_buttons.dart';
 import '../widgets/symbol_mark.dart';
 import 'reset_password_screen.dart';
 
-/// Email sign-up (with the emailed code) and sign-in.
+/// Email sign-up (with the emailed code) and sign-in, and Google and Apple
+/// once they are set up.
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key, required this.auth, required this.signUp, required this.onSignedIn});
 
@@ -46,7 +48,9 @@ class _AuthScreenState extends State<AuthScreen> {
     try {
       await step();
     } on AuthException catch (e) {
-      if (e.type == 'UserNotConfirmedException') {
+      if (e.type == 'Cancelled') {
+        // Closed the sign-in window: nothing to say.
+      } else if (e.type == 'UserNotConfirmedException') {
         await widget.auth.resendCode(_email.text.trim());
         setState(() => _needsCode = true);
       } else {
@@ -73,8 +77,14 @@ class _AuthScreenState extends State<AuthScreen> {
     await widget.onSignedIn();
   });
 
+  Future<void> _social(String provider) => _run(() async {
+    await widget.auth.signInWith(provider);
+    await widget.onSignedIn();
+  });
+
   @override
   Widget build(BuildContext context) {
+    final social = widget.auth.config.socialProviders;
     final title = _needsCode ? t('이메일을 확인해주세요') : (_signUp ? t('계정 만들기') : t('로그인'));
     final pill = RoundedRectangleBorder(borderRadius: BorderRadius.circular(25));
     return Scaffold(
@@ -93,10 +103,13 @@ class _AuthScreenState extends State<AuthScreen> {
             Text(
               _needsCode
                   ? t('{0}로 보낸 6자리 코드를 입력해주세요.', [_email.text.trim()])
+                  : social.isNotEmpty
+                  ? (_signUp ? t('편한 방법으로 시작해요.') : t('편한 방법으로 들어가요.'))
                   : (_signUp ? t('이메일과 비밀번호로 시작해요.') : t('이메일과 비밀번호로 들어가요.')),
               style: TextStyle(fontSize: 15, color: SgColors.muted),
             ),
             const SizedBox(height: 28),
+            if (!_needsCode && social.isNotEmpty) SocialButtons(providers: social, busy: _busy, onPressed: _social),
             if (!_needsCode) ...[
               TextField(
                 key: const Key('email'),

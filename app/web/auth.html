@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>생각</title>
+<p style="font-family: system-ui, sans-serif; text-align: center; margin-top: 30vh; color: #555">로그인 중이에요. 창이 닫히지 않으면 닫아주세요.<br>Signing you in. Close this window if it stays open.</p>
+<script>
+  // Hands the sign-in answer back to the app window that opened this one.
+  const message = { 'flutter-web-auth-2': window.location.href };
+  if (window.opener) {
+    window.opener.postMessage(message, window.location.origin);
+    window.close();
+  } else if (window.parent && window.parent !== window) {
+    window.parent.postMessage(message, window.location.origin);
+  } else {
+    localStorage.setItem('flutter-web-auth-2', window.location.href);
+    window.close();
+  }
+</script>

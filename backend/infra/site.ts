@@ -10,3 +10,24 @@ export const SITE = {
   domain: 'saenggak.app',
   certificateArn: 'arn:aws:acm:us-east-1:242126391246:certificate/68b0882d-5bda-442d-bd42-ae9d03a54c75',
 };
+
+/**
+ * Sign-in with Google and Apple, through Cognito's sign-in pages at [authDomain].
+ *
+ * Nothing here is secret. The secrets live in AWS Secrets Manager (us-east-1),
+ * as plain text, under the names below:
+ * - Google's client secret: `saenggak/google-client-secret`
+ * - Apple's private key (the whole .p8 file): `saenggak/apple-private-key`
+ *
+ * Each part turns on when its fields are filled in: the domain once its
+ * us-east-1 certificate is issued, Google once its client id is set, Apple once
+ * its team id and key id are set.
+ */
+export const SIGN_IN = {
+  authDomain: 'auth.saenggak.app',
+  authCertificateArn: '',
+  google: { clientId: '' },
+  apple: { servicesId: 'app.saenggak.signin', teamId: '', keyId: '' },
+};
+
+export type SignInSettings = typeof SIGN_IN;
