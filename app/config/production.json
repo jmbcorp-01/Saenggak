@@ -1,6 +1,6 @@
 {
-  "API_URL": "https://d2mvhrf2jc4qa9.cloudfront.net/api",
+  "API_URL": "https://saenggak.app/api",
   "COGNITO_REGION": "us-east-1",
   "COGNITO_CLIENT_ID": "4i4dpflbvoetuite7sce3jhpa6",
-  "SITE_URL": "https://d2mvhrf2jc4qa9.cloudfront.net"
+  "SITE_URL": "https://saenggak.app"
 }

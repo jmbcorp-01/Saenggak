@@ -103,4 +103,27 @@ describe('SaenggakStack', () => {
       LambdaConfig: { PreSignUp: Match.anyValue() },
     });
   });
+
+  it('answers at its own domain once a certificate is given', () => {
+    const withSite = Template.fromStack(
+      new SaenggakStack(new App(), 'Site', {
+        env: { account: '123456789012', region: 'us-east-1' },
+        site: { domain: 'saenggak.app', certificateArn: 'arn:aws:acm:us-east-1:123456789012:certificate/abc' },
+      }),
+    );
+    withSite.hasResourceProperties('AWS::CloudFront::Distribution', {
+      DistributionConfig: Match.objectLike({
+        Aliases: ['saenggak.app', 'www.saenggak.app'],
+        ViewerCertificate: Match.objectLike({
+          AcmCertificateArn: 'arn:aws:acm:us-east-1:123456789012:certificate/abc',
+        }),
+      }),
+    });
+    withSite.hasOutput('ApiUrl', { Value: 'https://saenggak.app/api' });
+  });
+
+  it('keeps the CloudFront address without a certificate', () => {
+    const cdn = template.findResources('AWS::CloudFront::Distribution');
+    expect(Object.values(cdn).every((d) => !(d as { Properties: { DistributionConfig: { Aliases?: unknown } } }).Properties.DistributionConfig.Aliases)).toBe(true);
+  });
 });
