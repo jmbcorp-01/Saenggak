@@ -126,12 +126,14 @@ class _ReviewTabState extends State<_ReviewTab> {
       onRefresh: _load,
       child: items.isEmpty
           ? ListView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               children: [
                 SizedBox(height: 120),
                 Center(child: Text(t('검토할 글이 없어요.'), style: SgText.small)),
               ],
             )
           : ListView.separated(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: const EdgeInsets.all(16),
               itemCount: items.length,
               separatorBuilder: (_, _) => const SizedBox(height: 12),
@@ -241,12 +243,14 @@ class _ReportsTabState extends State<_ReportsTab> {
       onRefresh: _load,
       child: items.isEmpty
           ? ListView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               children: [
                 SizedBox(height: 120),
                 Center(child: Text(t('처리할 신고가 없어요.'), style: SgText.small)),
               ],
             )
           : ListView.separated(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: const EdgeInsets.all(16),
               itemCount: items.length,
               separatorBuilder: (_, _) => const SizedBox(height: 12),
@@ -382,6 +386,7 @@ class _UsersTabState extends State<_UsersTab> {
               : users.isEmpty
               ? Center(child: Text(t('찾는 사람이 없어요.'), style: SgText.small))
               : ListView.builder(
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                   itemCount: users.length,
                   itemBuilder: (context, i) {
                     final u = users[i];
@@ -467,6 +472,7 @@ class _StatsTabState extends State<_StatsTab> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.all(16),
         children: [
           for (final (label, value, note) in rows)

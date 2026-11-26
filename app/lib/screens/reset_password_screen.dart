@@ -63,6 +63,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       appBar: AppBar(title: Text(t('비밀번호 다시 만들기'))),
       body: SafeArea(
         child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: formPadding(context),
           children: [
             Text(
@@ -75,6 +76,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               controller: _email,
               enabled: !_codeSent,
               keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.done,
               autofillHints: const [AutofillHints.email],
               decoration: InputDecoration(labelText: t('이메일'), border: border),
             ),

@@ -102,6 +102,7 @@ class _HumanCheckScreenState extends State<HumanCheckScreen> {
             ),
             Expanded(
               child: ListView(
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.fromLTRB(SgSpace.xl, SgSpace.sm, SgSpace.xl, SgSpace.xl),
                 children: [
                   Text(t('사람인지 확인할게요'), style: SgText.title),
