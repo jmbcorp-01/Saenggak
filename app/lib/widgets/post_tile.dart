@@ -244,7 +244,7 @@ class _PostTileState extends State<PostTile> {
                 children: [
                   Row(
                     children: [
-                      Flexible(
+                      Expanded(
                         child: Semantics(
                           button: widget.onOpenAuthor != null,
                           child: _AuthorLine(
@@ -312,11 +312,15 @@ class _PostTileState extends State<PostTile> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        EmpathyButton(
-                          key: ValueKey('empathy-${post.id}'),
-                          active: post.empathizedByMe,
-                          count: post.empathyCount,
-                          onTap: post.isMine ? null : widget.onEmpathy,
+                        // The hover circle reaches past the text edge so the icon lines up with it.
+                        Transform.translate(
+                          offset: const Offset(-6, 0),
+                          child: EmpathyButton(
+                            key: ValueKey('empathy-${post.id}'),
+                            active: post.empathizedByMe,
+                            count: post.empathyCount,
+                            onTap: post.isMine ? null : widget.onEmpathy,
+                          ),
                         ),
                         TypingTimeLabel(duration: post.typingTime),
                       ],
@@ -349,31 +353,35 @@ class _AuthorLineState extends State<_AuthorLine> {
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: widget.onTap != null ? SystemMouseCursors.click : MouseCursor.defer,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 48),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            widthFactor: 1,
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: widget.name,
-                    style: SgText.name.copyWith(
-                      decoration: _hover && widget.onTap != null ? TextDecoration.underline : null,
+    // Only the text itself is the link, not the empty space after it.
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: MouseRegion(
+        cursor: widget.onTap != null ? SystemMouseCursors.click : MouseCursor.defer,
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              widthFactor: 1,
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: widget.name,
+                      style: SgText.name.copyWith(
+                        decoration: _hover && widget.onTap != null ? TextDecoration.underline : null,
+                      ),
                     ),
-                  ),
-                  TextSpan(text: widget.rest, style: SgText.meta),
-                ],
+                    TextSpan(text: widget.rest, style: SgText.meta),
+                  ],
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
         ),

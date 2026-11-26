@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -13,6 +15,7 @@ import 'screens/home_shell.dart';
 import 'screens/profile_setup_screen.dart';
 import 'screens/start_screen.dart';
 import 'theme/tokens.dart';
+import 'widgets/symbol_mark.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -97,7 +100,9 @@ class _SaenggakAppState extends State<SaenggakApp> with WidgetsBindingObserver {
 
   /// After sign-in: create the profile if this is a new account, then home.
   Future<void> _enter(NavigatorState nav) async {
-    await state.start();
+    // Home opens as soon as the profile is known; the timeline fills in there.
+    await state.loadMe();
+    if (state.me != null) unawaited(state.loadLists());
     if (state.me == null) {
       await nav.pushAndRemoveUntil(
         MaterialPageRoute<void>(
@@ -105,7 +110,7 @@ class _SaenggakAppState extends State<SaenggakApp> with WidgetsBindingObserver {
             state: state,
             firstTime: true,
             onDone: () {
-              state.refresh();
+              state.loadLists();
               nav.pushNamedAndRemoveUntil('/home', (_) => false);
             },
           ),
@@ -186,5 +191,5 @@ class _ResumeState extends State<_Resume> {
   }
 
   @override
-  Widget build(BuildContext context) => const Scaffold(body: Center(child: CircularProgressIndicator()));
+  Widget build(BuildContext context) => const Scaffold(body: Center(child: SymbolMark(size: 48)));
 }

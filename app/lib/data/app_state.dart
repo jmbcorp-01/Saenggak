@@ -57,7 +57,20 @@ class AppState extends ChangeNotifier {
 
   /// Loads the profile and the first page of each list.
   Future<void> start() async {
+    await loadMe();
+    await loadLists();
+  }
+
+  /// The reader's own profile; null for a new account.
+  Future<void> loadMe() async {
     me = await backend.me();
+    notifyListeners();
+  }
+
+  /// The first page of each list. Until it arrives the feed shows
+  /// placeholder rows.
+  Future<void> loadLists() async {
+    loading = true;
     notifyListeners();
     await Future.wait([refresh(), if (me != null) loadNotifications()]);
   }
