@@ -1,4 +1,4 @@
-import { checkLength, type LengthVerdict } from '../rules/weightedLength.js';
+import { checkLength, tidyPost, type LengthVerdict } from '../rules/weightedLength.js';
 import { evaluate, parseSession, type HumanCheckIssue, type TypingSession } from '../rules/humanCheck.js';
 import { extractPhrases, pickFirstPhrases, type Phrase } from '../rules/phrases.js';
 import { MAX_COSINE_DISTANCE, summarizeSimilar, type SimilarSummary } from '../rules/similar.js';
@@ -79,7 +79,7 @@ interface Screened {
  * current text for an edit, so the session only has to account for the change.
  */
 function screen(input: PublishInput, baseText = ''): Omit<Screened, 'localDate'> | Rejected {
-  const body = input.text.trim();
+  const body = tidyPost(input.text);
   const verdict = checkLength(body);
   if (verdict !== 'ok') return { kind: 'invalid_length', verdict };
 

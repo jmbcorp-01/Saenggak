@@ -48,4 +48,19 @@ void main() {
       expect(WeightedLength.status('a' * 401).tooLong, isTrue);
     });
   });
+
+  test('tidies like the server: one blank line at most, no stray spaces', () {
+    expect(WeightedLength.tidy('\n\n첫 줄   \r\n\n\n\n\n둘째 줄\t\n\n'), '첫 줄\n\n둘째 줄');
+    expect(WeightedLength.tidy('한 줄\n다음 줄'), '한 줄\n다음 줄');
+  });
+
+  test('allows twelve lines, blank ones included', () {
+    String lines(int n) => List.filled(n, '가나다라마바').join('\n');
+    expect(WeightedLength.status(lines(12)).postable, isTrue);
+    final over = WeightedLength.status(lines(13));
+    expect(over.tooManyLines, isTrue);
+    expect(over.postable, isFalse);
+    // Blank lines beyond one are dropped before counting.
+    expect(WeightedLength.status('${lines(6)}\n\n\n\n\n${lines(6)}').lines, 13);
+  });
 }

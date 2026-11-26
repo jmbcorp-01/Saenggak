@@ -4,6 +4,8 @@
  */
 export const MIN_UNITS = 80;
 export const MAX_UNITS = 400;
+/** Lines in a post, blank ones included, so one post never fills the screen. */
+export const MAX_LINES = 12;
 
 const WIDE_RANGES: ReadonlyArray<readonly [number, number]> = [
   [0x1100, 0x11ff], // Hangul Jamo
@@ -30,11 +32,32 @@ export function weightedLength(text: string): number {
   return total;
 }
 
-export type LengthVerdict = 'ok' | 'too_short' | 'too_long';
+/**
+ * The post as it is kept and shown: line endings made plain, spaces at line
+ * ends and blank lines at the start and end dropped, and runs of blank lines
+ * cut to one. Kept identical to WeightedLength.tidy in the app.
+ */
+export function tidyPost(text: string): string {
+  return text
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((line) => line.replace(/[ \t\u3000]+$/, ''))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
 
+export function lineCount(text: string): number {
+  return text === '' ? 0 : text.split('\n').length;
+}
+
+export type LengthVerdict = 'ok' | 'too_short' | 'too_long' | 'too_many_lines';
+
+/** Checks a tidied post. */
 export function checkLength(text: string): LengthVerdict {
   const units = weightedLength(text);
   if (units < MIN_UNITS) return 'too_short';
   if (units > MAX_UNITS) return 'too_long';
+  if (lineCount(text) > MAX_LINES) return 'too_many_lines';
   return 'ok';
 }

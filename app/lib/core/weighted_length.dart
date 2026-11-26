@@ -11,6 +11,22 @@ class WeightedLength {
   static const int minUnits = 80;
   static const int maxUnits = 400;
 
+  /// Lines in a post, blank ones included, so one post never fills the screen.
+  static const int maxLines = 12;
+
+  /// The post as it is kept and shown: spaces at line ends and blank lines at
+  /// the start and end dropped, and runs of blank lines cut to one. Kept
+  /// identical to tidyPost on the server.
+  static String tidy(String text) => text
+      .replaceAll(RegExp(r'\r\n?'), '\n')
+      .split('\n')
+      .map((line) => line.replaceFirst(RegExp('[ \t\u3000]+\$'), ''))
+      .join('\n')
+      .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+      .trim();
+
+  static int lineCount(String text) => text.isEmpty ? 0 : '\n'.allMatches(text).length + 1;
+
   /// Weighted length of [text].
   static int of(String text) {
     var total = 0;
@@ -38,19 +54,24 @@ class WeightedLength {
 
   static bool _inRange(int v, int lo, int hi) => v >= lo && v <= hi;
 
-  /// How a post of [text] stands against the length rules.
-  static LengthStatus status(String text) => LengthStatus(of(text));
+  /// How a post of [text], once tidied, stands against the length rules.
+  static LengthStatus status(String text) {
+    final tidied = tidy(text);
+    return LengthStatus(of(tidied), lines: lineCount(tidied));
+  }
 }
 
 /// The weighted length of a draft and what it means for posting.
 class LengthStatus {
-  const LengthStatus(this.units);
+  const LengthStatus(this.units, {this.lines = 1});
 
   final int units;
+  final int lines;
 
   bool get tooShort => units < WeightedLength.minUnits;
   bool get tooLong => units > WeightedLength.maxUnits;
-  bool get postable => !tooShort && !tooLong;
+  bool get tooManyLines => lines > WeightedLength.maxLines;
+  bool get postable => !tooShort && !tooLong && !tooManyLines;
 
   /// Fill of the length ring, from 0.0 to 1.0.
   double get progress => (units / WeightedLength.maxUnits).clamp(0.0, 1.0);
