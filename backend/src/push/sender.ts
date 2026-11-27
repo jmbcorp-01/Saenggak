@@ -10,6 +10,8 @@ export interface PushStore {
    *  moves each person's mark to now so nothing goes out twice. */
   takeBatches(): Promise<PushBatch[]>;
   tokens(userIds: string[]): Promise<Map<string, PushToken[]>>;
+  /** Unread notifications per person, for the number on the app icon. */
+  unread(userIds: string[]): Promise<Map<string, number>>;
   removeTokens(tokens: string[]): Promise<void>;
 }
 
@@ -33,13 +35,14 @@ export async function sendPushes(store: PushStore, client: PushClient | null): P
   const batches = await store.takeBatches();
   report.batches = batches.length;
   if (!client || batches.length === 0) return report;
-  const devices = await store.tokens([...new Set(batches.map((b) => b.userId))]);
+  const people = [...new Set(batches.map((b) => b.userId))];
+  const [devices, unread] = await Promise.all([store.tokens(people), store.unread(people)]);
   const gone: string[] = [];
   await Promise.all(
     batches.flatMap((b) =>
       (devices.get(b.userId) ?? []).map(async (t) => {
         try {
-          if ((await client.send(t, compose(b))) === 'gone') gone.push(t.token);
+          if ((await client.send(t, compose(b, unread.get(b.userId)))) === 'gone') gone.push(t.token);
           else report.sent++;
         } catch (e) {
           report.failed++;

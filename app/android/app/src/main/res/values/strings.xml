@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="alert_channel_id" translatable="false">alerts</string>
+    <string name="alert_channel_name">알림</string>
+    <string name="alert_channel_description">공감, 새 팔로워, 알림을 켠 사람의 새 생각</string>
+</resources>

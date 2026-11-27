@@ -119,6 +119,60 @@ describe.skipIf(!url)('AuroraPushRepository on Postgres', () => {
     expect((await repo.takeBatches()).filter((b) => b.kind === 'empathy')).toEqual([]);
   });
 
+  it('looks back only a few minutes after a long gap, and says when 공감 span posts', async () => {
+    await repo.saveToken(A, TA, 'ios');
+    for (const t of ['empathies', 'follows', 'posts']) await sql(`UPDATE ${t} SET created_at = created_at - interval '1 hour'`);
+    // As if A signed out a week ago and just came back.
+    await sql(`UPDATE users SET push_checked_at = now() - interval '7 days' WHERE id = $1`, [A]);
+    const post = async (body: string) =>
+      (
+        await sql(
+          `INSERT INTO posts (author_id, body, lang, typing_ms, local_date, created_at) VALUES ($1, $2, 'ko', 60000, current_date, now() - interval '3 days') RETURNING id::text`,
+          [A, body],
+        )
+      ).rows[0].id as string;
+    const [p1, p2, old] = [await post('첫 생각'), await post('둘째 생각'), await post('오래된 생각')];
+    await sql(`INSERT INTO empathies (post_id, user_id, created_at) VALUES ($1, $2, now() - interval '2 days')`, [old, B]);
+    await sql(`INSERT INTO empathies (post_id, user_id, created_at) VALUES ($1, $2, ${ago}), ($3, $4, ${ago})`, [p1, B, p2, C]);
+
+    const [b, ...rest] = (await repo.takeBatches()).filter((x) => x.userId === A);
+    expect(rest).toEqual([]);
+    expect([b!.kind, b!.count, b!.manyPosts]).toEqual(['empathy', 2, true]);
+  });
+
+  it('does not alert twice when a 공감 or follow is undone and done again, and counts unread for the icon', async () => {
+    await repo.saveToken(A, TA, 'ios');
+    for (const t of ['empathies', 'follows', 'posts']) await sql(`UPDATE ${t} SET created_at = created_at - interval '1 hour'`);
+    await sql(`UPDATE users SET notifications_seen_at = now() - interval '2 minutes' WHERE id = $1`, [A]);
+    const p = (
+      await sql(
+        `INSERT INTO posts (author_id, body, lang, typing_ms, local_date, created_at) VALUES ($1, '다시 누른 생각', 'ko', 60000, current_date, now() - interval '1 day') RETURNING id::text`,
+        [A],
+      )
+    ).rows[0].id as string;
+    await sql(`DELETE FROM follows WHERE follower_id = $1 AND followee_id = $2`, [C, A]);
+    await rewind();
+    await sql(`INSERT INTO empathies (post_id, user_id, created_at) VALUES ($1, $2, ${ago})`, [p, C]);
+    await sql(`INSERT INTO follows (follower_id, followee_id, created_at) VALUES ($1, $2, ${ago})`, [C, A]);
+    expect((await repo.takeBatches()).filter((b) => b.userId === A).map((b) => b.kind).sort()).toEqual(['empathy', 'follow']);
+    expect((await repo.unread([A])).get(A)).toBe(2);
+
+    await sql(`DELETE FROM empathies WHERE post_id = $1 AND user_id = $2`, [p, C]);
+    await sql(`DELETE FROM follows WHERE follower_id = $1 AND followee_id = $2`, [C, A]);
+    await rewind();
+    await sql(`INSERT INTO empathies (post_id, user_id, created_at) VALUES ($1, $2, ${ago})`, [p, C]);
+    await sql(`INSERT INTO follows (follower_id, followee_id, created_at) VALUES ($1, $2, ${ago})`, [C, A]);
+    expect((await repo.takeBatches()).filter((b) => b.userId === A)).toEqual([]);
+
+    // A day later the same 공감 is news again.
+    await sql(`UPDATE push_sent SET at = at - interval '2 days'`);
+    await sql(`UPDATE follows SET created_at = created_at - interval '1 hour'`);
+    await sql(`DELETE FROM empathies WHERE post_id = $1 AND user_id = $2`, [p, C]);
+    await rewind();
+    await sql(`INSERT INTO empathies (post_id, user_id, created_at) VALUES ($1, $2, ${ago})`, [p, C]);
+    expect((await repo.takeBatches()).filter((b) => b.userId === A).map((b) => b.kind)).toEqual(['empathy']);
+  });
+
   it('forgets tokens in bulk', async () => {
     await repo.removeTokens([TA, TB]);
     expect((await repo.tokens([A, B])).size).toBe(0);

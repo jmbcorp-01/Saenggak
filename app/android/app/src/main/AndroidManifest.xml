@@ -13,6 +13,9 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/notification_accent" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="@string/alert_channel_id" />
         <!-- Google and Apple sign-in come back to saenggak://auth. -->
         <activity
             android:name="com.linusu.flutter_web_auth_2.CallbackActivity"

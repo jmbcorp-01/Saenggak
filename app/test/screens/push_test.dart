@@ -51,6 +51,11 @@ class FakePush implements PushService {
     return t;
   }
 
+  final badges = <int>[];
+
+  @override
+  Future<void> setBadge(int count) async => badges.add(count);
+
   void tap(PushTap t) => _taps.add(t);
   void refresh(String token) => _refresh.add(token);
 }
@@ -128,6 +133,35 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('아직 알림이 없어요.'), findsOneWidget);
     expect(state.unreadNotifications, 0);
+  });
+
+  testWidgets('the icon number follows the unread count, and clears once read', (tester) async {
+    final push = FakePush(state: PushPermission.granted);
+    final (state, _) = await openHome(tester, push);
+    expect(push.badges.last, state.unreadNotifications);
+    await tester.tap(find.byTooltip('알림').first);
+    await tester.pumpAndSettle();
+    expect(push.badges.last, 0);
+  });
+
+  testWidgets('alerts allowed in the device settings count once the app is back', (tester) async {
+    final push = FakePush(state: PushPermission.denied);
+    final (state, backend) = await openHome(tester, push);
+    expect(backend.pushTokens, isEmpty);
+    push.state = PushPermission.granted;
+    for (final s in [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(s);
+    }
+    await tester.pumpAndSettle();
+    expect(state.pushPermission, PushPermission.granted);
+    expect(backend.pushTokens, {'device-token-ios': 'ios'});
   });
 
   testWidgets('settings turn each kind of alert off', (tester) async {
