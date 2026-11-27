@@ -227,8 +227,15 @@ export class MemoryRepo implements Repository {
     const u = this.users.get(userId);
     return u ? { profile: u, posts: this.posts.filter((p) => p.authorId === userId) } : null;
   }
-  async cachedTranslation(postId: string, lang: string) {
-    return this.translations.get(`${postId}:${lang}`) ?? null;
+  translationLookups = 0;
+  async cachedTranslations(postIds: string[], lang: string) {
+    this.translationLookups++;
+    const found = new Map<string, string>();
+    for (const id of postIds) {
+      const body = this.translations.get(`${id}:${lang}`);
+      if (body !== undefined) found.set(id, body);
+    }
+    return found;
   }
   async saveTranslation(postId: string, lang: string, body: string) {
     this.translations.set(`${postId}:${lang}`, body);

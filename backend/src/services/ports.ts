@@ -234,7 +234,8 @@ export interface Repository {
    */
   setPostAlerts(followerId: string, followeeId: string, on: boolean): Promise<boolean>;
 
-  cachedTranslation(postId: string, lang: string): Promise<string | null>;
+  /** Stored translations into [lang] of any of [postIds], by post id, in one query. */
+  cachedTranslations(postIds: string[], lang: string): Promise<Map<string, string>>;
   saveTranslation(postId: string, lang: string, body: string): Promise<void>;
 
   /** Stores a published post's thought score. */
