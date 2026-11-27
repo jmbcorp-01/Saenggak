@@ -238,42 +238,43 @@ def promo(lang, size, raw):
     return canvas
 
 
-def header(lang, size, feed, compose):
-    """App Store header: everything that matters sits in the middle, since the store crops the sides."""
+def header(lang, size, safe, feed, compose):
+    """App Store header or search art. Text stays inside Apple's safe box (x, y, w, h); phones fill the rest."""
     w, h = size
+    sx, sy, sw, sh_ = safe
     canvas = gradient(size, RED, RED_DARK)
-    unit = h / 100
     d = ImageDraw.Draw(canvas)
-    # Decorative phones near the edges; they may be cropped away.
-    for raw, angle, cx in [(feed, 10, 0.1), (compose, -10, 0.9)]:
-        phone = device(raw, int(h * 0.5), 'iphone').rotate(angle, expand=True, resample=Image.BICUBIC)
-        px, py = int(w * cx - phone.width / 2), int(h * 0.22)
-        sh = Image.new('L', canvas.size, 0)
-        sh.paste(phone.split()[3].point(lambda v: v * 110 // 255), (px, py + int(unit * 3)))
-        canvas.paste((0, 0, 0), (0, 0), sh.filter(ImageFilter.GaussianBlur(unit * 3)))
+    pw = int(min(h * 0.55, (w - sw) / 2 * 0.75))
+    for raw, angle, cx in [(feed, 10, sx / 2), (compose, -10, sx + sw + (w - sx - sw) / 2)]:
+        phone = device(raw, pw, 'iphone').rotate(angle, expand=True, resample=Image.BICUBIC)
+        px, py = int(cx - phone.width / 2), int(h * 0.16)
+        shade = Image.new('L', canvas.size, 0)
+        shade.paste(phone.split()[3].point(lambda v: v * 110 // 255), (px, py + int(h * 0.03)))
+        canvas.paste((0, 0, 0), (0, 0), shade.filter(ImageFilter.GaussianBlur(h * 0.03)))
         canvas.paste(phone, (px, py), phone)
     name, l1, l2 = (
         ('생각', '사람이 직접 쓴 생각만', 'AI 글도, 붙여넣기도 없이')
         if lang == 'ko' else ('Saenggak', 'Only thoughts typed by hand', 'No AI text. No pasting.')
     )
-    safe = w * 0.46 if w / h > 2 else w * 0.5
-    cx = w / 2
-    icon_s = int(unit * 14)
-    icon = Image.open('assets/icon/icon.png').convert('RGBA').resize((icon_s, icon_s), Image.LANCZOS)
-    top = int(h * 0.3)
-    nf = font(BOLD, unit * 9)
-    nw = icon_s + unit * 3 + d.textlength(name, font=nf)
-    x0 = int(cx - nw / 2)
-    canvas.paste(icon, (x0, top), mask_rounded(icon.size, int(icon_s * 0.24)))
-    d.text((x0 + icon_s + unit * 3, top + icon_s / 2), name, font=nf, fill=(255, 255, 255), anchor='lm')
-    f1 = font(BOLD, unit * 10)
-    while d.textlength(l1, font=f1) > safe:
+    cx = sx + sw / 2
+    f1 = font(BOLD, sh_ * 0.2)
+    while d.textlength(l1, font=f1) > sw * 0.96:
         f1 = font(BOLD, f1.size - 2)
-    y = top + icon_s + unit * 6
+    f2 = font(MEDIUM, f1.size * 0.62)
+    icon_s = int(f1.size * 1.5)
+    nf = font(BOLD, f1.size * 1.05)
+    gap = f1.size * 0.55
+    total = icon_s + gap + f1.size * 1.25 + f2.size * 1.3
+    y = sy + (sh_ - total) / 2
+    icon = Image.open('assets/icon/icon.png').convert('RGBA').resize((icon_s, icon_s), Image.LANCZOS)
+    nw = icon_s + f1.size * 0.5 + d.textlength(name, font=nf)
+    x0 = int(cx - nw / 2)
+    canvas.paste(icon, (x0, int(y)), mask_rounded(icon.size, int(icon_s * 0.24)))
+    d.text((x0 + icon_s + f1.size * 0.5, y + icon_s / 2), name, font=nf, fill=(255, 255, 255), anchor='lm')
+    y += icon_s + gap
     d.text((cx, y), l1, font=f1, fill=(255, 255, 255), anchor='mt')
-    d.text((cx, y + f1.size * 1.4), l2, font=font(MEDIUM, f1.size * 0.6), fill=WARM, anchor='mt')
+    d.text((cx, y + f1.size * 1.25), l2, font=f2, fill=WARM, anchor='mt')
     return canvas
-
 
 def main():
     for lang, slides in SLIDES.items():
@@ -291,9 +292,15 @@ def main():
             out.parent.mkdir(parents=True, exist_ok=True)
             promo(lang, size, feed).save(out, optimize=True)
         compose = Image.open(RAW / f'{lang}-iphone-4-result.png').convert('RGB')
-        for size in [(5244, 2950), (3840, 1646)]:
-            out = OUT / 'app-store' / 'header' / f'{lang}-{size[0]}x{size[1]}.png'
-            header(lang, size, feed, compose).save(out, optimize=True)
+        # Apple's safe areas: https://developer.apple.com/app-store/asset-best-practices/
+        for size, safe, fname in [
+            ((5244, 2950), (1921, 660, 1402, 962), 'header-16x9'),
+            ((3840, 1646), (1097, 493, 1646, 661), 'header-21x9'),
+            ((3840, 2560), (836, 765, 2168, 1030), 'search-3x2'),
+        ]:
+            out = OUT / 'app-store' / 'header' / f'{lang}-{fname}-{size[0]}x{size[1]}.png'
+            out.parent.mkdir(parents=True, exist_ok=True)
+            header(lang, size, safe, feed, compose).save(out, optimize=True)
     icon = Image.open('assets/icon/icon.png').convert('RGBA').resize((512, 512), Image.LANCZOS)
     icon.save(OUT / 'google-play' / 'icon-512.png')
 
