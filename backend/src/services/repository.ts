@@ -424,7 +424,11 @@ export class AuroraRepository implements Repository {
 
   async exportData(userId: string): Promise<Record<string, unknown> | null> {
     const profile = await this.query(
-      `SELECT handle, display_name, bio, locale, time_zone, created_at::text FROM users WHERE id = :u::uuid`,
+      `SELECT handle, display_name, bio, locale, time_zone, created_at::text,
+              share_ok, share_anonymous, invite_code,
+              (SELECT row_to_json(x)::text FROM (SELECT code, channel, created_at FROM signup_sources
+                                                 WHERE user_id = users.id) x) AS signup_source
+       FROM users WHERE id = :u::uuid`,
       { u: userId },
     );
     if (profile.length === 0) return null;

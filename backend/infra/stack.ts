@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CfnOutput, Duration, RemovalPolicy, SecretValue, Stack, type StackProps } from 'aws-cdk-lib';
 import * as apigw from 'aws-cdk-lib/aws-apigatewayv2';
+import { HttpNoneAuthorizer } from 'aws-cdk-lib/aws-apigatewayv2';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
@@ -173,7 +174,23 @@ export class SaenggakStack extends Stack {
     // Writing waits on moderation and embedding, so it gets a longer timeout.
     const write = fn('write', 30);
     const api = fn('api', 15);
-    const admin = fn('admin', 15);
+    // Admins can run the promo agent's pick from the page, which drafts captions.
+    const admin = fn('admin', 30);
+    // Sharing consent, invite links, where people came from, the daily question.
+    const growth = fn('growth', 10);
+    // Pages for people not signed in: invite landing, shareable posts, sitemap.
+    const publicPages = fn('public', 10);
+    // The promo agent (src/growth/agent.ts). Posting waits on Meta between steps.
+    const promoAgent = fn('promoAgent', 300);
+    const agentJob = (id: string, schedule: events.Schedule, job: string) =>
+      new events.Rule(this, id, {
+        schedule,
+        targets: [new targets.LambdaFunction(promoAgent, { event: events.RuleTargetInput.fromObject({ job }) })],
+      });
+    agentJob('PromoPick', events.Schedule.cron({ hour: '22', minute: '0' }), 'pick'); // 07:00 in Korea
+    agentJob('PromoPublish', events.Schedule.cron({ minute: '5' }), 'publish'); // every hour
+    agentJob('PromoQuestions', events.Schedule.cron({ weekDay: 'SUN', hour: '21', minute: '0' }), 'questions'); // Mon 06:00 KST
+    agentJob('PromoTokens', events.Schedule.cron({ weekDay: 'SAT', hour: '20', minute: '0' }), 'tokens'); // Sun 05:00 KST
     // Deletes old rate-limit rows, admin logs and resolved reports each day.
     new events.Rule(this, 'DailyCleanup', {
       schedule: events.Schedule.cron({ hour: '18', minute: '30' }), // 03:30 in Korea
@@ -188,14 +205,38 @@ export class SaenggakStack extends Stack {
     );
     // Claude on Bedrock is called through the bedrock-mantle endpoint (SigV4 service "bedrock-mantle").
     // Narrow this to the exact actions and model once the account's Bedrock access is set up.
-    write.addToRolePolicy(new iam.PolicyStatement({ actions: ['bedrock-mantle:*'], resources: ['*'] }));
+    for (const f of [write, admin, promoAgent]) {
+      f.addToRolePolicy(new iam.PolicyStatement({ actions: ['bedrock-mantle:*'], resources: ['*'] }));
+    }
     // The Claude API key, for MODERATION_PROVIDER=anthropic. The deploy creates
     // it with a random placeholder; paste the real key in the Secrets Manager console.
     const claudeKey = new secretsmanager.Secret(this, 'ClaudeApiKey', {
       description: 'Claude API key for the Saenggak content filter (console.anthropic.com)',
     });
-    claudeKey.grantRead(write);
-    write.addEnvironment('ANTHROPIC_KEY_SECRET_ARN', claudeKey.secretArn);
+    // The promo agent drafts captions and questions with the same key.
+    for (const f of [write, admin, promoAgent]) {
+      claudeKey.grantRead(f);
+      f.addEnvironment('ANTHROPIC_KEY_SECRET_ARN', claudeKey.secretArn);
+    }
+    // Saenggak's own Threads and Instagram accounts, for the promo agent. The
+    // deploy creates it with placeholders; paste the real ids and tokens in the
+    // Secrets Manager console (see deploy/PROMO.md). Until then nothing is posted.
+    const socialTokens = new secretsmanager.Secret(this, 'SocialTokens', {
+      description: 'Threads and Instagram ids and long-lived tokens for Saenggak promo posts',
+      generateSecretString: {
+        secretStringTemplate: JSON.stringify({
+          threadsUserId: 'REPLACE',
+          threadsToken: 'REPLACE',
+          instagramUserId: 'REPLACE',
+          instagramToken: 'REPLACE',
+        }),
+        generateStringKey: 'unused',
+      },
+    });
+    socialTokens.grantRead(admin);
+    socialTokens.grantRead(promoAgent);
+    socialTokens.grantWrite(promoAgent);
+    for (const f of [admin, promoAgent]) f.addEnvironment('SOCIAL_TOKENS_SECRET_ARN', socialTokens.secretArn);
     api.addToRolePolicy(new iam.PolicyStatement({ actions: ['translate:TranslateText'], resources: ['*'] }));
     // Searching posts by meaning embeds the search words.
     api.addToRolePolicy(
@@ -235,7 +276,9 @@ export class SaenggakStack extends Stack {
       description: 'Header value CloudFront adds to API requests so the API answers only through the CDN',
       generateSecretString: { excludePunctuation: true, passwordLength: 40 },
     });
-    for (const f of [write, api, admin]) f.addEnvironment('ORIGIN_SECRET', originSecret.secretValue.unsafeUnwrap());
+    for (const f of [write, api, admin, growth, publicPages]) {
+      f.addEnvironment('ORIGIN_SECRET', originSecret.secretValue.unsafeUnwrap());
+    }
 
     const http = new apigw.HttpApi(this, 'Api', {
       defaultAuthorizer: new HttpJwtAuthorizer('Jwt', users.userPoolProviderUrl, {
@@ -257,6 +300,8 @@ export class SaenggakStack extends Stack {
     const writeIntegration = new HttpLambdaIntegration('Write', write);
     const apiIntegration = new HttpLambdaIntegration('ApiFn', api);
     const adminIntegration = new HttpLambdaIntegration('AdminFn', admin);
+    const growthIntegration = new HttpLambdaIntegration('GrowthFn', growth);
+    const publicIntegration = new HttpLambdaIntegration('PublicFn', publicPages);
     const routes: [string, apigw.HttpMethod, HttpLambdaIntegration][] = [
       ['/posts', M.POST, writeIntegration],
       ['/posts/{id}', M.PATCH, writeIntegration],
@@ -298,8 +343,28 @@ export class SaenggakStack extends Stack {
       ['/admin/users/{id}/photo', M.DELETE, adminIntegration],
       ['/admin/reports', M.GET, adminIntegration],
       ['/admin/reports/{id}/resolve', M.POST, adminIntegration],
+      ['/admin/dashboard', M.GET, adminIntegration],
+      ['/admin/audit', M.GET, adminIntegration],
+      ['/admin/promo', M.GET, adminIntegration],
+      ['/admin/promo/run', M.POST, adminIntegration],
+      ['/admin/promo/{id}/decision', M.POST, adminIntegration],
+      ['/admin/promo/{id}/mark', M.POST, adminIntegration],
+      ['/admin/links', M.GET, adminIntegration],
+      ['/admin/links', M.POST, adminIntegration],
+      ['/admin/questions', M.GET, adminIntegration],
+      ['/admin/questions/{day}', M.PUT, adminIntegration],
+      ['/me/sharing', M.GET, growthIntegration],
+      ['/me/sharing', M.PUT, growthIntegration],
+      ['/posts/{id}/sharing', M.PUT, growthIntegration],
+      ['/me/invite', M.GET, growthIntegration],
+      ['/me/source', M.POST, growthIntegration],
+      ['/questions/today', M.GET, growthIntegration],
     ];
     for (const [path, method, integration] of routes) http.addRoutes({ path, methods: [method], integration });
+    // Public pages need no sign-in; the origin header still keeps them behind CloudFront.
+    for (const path of ['/public/i/{code}', '/public/p/{id}', '/public/sitemap-posts.xml']) {
+      http.addRoutes({ path, methods: [M.GET], integration: publicIntegration, authorizer: new HttpNoneAuthorizer() });
+    }
 
     // These limits are shared by every user of the API, so they only guard the
     // account against floods. Per-person limits are the hourly write limit and
@@ -366,11 +431,12 @@ export class SaenggakStack extends Stack {
         "function handler(event) { var r = event.request; r.uri = r.uri.replace(/^\\/api/, '') || '/'; return r; }",
       ),
     });
+    const apiOrigin = new origins.HttpOrigin(`${http.httpApiId}.execute-api.${this.region}.${this.urlSuffix}`, {
+      customHeaders: { 'x-origin-verify': originSecret.secretValue.unsafeUnwrap() },
+    });
     cdn.addBehavior(
       '/api/*',
-      new origins.HttpOrigin(`${http.httpApiId}.execute-api.${this.region}.${this.urlSuffix}`, {
-        customHeaders: { 'x-origin-verify': originSecret.secretValue.unsafeUnwrap() },
-      }),
+      apiOrigin,
       {
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
         allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
@@ -387,6 +453,39 @@ export class SaenggakStack extends Stack {
       },
     );
     const apiUrl = `https://${webHost}/api`;
+    // Invite links (/i/CODE), shareable posts (/p/ID) and their sitemap are
+    // pages at the site's own addresses, made by the public function. The
+    // pages say how long they may be kept: invite pages not at all (each
+    // visit is a click), post pages a minute.
+    const toPublic = new cloudfront.Function(this, 'PublicPagePrefix', {
+      runtime: cloudfront.FunctionRuntime.JS_2_0,
+      code: cloudfront.FunctionCode.fromInline("function handler(event) { var r = event.request; r.uri = '/public' + r.uri; return r; }"),
+    });
+    const publicCache = new cloudfront.CachePolicy(this, 'PublicPageCache', {
+      comment: 'Public pages: kept only as long as the page itself allows',
+      minTtl: Duration.seconds(0),
+      defaultTtl: Duration.seconds(0),
+      maxTtl: Duration.hours(1),
+      enableAcceptEncodingGzip: true,
+      enableAcceptEncodingBrotli: true,
+    });
+    for (const pattern of ['/i/*', '/p/*', '/sitemap-posts.xml']) {
+      cdn.addBehavior(pattern, apiOrigin, {
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: publicCache,
+        originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+        responseHeadersPolicy: cloudfront.ResponseHeadersPolicy.SECURITY_HEADERS,
+        functionAssociations: [{ function: toPublic, eventType: cloudfront.FunctionEventType.VIEWER_REQUEST }],
+      });
+    }
+    for (const f of [growth, publicPages, promoAgent, admin]) f.addEnvironment('SITE_URL', `https://${webHost}`);
+    // Store pages for the invite page's buttons, from GitHub variables once the apps are live.
+    for (const [name, value] of [
+      ['IOS_APP_URL', process.env.IOS_APP_URL],
+      ['ANDROID_APP_URL', process.env.ANDROID_APP_URL || 'https://play.google.com/store/apps/details?id=app.saenggak'],
+    ] as const) {
+      if (value) publicPages.addEnvironment(name, value);
+    }
 
     // Sign-up and sign-in: known bad addresses and bursts from one address are stopped.
     new wafv2.CfnWebACLAssociation(this, 'SignInFirewall', {
@@ -397,6 +496,9 @@ export class SaenggakStack extends Stack {
     photos.grantPut(write);
     photos.grantDelete(write);
     photos.grantDelete(admin);
+    // Approved promo cards are stored next to the photos and served at /photos/promo/*.
+    photos.grantPut(admin);
+    photos.grantDelete(promoAgent);
     photos.grantDelete(api);
     // Account deletion removes the sign-in account as well.
     api.addToRolePolicy(new iam.PolicyStatement({ actions: ['cognito-idp:AdminDeleteUser'], resources: [users.userPoolArn] }));
@@ -407,8 +509,8 @@ export class SaenggakStack extends Stack {
         resources: ['*'],
       }),
     );
-    for (const f of [write, api, admin]) f.addEnvironment('PHOTO_BUCKET', photos.bucketName);
-    for (const f of [write, api, admin]) f.addEnvironment('PHOTO_BASE_URL', `https://${webHost}`);
+    for (const f of [write, api, admin, promoAgent]) f.addEnvironment('PHOTO_BUCKET', photos.bucketName);
+    for (const f of [write, api, admin, promoAgent]) f.addEnvironment('PHOTO_BASE_URL', `https://${webHost}`);
 
     const config = {
       apiUrl,

@@ -42,7 +42,8 @@ export interface PhotoChecker {
 }
 
 export interface PhotoStore {
-  put(key: string, jpeg: Uint8Array): Promise<void>;
+  /** JPEG unless [contentType] says otherwise (promo cards are PNG). */
+  put(key: string, bytes: Uint8Array, contentType?: string): Promise<void>;
   remove(key: string): Promise<void>;
 }
 

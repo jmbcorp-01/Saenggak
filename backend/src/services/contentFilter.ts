@@ -17,7 +17,7 @@ export const MODERATION_PROVIDER = process.env.MODERATION_PROVIDER === 'anthropi
 export const MODERATION_MODEL =
   process.env.MODERATION_MODEL || (MODERATION_PROVIDER === 'anthropic' ? 'claude-haiku-5-5' : 'anthropic.claude-haiku-5-5');
 
-type MessagesClient = Pick<Anthropic, 'messages'>;
+export type MessagesClient = Pick<Anthropic, 'messages'>;
 
 /** The Claude API client, with its key read once per Lambda from Secrets Manager. */
 async function anthropicClient(): Promise<MessagesClient> {
@@ -29,7 +29,8 @@ async function anthropicClient(): Promise<MessagesClient> {
   return new Anthropic({ apiKey, maxRetries: 2, timeout: 20_000 });
 }
 
-function defaultClient(): Promise<MessagesClient> {
+/** The Claude client the moderation route uses; the promo copywriter shares it. */
+export function defaultClient(): Promise<MessagesClient> {
   if (MODERATION_PROVIDER === 'anthropic') return anthropicClient();
   return Promise.resolve(new AnthropicBedrockMantle() as unknown as MessagesClient);
 }

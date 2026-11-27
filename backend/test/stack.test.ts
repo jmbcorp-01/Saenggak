@@ -22,15 +22,34 @@ describe('SaenggakStack', () => {
     });
   });
 
-  it('protects every route with the Cognito JWT authorizer', () => {
-    template.resourceCountIs('AWS::ApiGatewayV2::Route', 39);
-    template.allResourcesProperties('AWS::ApiGatewayV2::Route', { AuthorizationType: 'JWT' });
+  it('protects every route with the Cognito JWT authorizer, except the public pages', () => {
+    template.resourceCountIs('AWS::ApiGatewayV2::Route', 58);
+    const routes = Object.values(template.findResources('AWS::ApiGatewayV2::Route'));
+    const open = routes.filter((r) => r.Properties.AuthorizationType !== 'JWT').map((r) => r.Properties.RouteKey);
+    expect(open.sort()).toEqual(['GET /public/i/{code}', 'GET /public/p/{id}', 'GET /public/sitemap-posts.xml']);
+  });
+
+  it('runs the promo agent on a schedule and serves public pages at the site', () => {
+    template.resourceCountIs('AWS::Events::Rule', 5);
+    template.hasResourceProperties('AWS::Events::Rule', {
+      ScheduleExpression: 'cron(0 22 * * ? *)',
+      Targets: [Match.objectLike({ Input: JSON.stringify({ job: 'pick' }) })],
+    });
+    template.hasResourceProperties('AWS::CloudFront::Distribution', {
+      DistributionConfig: Match.objectLike({
+        CacheBehaviors: Match.arrayWith([
+          Match.objectLike({ PathPattern: '/i/*' }),
+          Match.objectLike({ PathPattern: '/p/*' }),
+          Match.objectLike({ PathPattern: '/sitemap-posts.xml' }),
+        ]),
+      }),
+    });
   });
 
   it('runs the Node 22 Lambdas outside the VPC', () => {
     const fns = template.findResources('AWS::Lambda::Function', { Properties: { Runtime: 'nodejs22.x' } });
-    // write, api, admin, cleanup, migrate and the sign-up check
-    expect(Object.keys(fns)).toHaveLength(6);
+    // write, api, admin, growth, public, promoAgent, cleanup, migrate and the sign-up check
+    expect(Object.keys(fns)).toHaveLength(9);
     for (const f of Object.values(fns)) expect(f.Properties.VpcConfig).toBeUndefined();
   });
 
@@ -121,7 +140,7 @@ describe('SaenggakStack', () => {
     const fns = template.findResources('AWS::Lambda::Function', {
       Properties: { Environment: { Variables: { ORIGIN_SECRET: Match.anyValue() } } },
     });
-    expect(Object.keys(fns)).toHaveLength(3);
+    expect(Object.keys(fns)).toHaveLength(5);
   });
 
   it('guards sign-up and sign-in', () => {

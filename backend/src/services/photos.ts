@@ -67,13 +67,13 @@ export class S3PhotoStore implements PhotoStore {
     private readonly client = new S3Client({}),
   ) {}
 
-  async put(key: string, jpeg: Uint8Array): Promise<void> {
+  async put(key: string, bytes: Uint8Array, contentType = 'image/jpeg'): Promise<void> {
     await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
         Key: key,
-        Body: jpeg,
-        ContentType: 'image/jpeg',
+        Body: bytes,
+        ContentType: contentType,
         // Each photo gets a new key, so it can be cached forever.
         CacheControl: 'public, max-age=31536000, immutable',
       }),
