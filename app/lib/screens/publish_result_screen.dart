@@ -4,6 +4,7 @@ import '../l10n/l10n.dart';
 import '../models/publish_outcome.dart';
 import '../theme/tokens.dart';
 import '../widgets/post_tile.dart';
+import '../widgets/share_card.dart';
 import '../widgets/symbol_mark.dart';
 import 'profile_screen.dart';
 
@@ -17,12 +18,18 @@ class PublishResultScreen extends StatelessWidget {
     required this.body,
     this.edited = false,
     this.daysToFollow = 10,
+    this.authorName,
+    this.inviteUrl,
   });
 
   final Published outcome;
   final String body;
   final bool edited;
   final int daysToFollow;
+
+  /// With both, a button opens the share card for this post.
+  final String? authorName;
+  final Future<String?> Function()? inviteUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -117,6 +124,29 @@ class PublishResultScreen extends StatelessWidget {
               ),
               child: Text(t('피드로')),
             ),
+            if (authorName != null && inviteUrl != null) ...[
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                key: const Key('result-share'),
+                onPressed: () => openShareCard(
+                  context,
+                  body: body,
+                  typingTime: outcome.typingTime,
+                  authorName: authorName!,
+                  inviteUrl: inviteUrl!(),
+                  similarPeople: outcome.showSimilar ? outcome.similarPeople : 0,
+                  lang: AppLang.instance.value,
+                ),
+                icon: const Icon(Icons.ios_share, size: 18),
+                label: Text(t('공유 카드 만들기')),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: SgColors.ink,
+                  side: BorderSide(color: SgColors.line),
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                ),
+              ),
+            ],
           ],
         ),
       ),

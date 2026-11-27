@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { adminHandler, isAdmin } from '../src/handlers/admin.js';
 import type { Event } from '../src/handlers/http.js';
 import type { AdminRepository, ReviewDecision } from '../src/services/ports.js';
+import type { GrowthAdmin } from '../src/services/growthPorts.js';
 
 const ADMIN = '11111111-1111-4111-8111-111111111111';
 const USER = '22222222-2222-4222-8222-222222222222';
@@ -40,7 +41,13 @@ function setup() {
     openReports: async () => [],
     resolveReport: async (id: string) => (log.push(`resolve ${id}`), id === '7'),
   };
-  const handler = adminHandler({ admin, photoStore: { put: async () => {}, remove: async (k) => void removed.push(k) } });
+  const handler = adminHandler({
+    admin,
+    photoStore: { put: async () => {}, remove: async (k) => void removed.push(k) },
+    growth: {} as GrowthAdmin,
+    pickNow: async () => 0,
+    channels: async () => [],
+  });
   return { handler, log, removed };
 }
 

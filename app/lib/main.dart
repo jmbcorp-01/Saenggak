@@ -9,6 +9,7 @@ import 'api/demo_backend.dart';
 import 'api/http_backend.dart';
 import 'api/token_store.dart';
 import 'core/appearance.dart';
+import 'core/links.dart';
 import 'data/app_state.dart';
 import 'l10n/l10n.dart';
 import 'screens/auth_screen.dart';
@@ -66,6 +67,7 @@ class _SaenggakAppState extends State<SaenggakApp> with WidgetsBindingObserver {
     Appearance.instance.addListener(_applyPalette);
     AppLang.instance.addListener(_rebuildAll);
     SgColors.use(_palette());
+    state.pendingCode ??= linkedCode();
   }
 
   @override

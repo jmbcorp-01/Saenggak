@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /i/
+
+Sitemap: https://saenggak.app/sitemap-posts.xml

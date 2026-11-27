@@ -22,6 +22,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   late final _name = TextEditingController(text: widget.state.me?.displayName ?? '');
   late final _handle = TextEditingController(text: widget.state.me?.handle ?? '');
   late final _bio = TextEditingController(text: widget.state.me?.bio ?? '');
+
+  /// Only on a new profile: the code of whoever or whatever brought them.
+  late final _code = TextEditingController(text: widget.state.pendingCode ?? '');
   bool _busy = false;
   String? _error;
 
@@ -32,6 +35,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     _name.dispose();
     _handle.dispose();
     _bio.dispose();
+    _code.dispose();
     super.dispose();
   }
 
@@ -52,6 +56,18 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     });
     try {
       await widget.state.saveProfile(handle: handle, displayName: name, bio: _bio.text.trim());
+      final code = _code.text.trim();
+      if (widget.firstTime && code.isNotEmpty) {
+        try {
+          await widget.state.recordSource(code);
+        } on ApiException catch (e) {
+          if (e.code == 'unknown_code') {
+            setState(() => _error = t('없는 초대 코드예요. 다시 확인하거나 비워 두세요.'));
+            return;
+          }
+          // Anything else is not worth holding the new person back for.
+        } catch (_) {}
+      }
       widget.onDone();
     } on ApiException catch (e) {
       setState(
@@ -120,6 +136,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             minLines: 1,
             decoration: InputDecoration(labelText: t('소개 (선택)')),
           ),
+          if (widget.firstTime)
+            TextField(
+              key: const Key('invite-code'),
+              controller: _code,
+              maxLength: 32,
+              autocorrect: false,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(labelText: t('초대 코드 (선택)'), helperText: t('초대받았다면 받은 코드를 넣어 주세요.')),
+            ),
           if (_error != null) Text(_error!, style: TextStyle(fontSize: 14, color: SgColors.accentText)),
         ],
       ),

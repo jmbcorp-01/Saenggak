@@ -137,6 +137,8 @@ class PostTile extends StatefulWidget {
     this.onBlock,
     this.onBookmark,
     this.onCopyLink,
+    this.onShareCard,
+    this.onShareExclude,
   });
 
   final Post post;
@@ -163,6 +165,13 @@ class PostTile extends StatefulWidget {
   final VoidCallback? onBookmark;
   final VoidCallback? onCopyLink;
 
+  /// Shown on the reader's own posts: a card of the post to share elsewhere.
+  final VoidCallback? onShareCard;
+
+  /// Shown on the reader's own posts while they let Saenggak's accounts show
+  /// their writing: keeps this one out, or lets it back in.
+  final VoidCallback? onShareExclude;
+
   @override
   State<PostTile> createState() => _PostTileState();
 }
@@ -177,6 +186,9 @@ class _PostTileState extends State<PostTile> {
     return [
       if (widget.onBookmark != null) (value: 'bookmark', label: post.bookmarked ? t('저장 취소') : t('저장'), danger: false),
       if (widget.onCopyLink != null) (value: 'link', label: t('링크 복사'), danger: false),
+      if (post.isMine && widget.onShareCard != null) (value: 'card', label: t('공유 카드 만들기'), danger: false),
+      if (post.isMine && widget.onShareExclude != null)
+        (value: 'exclude', label: post.shareExcluded ? t('생각 공식 계정 소개 다시 허용') : t('생각 공식 계정 소개에서 빼기'), danger: false),
       if (!post.isMine && widget.onReport != null) (value: 'report', label: t('신고'), danger: false),
       if (!post.isMine && widget.onBlock != null)
         (value: 'block', label: t('@{0} 차단', [post.authorHandle]), danger: false),
@@ -193,6 +205,8 @@ class _PostTileState extends State<PostTile> {
     'block' => widget.onBlock!(),
     'bookmark' => widget.onBookmark!(),
     'link' => widget.onCopyLink!(),
+    'card' => widget.onShareCard!(),
+    'exclude' => widget.onShareExclude!(),
     _ => widget.onAdminRemove!(),
   };
 

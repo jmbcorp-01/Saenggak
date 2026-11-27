@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../core/typing_session.dart';
 import '../models/admin.dart';
+import '../models/growth.dart';
 import '../models/post.dart';
 import '../models/profile.dart';
 import '../models/publish_outcome.dart';
@@ -284,4 +285,109 @@ class HttpBackend implements Backend {
   @override
   Future<void> setPostAlerts(String userId, bool on) async =>
       _ok(await _send(on ? 'PUT' : 'DELETE', 'users/$userId/alerts'));
+
+  @override
+  Future<SharingSettings> sharing() async => SharingSettings.fromJson(_ok(await _send('GET', 'me/sharing')));
+
+  @override
+  Future<SharingSettings> setSharing({required bool shareOk, required bool anonymous}) async =>
+      SharingSettings.fromJson(
+        _ok(await _send('PUT', 'me/sharing', body: {'shareOk': shareOk, 'anonymous': anonymous})),
+      );
+
+  @override
+  Future<void> setPostSharing(String postId, {required bool excluded}) async =>
+      _ok(await _send('PUT', 'posts/$postId/sharing', body: {'excluded': excluded}));
+
+  @override
+  Future<Invite> invite() async => Invite.fromJson(_ok(await _send('GET', 'me/invite')));
+
+  @override
+  Future<void> recordSource(String code) async => _ok(await _send('POST', 'me/source', body: {'code': code}));
+
+  @override
+  Future<DailyQuestion?> todayQuestion() async {
+    final q = _ok(await _send('GET', 'questions/today'))['question'] as Map<String, dynamic>?;
+    return q == null ? null : DailyQuestion(ko: q['ko'] as String, en: q['en'] as String);
+  }
+
+  @override
+  Future<Dashboard> adminDashboard({int days = 30}) async =>
+      Dashboard.fromJson(_ok(await _send('GET', 'admin/dashboard', query: {'days': '$days'})));
+
+  @override
+  Future<List<AuditEntry>> adminAudit({DateTime? before}) async =>
+      (_ok(
+                await _send(
+                  'GET',
+                  'admin/audit',
+                  query: before == null ? null : {'before': before.toUtc().toIso8601String()},
+                ),
+              )['items']
+              as List)
+          .cast<Map<String, dynamic>>()
+          .map(AuditEntry.fromJson)
+          .toList();
+
+  @override
+  Future<PromoPage> promoItems(String tab) async {
+    final j = _ok(await _send('GET', 'admin/promo', query: {'tab': tab}));
+    return PromoPage(
+      (j['items'] as List).cast<Map<String, dynamic>>().map(PromoItem.fromJson).toList(),
+      (j['channels'] as List? ?? const []).cast<String>(),
+    );
+  }
+
+  @override
+  Future<int> runPromoPick() async => (_ok(await _send('POST', 'admin/promo/run'))['added'] as num).toInt();
+
+  @override
+  Future<void> decidePromo(
+    String itemId, {
+    required bool approve,
+    String? caption,
+    Uint8List? png,
+    DateTime? at,
+  }) async => _ok(
+    await _send(
+      'POST',
+      'admin/promo/$itemId/decision',
+      body: {
+        'approve': approve,
+        'caption': ?caption,
+        if (png != null) 'png': base64Encode(png),
+        if (at != null) 'scheduledFor': at.toUtc().toIso8601String(),
+      },
+    ),
+  );
+
+  @override
+  Future<void> markPromo(String itemId, String status) async =>
+      _ok(await _send('POST', 'admin/promo/$itemId/mark', body: {'status': status}));
+
+  @override
+  Future<List<LinkStat>> linkStats() async => (_ok(await _send('GET', 'admin/links'))['items'] as List)
+      .cast<Map<String, dynamic>>()
+      .map(LinkStat.fromJson)
+      .toList();
+
+  @override
+  Future<void> createLink({required String code, required String channel, String label = ''}) async =>
+      _ok(await _send('POST', 'admin/links', body: {'code': code, 'channel': channel, 'label': label}));
+
+  @override
+  Future<List<AdminQuestion>> adminQuestions() async => (_ok(await _send('GET', 'admin/questions'))['items'] as List)
+      .cast<Map<String, dynamic>>()
+      .map(AdminQuestion.fromJson)
+      .toList();
+
+  @override
+  Future<AdminQuestion> saveQuestion(
+    String day, {
+    required String textKo,
+    required String textEn,
+    required bool approve,
+  }) async => AdminQuestion.fromJson(
+    _ok(await _send('PUT', 'admin/questions/$day', body: {'textKo': textKo, 'textEn': textEn, 'approve': approve})),
+  );
 }

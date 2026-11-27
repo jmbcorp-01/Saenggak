@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import '../core/weighted_length.dart';
 import '../core/typing_session.dart';
 import '../models/admin.dart';
+import '../models/growth.dart';
 import '../models/post.dart';
 import '../models/profile.dart';
 import '../models/publish_outcome.dart';
@@ -428,6 +429,202 @@ class DemoBackend implements Backend {
   Future<void> passHumanCheck(String text, TypingSession session) async {
     if (text.trim() != demoCheckPhrase || session.events.isEmpty) throw const ApiException(400, 'not_human');
     wantsHumanCheck = false;
+  }
+
+  // ---- Growth: sharing, invites, the daily question and the admin side ----
+
+  SharingSettings _sharing = const SharingSettings();
+  final Set<String> excludedPosts = {};
+  String? recordedSource;
+  final Map<String, PromoItem> _promo = {};
+  final Map<String, AdminQuestion> _questions = {};
+  final List<LinkStat> _links = [
+    const LinkStat(code: '*', channel: 'invite', clicks: 42, signups: 9, active7: 6),
+    const LinkStat(code: 'disquiet', channel: 'community', label: '디스콰이엇 런칭', clicks: 120, signups: 14, active7: 8),
+  ];
+  final List<AuditEntry> _audit = [];
+
+  /// Today's question in the demo, or none.
+  DailyQuestion? question = const DailyQuestion(
+    ko: '오늘 가장 오래 생각한 사람은 누구인가요?',
+    en: 'Who did you think about most today?',
+  );
+
+  void _log(String action, String target) => _audit.insert(
+    0,
+    AuditEntry(id: '${_audit.length}', adminHandle: _me.handle, action: action, targetId: target, at: _clock()),
+  );
+
+  @override
+  Future<SharingSettings> sharing() async => _sharing;
+
+  @override
+  Future<SharingSettings> setSharing({required bool shareOk, required bool anonymous}) async =>
+      _sharing = SharingSettings(shareOk: shareOk, anonymous: anonymous);
+
+  @override
+  Future<void> setPostSharing(String postId, {required bool excluded}) async {
+    final i = _posts.indexWhere((p) => p.id == postId && p.authorId == _me.id);
+    if (i < 0) throw const ApiException(404, 'not_found');
+    excluded ? excludedPosts.add(postId) : excludedPosts.remove(postId);
+    _posts[i] = _posts[i].copyWith(shareExcluded: excluded);
+  }
+
+  @override
+  Future<Invite> invite() async => const Invite(code: 'SAENG2K7', url: 'https://saenggak.app/i/SAENG2K7');
+
+  @override
+  Future<void> recordSource(String code) async {
+    if (code.toUpperCase() != 'SAENG2K7' && code.toLowerCase() != 'disquiet') {
+      throw const ApiException(404, 'unknown_code');
+    }
+    recordedSource = code;
+  }
+
+  @override
+  Future<DailyQuestion?> todayQuestion() async => question;
+
+  @override
+  Future<Dashboard> adminDashboard({int days = 30}) async {
+    final today = _clock();
+    return Dashboard(
+      days: [
+        for (var i = days - 1; i >= 0; i--)
+          DashboardDay(
+            day: localDateOf(today.subtract(Duration(days: i))),
+            signups: 3 + (i * 7) % 11,
+            posts: 8 + (i * 5) % 17,
+            empathies: 20 + (i * 13) % 31,
+            activePeople: 10 + (i * 3) % 9,
+          ),
+      ],
+      d1: const Retention(rate: 0.46, cohort: 210),
+      d7: const Retention(rate: 0.27, cohort: 160),
+      d30: const Retention(rate: 0.14, cohort: 60),
+      sources: const [
+        SourceStat(channel: 'direct', signups: 140, active7: 31),
+        SourceStat(channel: 'promo', signups: 22, active7: 9),
+        SourceStat(channel: 'community', signups: 14, active7: 8),
+        SourceStat(channel: 'invite', signups: 9, active7: 6),
+      ],
+    );
+  }
+
+  @override
+  Future<List<AuditEntry>> adminAudit({DateTime? before}) async => List.of(_audit);
+
+  void _seedPromo() {
+    if (_promo.isNotEmpty) return;
+    for (final p in _posts.where((p) => p.authorId != _me.id).take(3)) {
+      final id = 'promo-${p.id}';
+      _promo[id] = PromoItem(
+        id: id,
+        status: 'pending',
+        caption: p.lang == 'ko'
+            ? '오늘 생각에서 많은 공감을 받은 생각입니다. 당신의 생각도 직접 써 보세요. #생각 #오늘의생각'
+            : 'One of today’s most felt thoughts on Saenggak. Write your own, by hand. #saenggak',
+        linkCode: 'p-${p.id}',
+        post: PromoPost(
+          body: p.body,
+          lang: p.lang,
+          authorHandle: p.authorHandle,
+          authorName: p.authorName,
+          empathyCount: p.empathyCount,
+          typingMs: p.typingTime.inMilliseconds,
+        ),
+      );
+    }
+  }
+
+  static const _tabs = {
+    'pending': ['pending'],
+    'scheduled': ['approved', 'failed', 'takedown'],
+    'done': ['posted', 'skipped', 'withdrawn'],
+  };
+
+  @override
+  Future<PromoPage> promoItems(String tab) async {
+    _seedPromo();
+    final statuses = _tabs[tab] ?? const ['pending'];
+    return PromoPage(_promo.values.where((i) => statuses.contains(i.status)).toList(), const []);
+  }
+
+  @override
+  Future<int> runPromoPick() async {
+    final before = _promo.length;
+    _seedPromo();
+    return _promo.length - before;
+  }
+
+  /// The last card image an admin approved, for tests.
+  Uint8List? lastCard;
+
+  @override
+  Future<void> decidePromo(
+    String itemId, {
+    required bool approve,
+    String? caption,
+    Uint8List? png,
+    DateTime? at,
+  }) async {
+    final i = _promo[itemId];
+    if (i == null) throw const ApiException(404, 'not_found');
+    if (png != null) lastCard = png;
+    _promo[itemId] = PromoItem(
+      id: i.id,
+      status: approve ? 'approved' : 'skipped',
+      caption: caption ?? i.caption,
+      linkCode: i.linkCode,
+      post: i.post,
+      scheduledFor: approve ? (at ?? _clock().add(const Duration(hours: 3))) : null,
+    );
+    _log(approve ? 'promo_approve' : 'promo_skip', itemId);
+  }
+
+  @override
+  Future<void> markPromo(String itemId, String status) async {
+    final i = _promo[itemId];
+    if (i == null) throw const ApiException(404, 'not_found');
+    _promo[itemId] = PromoItem(id: i.id, status: status, caption: i.caption, linkCode: i.linkCode, post: i.post);
+    _log('promo_$status', itemId);
+  }
+
+  @override
+  Future<List<LinkStat>> linkStats() async => List.of(_links);
+
+  @override
+  Future<void> createLink({required String code, required String channel, String label = ''}) async {
+    if (_links.any((l) => l.code == code)) throw const ApiException(409, 'taken');
+    _links.add(LinkStat(code: code, channel: channel, label: label));
+    _log('link_code', code);
+  }
+
+  @override
+  Future<List<AdminQuestion>> adminQuestions() async {
+    if (_questions.isEmpty) {
+      final today = _clock();
+      const drafts = [
+        ('요즘 자주 듣는 노래에 담긴 기억은?', 'What memory lives in a song you play a lot lately?'),
+        ('어릴 때 살던 동네에서 가장 먼저 떠오르는 곳은?', 'What place comes first to mind from where you grew up?'),
+        ('오늘 누군가에게 고마웠던 순간은?', 'When were you grateful to someone today?'),
+      ];
+      for (var i = 0; i < drafts.length; i++) {
+        final day = localDateOf(today.add(Duration(days: i + 1)));
+        _questions[day] = AdminQuestion(day: day, textKo: drafts[i].$1, textEn: drafts[i].$2, approved: i == 0);
+      }
+    }
+    return _questions.values.toList()..sort((a, b) => a.day.compareTo(b.day));
+  }
+
+  @override
+  Future<AdminQuestion> saveQuestion(
+    String day, {
+    required String textKo,
+    required String textEn,
+    required bool approve,
+  }) async {
+    _log(approve ? 'question_approved' : 'question_draft', day);
+    return _questions[day] = AdminQuestion(day: day, textKo: textKo, textEn: textEn, approved: approve);
   }
 }
 
