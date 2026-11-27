@@ -15,6 +15,8 @@ export interface PushBatch {
   actorName: string;
   postId: string | null;
   excerpt: string | null;
+  /** The events are about more than one post, so a tap opens the list. */
+  manyPosts?: boolean;
 }
 
 export interface PushMessage {
@@ -40,8 +42,8 @@ export function compose(b: PushBatch): PushMessage {
         title: ko
           ? others > 0 ? `${name}님 외 ${others}명이 공감했어요` : `${name}님이 공감했어요`
           : others > 0 ? `${name} and ${others} ${others === 1 ? 'other' : 'others'} related` : `${name} related`,
-        body: excerpt,
-        data: { kind: 'empathy', ...(b.postId ? { postId: b.postId } : {}) },
+        body: b.manyPosts ? (ko ? '여러 생각에 공감이 모였어요.' : 'Across several of your thoughts.') : excerpt,
+        data: { kind: 'empathy', ...(b.postId && !b.manyPosts ? { postId: b.postId } : {}) },
       };
     case 'follow':
       return {

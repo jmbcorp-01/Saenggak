@@ -45,6 +45,12 @@ describe('push messages', () => {
     expect(compose(batch({ lang: 'en', count: 2 })).title).toBe('하루 and 1 other related');
   });
 
+  it('opens the list when 공감 came to several posts', () => {
+    const m = compose(batch({ kind: 'empathy', count: 3, manyPosts: true }));
+    expect(m.body).toBe('여러 생각에 공감이 모였어요.');
+    expect(m.data).toEqual({ kind: 'empathy' });
+  });
+
   it('opens the follower for one follow, and the list for many', () => {
     expect(compose(batch({ kind: 'follow', postId: null })).data).toEqual({ kind: 'follow', userId: 'actor' });
     expect(compose(batch({ kind: 'follow', postId: null, count: 3 })).data).toEqual({ kind: 'follow' });

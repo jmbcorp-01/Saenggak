@@ -25,6 +25,13 @@ export interface PushRepository {
  */
 const SETTLE = `interval '5 seconds'`;
 
+/**
+ * How far back the first run for a device looks. Someone who signs in again
+ * after a week, or turns alerts on for the first time, gets what happened in
+ * the last few minutes, not a pile of old events.
+ */
+const LOOKBACK = `interval '10 minutes'`;
+
 export class AuroraPushRepository extends AuroraRepository implements PushRepository, PushStore {
   async saveToken(userId: string, token: string, platform: Platform): Promise<boolean> {
     const rows = await this.query(
@@ -59,7 +66,7 @@ export class AuroraPushRepository extends AuroraRepository implements PushReposi
   async takeBatches(): Promise<PushBatch[]> {
     const rows = await this.query(
       `WITH due AS (
-         SELECT u.id, u.locale, u.push_checked_at AS since, now() - ${SETTLE} AS upto,
+         SELECT u.id, u.locale, greatest(u.push_checked_at, now() - ${LOOKBACK}) AS since, now() - ${SETTLE} AS upto,
                 u.push_empathy, u.push_follow, u.push_posts
          FROM users u
          WHERE u.suspended_at IS NULL AND EXISTS (SELECT 1 FROM push_tokens t WHERE t.user_id = u.id)
@@ -87,7 +94,8 @@ export class AuroraPushRepository extends AuroraRepository implements PushReposi
            JOIN users au ON au.id = p.author_id AND au.suspended_at IS NULL
          WHERE d.push_posts
        ), latest AS (
-         SELECT ev.*, count(*) OVER w AS n, row_number() OVER (w ORDER BY ev.created_at DESC) AS rn
+         SELECT ev.*, count(*) OVER w AS n, row_number() OVER (w ORDER BY ev.created_at DESC) AS rn,
+                min(ev.post_id::text) OVER w IS DISTINCT FROM max(ev.post_id::text) OVER w AS many_posts
          FROM ev
          WHERE NOT EXISTS (SELECT 1 FROM blocks b
            WHERE (b.blocker_id = ev.recipient AND b.blocked_id = ev.actor)
@@ -95,7 +103,7 @@ export class AuroraPushRepository extends AuroraRepository implements PushReposi
          WINDOW w AS (PARTITION BY ev.recipient, ev.kind)
        )
        SELECT l.recipient::text AS user_id, d.locale, l.kind, l.n, l.actor::text AS actor_id,
-              a.display_name, l.post_id::text, l.excerpt
+              a.display_name, l.post_id::text, l.excerpt, l.many_posts
        FROM latest l JOIN due d ON d.id = l.recipient JOIN users a ON a.id = l.actor
        WHERE l.rn = 1`,
     );
@@ -108,6 +116,7 @@ export class AuroraPushRepository extends AuroraRepository implements PushReposi
       actorName: r.display_name as string,
       postId: (r.post_id as string | null) ?? null,
       excerpt: (r.excerpt as string | null) ?? null,
+      manyPosts: !!r.many_posts,
     }));
   }
 

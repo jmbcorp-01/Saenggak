@@ -134,7 +134,11 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState s) {
-    if (s == AppLifecycleState.resumed) state.checkForNew();
+    if (s != AppLifecycleState.resumed) return;
+    state.checkForNew();
+    // Alerts allowed in the device settings while the app was away take
+    // effect on return, not only on the next launch.
+    if (state.pushPermission == PushPermission.denied) state.startPush();
   }
 
   void _select(int i) {
