@@ -238,6 +238,43 @@ def promo(lang, size, raw):
     return canvas
 
 
+def header(lang, size, feed, compose):
+    """App Store header: everything that matters sits in the middle, since the store crops the sides."""
+    w, h = size
+    canvas = gradient(size, RED, RED_DARK)
+    unit = h / 100
+    d = ImageDraw.Draw(canvas)
+    # Decorative phones near the edges; they may be cropped away.
+    for raw, angle, cx in [(feed, 10, 0.1), (compose, -10, 0.9)]:
+        phone = device(raw, int(h * 0.5), 'iphone').rotate(angle, expand=True, resample=Image.BICUBIC)
+        px, py = int(w * cx - phone.width / 2), int(h * 0.22)
+        sh = Image.new('L', canvas.size, 0)
+        sh.paste(phone.split()[3].point(lambda v: v * 110 // 255), (px, py + int(unit * 3)))
+        canvas.paste((0, 0, 0), (0, 0), sh.filter(ImageFilter.GaussianBlur(unit * 3)))
+        canvas.paste(phone, (px, py), phone)
+    name, l1, l2 = (
+        ('생각', '사람이 직접 쓴 생각만', 'AI 글도, 붙여넣기도 없이')
+        if lang == 'ko' else ('Saenggak', 'Only thoughts typed by hand', 'No AI text. No pasting.')
+    )
+    safe = w * 0.46 if w / h > 2 else w * 0.5
+    cx = w / 2
+    icon_s = int(unit * 14)
+    icon = Image.open('assets/icon/icon.png').convert('RGBA').resize((icon_s, icon_s), Image.LANCZOS)
+    top = int(h * 0.3)
+    nf = font(BOLD, unit * 9)
+    nw = icon_s + unit * 3 + d.textlength(name, font=nf)
+    x0 = int(cx - nw / 2)
+    canvas.paste(icon, (x0, top), mask_rounded(icon.size, int(icon_s * 0.24)))
+    d.text((x0 + icon_s + unit * 3, top + icon_s / 2), name, font=nf, fill=(255, 255, 255), anchor='lm')
+    f1 = font(BOLD, unit * 10)
+    while d.textlength(l1, font=f1) > safe:
+        f1 = font(BOLD, f1.size - 2)
+    y = top + icon_s + unit * 6
+    d.text((cx, y), l1, font=f1, fill=(255, 255, 255), anchor='mt')
+    d.text((cx, y + f1.size * 1.4), l2, font=font(MEDIUM, f1.size * 0.6), fill=WARM, anchor='mt')
+    return canvas
+
+
 def main():
     for lang, slides in SLIDES.items():
         for dev, (folder, size, kind) in DEVICES.items():
@@ -249,12 +286,14 @@ def main():
         feed = Image.open(RAW / f'{lang}-iphone-2-feed.png').convert('RGB')
         for folder, size, fname in [
             ('google-play/feature-graphic', (1024, 500), f'{lang}.png'),
-            ('app-store/header', (5244, 2950), f'{lang}-5244x2950.png'),
-            ('app-store/header', (3840, 1646), f'{lang}-3840x1646.png'),
         ]:
             out = OUT / folder / fname
             out.parent.mkdir(parents=True, exist_ok=True)
             promo(lang, size, feed).save(out, optimize=True)
+        compose = Image.open(RAW / f'{lang}-iphone-4-result.png').convert('RGB')
+        for size in [(5244, 2950), (3840, 1646)]:
+            out = OUT / 'app-store' / 'header' / f'{lang}-{size[0]}x{size[1]}.png'
+            header(lang, size, feed, compose).save(out, optimize=True)
     icon = Image.open('assets/icon/icon.png').convert('RGBA').resize((512, 512), Image.LANCZOS)
     icon.save(OUT / 'google-play' / 'icon-512.png')
 
