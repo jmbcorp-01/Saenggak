@@ -162,10 +162,16 @@ class CognitoAuth {
 
   /// Signs in again with the refresh token saved last time, so people stay
   /// signed in across restarts. False when there is none or it no longer works.
+  ///
+  /// An access token saved with more than [_reuseMargin] left is used as is,
+  /// with no trip to Cognito: from Korea a new connection to us-east-1 costs
+  /// about half a second before the first screen. Should the server turn it
+  /// down, the next request refreshes it.
   Future<bool> restore() async {
     final saved = await _store.read();
     if (saved == null) return false;
     _refreshToken = saved;
+    if (await _reuseSavedAccess()) return true;
     try {
       await refresh();
       return true;
@@ -175,6 +181,26 @@ class CognitoAuth {
     } catch (_) {
       // Offline: keep the saved token for next time, but start signed out.
       _refreshToken = null;
+      return false;
+    }
+  }
+
+  static const _reuseMargin = Duration(minutes: 5);
+
+  Future<bool> _reuseSavedAccess() async {
+    final saved = await _store.readAccess();
+    if (saved == null) return false;
+    try {
+      final j = jsonDecode(saved) as Map<String, dynamic>;
+      final token = j['token'] as String;
+      final expiresAt = DateTime.fromMillisecondsSinceEpoch((j['expiresAt'] as num).toInt());
+      if (_clock().isAfter(expiresAt.subtract(_reuseMargin))) return false;
+      final user = jwtSubject(token);
+      _accessToken = token;
+      _expiresAt = expiresAt;
+      _userId = user;
+      return true;
+    } catch (_) {
       return false;
     }
   }
@@ -238,6 +264,7 @@ class CognitoAuth {
     _userId = jwtSubject(_accessToken!);
     final refresh = _refreshToken;
     if (refresh != null && result['RefreshToken'] != null) _store.write(refresh);
+    _store.writeAccess(jsonEncode({'token': _accessToken, 'expiresAt': _expiresAt!.millisecondsSinceEpoch}));
   }
 }
 

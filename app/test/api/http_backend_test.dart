@@ -78,8 +78,37 @@ void main() {
 
     await next.signOut();
     expect(store.token, isNull);
+    expect(store.access, isNull);
     expect(next.signedIn, isFalse);
     expect(await CognitoAuth(config, client: client, store: store).restore(), isFalse);
+  });
+
+  test('a launch within the access token\'s hour asks Cognito nothing', () async {
+    final store = MemoryTokenStore();
+    final client = MockClient((req) async => cognito.handle(req));
+    var now = DateTime(2026, 11, 27, 9);
+    await CognitoAuth(config, client: client, store: store, clock: () => now).signIn('a@b.c', 'secret-password');
+    final before = cognito.refreshes;
+
+    now = now.add(const Duration(minutes: 30));
+    final next = CognitoAuth(config, client: client, store: store, clock: () => now);
+    expect(await next.restore(), isTrue);
+    expect(next.userId, 'user-1');
+    expect(cognito.refreshes, before);
+
+    // Too close to expiry: refreshed as before.
+    now = now.add(const Duration(minutes: 27));
+    expect(await CognitoAuth(config, client: client, store: store, clock: () => now).restore(), isTrue);
+    expect(cognito.refreshes, before + 1);
+  });
+
+  test('a saved access token that cannot be read falls back to a refresh', () async {
+    final store = MemoryTokenStore()
+      ..token = 'r'
+      ..access = 'not json';
+    final client = MockClient((req) async => cognito.handle(req));
+    expect(await CognitoAuth(config, client: client, store: store).restore(), isTrue);
+    expect(cognito.refreshes, 1);
   });
 
   test('a refresh token Cognito no longer accepts is forgotten', () async {

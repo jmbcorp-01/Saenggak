@@ -114,9 +114,9 @@ class _SaenggakAppState extends State<SaenggakApp> with WidgetsBindingObserver {
 
   /// After sign-in: create the profile if this is a new account, then home.
   Future<void> _enter(NavigatorState nav) async {
-    // Home opens as soon as the profile is known; the timeline fills in there.
-    await state.loadMe();
-    if (state.me != null) unawaited(state.loadLists());
+    // Home opens as soon as the profile is known; the timeline, asked for
+    // at the same time, fills in there.
+    await state.loadHome();
     if (state.me == null) {
       await nav.pushAndRemoveUntil(
         MaterialPageRoute<void>(

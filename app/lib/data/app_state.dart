@@ -85,9 +85,71 @@ class AppState extends ChangeNotifier {
   bool get hasMore => _feedNext != null;
 
   /// Loads the profile and the first page of each list.
-  Future<void> start() async {
+  Future<void> start() => loadHome(waitForLists: true);
+
+  /// Asks for the profile and the first page of each list at the same time,
+  /// instead of the lists after the profile: far from the server each wait
+  /// is a long round trip. Returns once the profile is known, so home can
+  /// open with placeholder rows; with [waitForLists], once the lists are in.
+  Future<void> loadHome({bool waitForLists = false}) async {
+    final asked = lang;
+    loading = true;
+    final early = _firstPages(asked);
     await loadMe();
-    await loadLists();
+    final shown = _showFirstPages(early, asked);
+    if (waitForLists) {
+      await shown;
+    } else {
+      unawaited(shown);
+    }
+  }
+
+  /// The first page of each list for the signed-in reader, or null if any
+  /// failed. The 팔로잉 page is asked for before it is known to be unlocked,
+  /// and dropped if it is not.
+  Future<_FirstPages?> _firstPages(String lang) async {
+    try {
+      final id = backend.myId;
+      final r = await Future.wait<Object>([
+        backend.feed(lang: lang),
+        backend.feed(lang: lang, following: true),
+        backend.feed(lang: lang, authorId: id),
+        backend.notifications(),
+      ]);
+      return (
+        feed: r[0] as FeedPage,
+        following: r[1] as FeedPage,
+        mine: r[2] as FeedPage,
+        notes: r[3] as NotificationsPage,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _showFirstPages(Future<_FirstPages?> early, String asked) async {
+    final pages = await early;
+    if (me == null) {
+      loading = false;
+      notifyListeners();
+      return;
+    }
+    // The account's language differs from this device's, or a list failed:
+    // ask again the usual way.
+    if (pages == null || lang != asked) return loadLists();
+    final before = {for (final p in feed) p.id};
+    feed = pages.feed.items;
+    _feedNext = pages.feed.next;
+    incoming = const [];
+    incomingFollowing = const [];
+    fresh = before.isEmpty ? const {} : {for (final p in feed.takeWhile((p) => !before.contains(p.id))) p.id};
+    following = me!.followUnlocked ? pages.following.items : const [];
+    mine = pages.mine.items;
+    notifications = pages.notes.items;
+    unreadNotifications = pages.notes.unread;
+    error = null;
+    loading = false;
+    notifyListeners();
   }
 
   /// The reader's own profile; null for a new account.
@@ -483,3 +545,5 @@ class AppState extends ChangeNotifier {
     return updated;
   }
 }
+
+typedef _FirstPages = ({FeedPage feed, FeedPage following, FeedPage mine, NotificationsPage notes});
