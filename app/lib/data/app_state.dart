@@ -429,6 +429,7 @@ class AppState extends ChangeNotifier {
       locale: current?.locale ?? AppLang.instance.value,
       timeZone: current?.timeZone ?? await deviceTimeZone(),
     );
+    _showMyProfileOnPosts();
     notifyListeners();
   }
 
@@ -463,7 +464,28 @@ class AppState extends ChangeNotifier {
   /// Throws [ApiException] with the reason when the server turns the photo down.
   Future<void> setPhoto(Uint8List jpeg) async {
     me = await backend.setPhoto(jpeg);
+    _showMyProfileOnPosts();
     notifyListeners();
+  }
+
+  /// Puts the reader's current name, handle and photo on their posts already
+  /// loaded, so a profile change shows everywhere at once instead of after
+  /// the next reload.
+  void _showMyProfileOnPosts() {
+    final p = me;
+    if (p == null) return;
+    List<Post> update(List<Post> posts) => [
+      for (final post in posts)
+        post.authorId == p.id ? post.withAuthor(name: p.displayName, handle: p.handle, photoUrl: p.photoUrl) : post,
+    ];
+    feed = update(feed);
+    following = update(following);
+    mine = update(mine);
+    incoming = update(incoming);
+    incomingFollowing = update(incomingFollowing);
+    saved = update(saved);
+    found = update(found);
+    opened = update(opened);
   }
 
   Future<void> loadNotifications() async {

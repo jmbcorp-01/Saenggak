@@ -94,6 +94,26 @@ class Post {
     isMine: isMine,
     authorPhotoUrl: authorPhotoUrl,
   );
+
+  /// The same post with its author's current name, handle and photo, after
+  /// the author changed their profile.
+  Post withAuthor({required String name, required String handle, required String? photoUrl}) => Post(
+    id: id,
+    authorId: authorId,
+    authorName: name,
+    authorHandle: handle,
+    body: body,
+    lang: lang,
+    translation: translation,
+    createdAt: createdAt,
+    editedAt: editedAt,
+    typingTime: typingTime,
+    empathyCount: empathyCount,
+    empathizedByMe: empathizedByMe,
+    bookmarked: bookmarked,
+    isMine: isMine,
+    authorPhotoUrl: photoUrl,
+  );
 }
 
 const avatarPalette = [0xFF3B4A42, 0xFFC7B9A5, 0xFFE4DDD2, 0xFF6E5B4B, 0xFF8A9A8E, 0xFFB9A38C];
