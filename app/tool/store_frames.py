@@ -39,7 +39,7 @@ CAPTIONS = {
 NAMES = ['start', 'feed', 'compose', 'result', 'search', 'profile']
 # device -> (store folder, canvas size)
 DEVICES = {
-    'iphone': ('app-store/iphone-6.9', (1290, 2796)),
+    'iphone': ('app-store/iphone', (1206, 2622)),
     'ipad': ('app-store/ipad-13', (2064, 2752)),
     'android': ('google-play/phone', (1080, 1920)),
 }
