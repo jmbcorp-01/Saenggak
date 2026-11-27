@@ -140,6 +140,39 @@ describe.skipIf(!url)('AuroraPushRepository on Postgres', () => {
     expect([b!.kind, b!.count, b!.manyPosts]).toEqual(['empathy', 2, true]);
   });
 
+  it('does not alert twice when a 공감 or follow is undone and done again, and counts unread for the icon', async () => {
+    await repo.saveToken(A, TA, 'ios');
+    for (const t of ['empathies', 'follows', 'posts']) await sql(`UPDATE ${t} SET created_at = created_at - interval '1 hour'`);
+    await sql(`UPDATE users SET notifications_seen_at = now() - interval '2 minutes' WHERE id = $1`, [A]);
+    const p = (
+      await sql(
+        `INSERT INTO posts (author_id, body, lang, typing_ms, local_date, created_at) VALUES ($1, '다시 누른 생각', 'ko', 60000, current_date, now() - interval '1 day') RETURNING id::text`,
+        [A],
+      )
+    ).rows[0].id as string;
+    await sql(`DELETE FROM follows WHERE follower_id = $1 AND followee_id = $2`, [C, A]);
+    await rewind();
+    await sql(`INSERT INTO empathies (post_id, user_id, created_at) VALUES ($1, $2, ${ago})`, [p, C]);
+    await sql(`INSERT INTO follows (follower_id, followee_id, created_at) VALUES ($1, $2, ${ago})`, [C, A]);
+    expect((await repo.takeBatches()).filter((b) => b.userId === A).map((b) => b.kind).sort()).toEqual(['empathy', 'follow']);
+    expect((await repo.unread([A])).get(A)).toBe(2);
+
+    await sql(`DELETE FROM empathies WHERE post_id = $1 AND user_id = $2`, [p, C]);
+    await sql(`DELETE FROM follows WHERE follower_id = $1 AND followee_id = $2`, [C, A]);
+    await rewind();
+    await sql(`INSERT INTO empathies (post_id, user_id, created_at) VALUES ($1, $2, ${ago})`, [p, C]);
+    await sql(`INSERT INTO follows (follower_id, followee_id, created_at) VALUES ($1, $2, ${ago})`, [C, A]);
+    expect((await repo.takeBatches()).filter((b) => b.userId === A)).toEqual([]);
+
+    // A day later the same 공감 is news again.
+    await sql(`UPDATE push_sent SET at = at - interval '2 days'`);
+    await sql(`UPDATE follows SET created_at = created_at - interval '1 hour'`);
+    await sql(`DELETE FROM empathies WHERE post_id = $1 AND user_id = $2`, [p, C]);
+    await rewind();
+    await sql(`INSERT INTO empathies (post_id, user_id, created_at) VALUES ($1, $2, ${ago})`, [p, C]);
+    expect((await repo.takeBatches()).filter((b) => b.userId === A).map((b) => b.kind)).toEqual(['empathy']);
+  });
+
   it('forgets tokens in bulk', async () => {
     await repo.removeTokens([TA, TB]);
     expect((await repo.tokens([A, B])).size).toBe(0);

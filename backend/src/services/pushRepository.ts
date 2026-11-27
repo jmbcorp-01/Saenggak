@@ -93,13 +93,22 @@ export class AuroraPushRepository extends AuroraRepository implements PushReposi
              AND p.created_at >= f.alerts_since AND p.created_at > d.since AND p.created_at <= d.upto
            JOIN users au ON au.id = p.author_id AND au.suspended_at IS NULL
          WHERE d.push_posts
-       ), latest AS (
-         SELECT ev.*, count(*) OVER w AS n, row_number() OVER (w ORDER BY ev.created_at DESC) AS rn,
-                min(ev.post_id::text) OVER w IS DISTINCT FROM max(ev.post_id::text) OVER w AS many_posts
-         FROM ev
+       ), fresh AS (
+         SELECT ev.* FROM ev
          WHERE NOT EXISTS (SELECT 1 FROM blocks b
            WHERE (b.blocker_id = ev.recipient AND b.blocked_id = ev.actor)
               OR (b.blocker_id = ev.actor AND b.blocked_id = ev.recipient))
+           AND NOT EXISTS (SELECT 1 FROM push_sent s
+             WHERE s.user_id = ev.recipient AND s.kind = ev.kind AND s.actor_id = ev.actor
+               AND s.post_id = coalesce(ev.post_id, '00000000-0000-0000-0000-000000000000'::uuid) AND s.at > now() - interval '1 day')
+       ), remember AS (
+         INSERT INTO push_sent (user_id, kind, actor_id, post_id)
+         SELECT DISTINCT recipient, kind, actor, coalesce(post_id, '00000000-0000-0000-0000-000000000000'::uuid) FROM fresh WHERE kind <> 'post'
+         ON CONFLICT (user_id, kind, actor_id, post_id) DO UPDATE SET at = now()
+       ), latest AS (
+         SELECT ev.*, count(*) OVER w AS n, row_number() OVER (w ORDER BY ev.created_at DESC) AS rn,
+                min(ev.post_id::text) OVER w IS DISTINCT FROM max(ev.post_id::text) OVER w AS many_posts
+         FROM fresh ev
          WINDOW w AS (PARTITION BY ev.recipient, ev.kind)
        )
        SELECT l.recipient::text AS user_id, d.locale, l.kind, l.n, l.actor::text AS actor_id,
@@ -118,6 +127,38 @@ export class AuroraPushRepository extends AuroraRepository implements PushReposi
       excerpt: (r.excerpt as string | null) ?? null,
       manyPosts: !!r.many_posts,
     }));
+  }
+
+  /** What the notifications tab would count as unread, up to 99, for the app icon. */
+  async unread(userIds: string[]): Promise<Map<string, number>> {
+    const out = new Map<string, number>();
+    if (userIds.length === 0) return out;
+    const rows = await this.query(
+      `SELECT me.id::text AS user_id, (
+         SELECT count(*) FROM (
+           SELECT 1 FROM (
+             SELECT e.created_at, e.user_id AS actor
+             FROM posts p JOIN empathies e ON e.post_id = p.id
+             WHERE p.author_id = me.id AND p.status = 'published'
+             UNION ALL
+             SELECT f.created_at, f.follower_id FROM follows f WHERE f.followee_id = me.id AND NOT f.hidden
+             UNION ALL
+             SELECT p.created_at, p.author_id
+             FROM follows f JOIN posts p ON p.author_id = f.followee_id
+               JOIN users au ON au.id = p.author_id AND au.suspended_at IS NULL
+             WHERE f.follower_id = me.id AND f.alerts_since IS NOT NULL AND NOT f.hidden
+               AND p.status = 'published' AND p.created_at >= f.alerts_since
+           ) n
+           WHERE n.created_at > me.notifications_seen_at
+             AND NOT EXISTS (SELECT 1 FROM blocks b
+               WHERE (b.blocker_id = me.id AND b.blocked_id = n.actor) OR (b.blocker_id = n.actor AND b.blocked_id = me.id))
+           LIMIT 99
+         ) x) AS n
+       FROM users me WHERE me.id::text = ANY(string_to_array(:ids, ','))`,
+      { ids: userIds.join(',') },
+    );
+    for (const r of rows) out.set(r.user_id as string, Number(r.n));
+    return out;
   }
 
   async tokens(userIds: string[]): Promise<Map<string, PushToken[]>> {

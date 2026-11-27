@@ -89,6 +89,9 @@ class FakeStore implements PushStore {
   async removeTokens(t: string[]) {
     this.removed.push(...t);
   }
+  async unread(ids: string[]) {
+    return new Map(ids.map((id) => [id, 4]));
+  }
 }
 
 describe('sendPushes', () => {
@@ -102,6 +105,7 @@ describe('sendPushes', () => {
     const sent: string[] = [];
     const client: PushClient = {
       async send(t, m) {
+        expect(m.badge).toBe(4);
         sent.push(`${t.token}:${m.data.kind}`);
         return t.token === 'b' ? 'gone' : 'sent';
       },
@@ -158,6 +162,14 @@ describe('Firebase Cloud Messaging', () => {
     expect(m.message.data).toEqual({ kind: 'empathy', postId: POST });
     expect(m.message.webpush.fcm_options.link).toBe(`/?post=${POST}`);
     expect(linkFor(compose(batch({ kind: 'follow', count: 2 })))).toBe('/?tab=notifications');
+    expect(m.message.apns.payload.aps).not.toHaveProperty('badge');
+  });
+
+  it('puts the unread count on the app icon', () => {
+    const m = fcmMessage({ token: 't', platform: 'ios' }, compose(batch(), 7));
+    expect(m.message.apns.payload.aps.badge).toBe(7);
+    expect(m.message.android.notification.notification_count).toBe(7);
+    expect(m.message.data).toEqual({ kind: 'empathy', postId: POST });
   });
 
   it('signs in once, reuses the access token, and reports a token that is gone', async () => {

@@ -46,8 +46,13 @@ export function fcmMessage(token: PushToken, m: PushMessage) {
       token: token.token,
       notification: { title: m.title, body: m.body },
       data,
-      android: { priority: 'HIGH', notification: { tag: m.data.kind } },
-      apns: { payload: { aps: { sound: 'default', 'thread-id': m.data.kind } } },
+      android: {
+        priority: 'HIGH',
+        notification: { tag: m.data.kind, ...(m.badge !== undefined ? { notification_count: m.badge } : {}) },
+      },
+      apns: {
+        payload: { aps: { sound: 'default', 'thread-id': m.data.kind, ...(m.badge !== undefined ? { badge: m.badge } : {}) } },
+      },
       webpush: {
         notification: { icon: '/icons/Icon-192.png', tag: m.data.kind, renotify: true },
         fcm_options: { link: linkFor(m) },

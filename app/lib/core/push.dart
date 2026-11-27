@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:app_badge_plus/app_badge_plus.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -106,6 +107,10 @@ abstract class PushService {
 
   /// The alert that opened the app from closed, once.
   Future<PushTap?> launchTap();
+
+  /// The number on the app icon. Alerts set it while the app is away; the
+  /// app puts it right once the person has read them.
+  Future<void> setBadge(int count);
 }
 
 class FirebasePushService implements PushService {
@@ -180,6 +185,16 @@ class FirebasePushService implements PushService {
 
   @override
   Stream<PushTap> get taps => FirebaseMessaging.onMessageOpenedApp.map((m) => PushTap.fromData(m.data));
+
+  @override
+  Future<void> setBadge(int count) async {
+    // Android launchers count the alerts in the tray themselves, and clear
+    // them with it; only iPhones keep a number the app has to reset.
+    if (platform != 'ios') return;
+    try {
+      await AppBadgePlus.updateBadge(count);
+    } catch (_) {}
+  }
 
   @override
   Future<PushTap?> launchTap() async {

@@ -24,6 +24,8 @@ export interface PushMessage {
   body: string;
   /** Where a tap opens: a post, a person, or the notifications tab. */
   data: { kind: PushKind; postId?: string; userId?: string };
+  /** Unread notifications, shown on the app icon. */
+  badge?: number;
 }
 
 const short = (text: string | null, max = 60) => {
@@ -31,7 +33,12 @@ const short = (text: string | null, max = 60) => {
   return [...t].length > max ? `${[...t].slice(0, max - 1).join('')}…` : t;
 };
 
-export function compose(b: PushBatch): PushMessage {
+export function compose(b: PushBatch, badge?: number): PushMessage {
+  const m = words(b);
+  return badge === undefined ? m : { ...m, badge };
+}
+
+function words(b: PushBatch): PushMessage {
   const ko = b.lang !== 'en';
   const others = b.count - 1;
   const name = short(b.actorName, 20);

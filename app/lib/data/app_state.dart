@@ -44,7 +44,16 @@ class AppState extends ChangeNotifier {
 
   /// The notifications tab: newest first, and how many arrived since last read.
   List<AppNotification> notifications = const [];
-  int unreadNotifications = 0;
+  int _unread = 0;
+  int get unreadNotifications => _unread;
+
+  /// The count on the notifications tab, and on the app icon where the
+  /// phone shows one.
+  set unreadNotifications(int n) {
+    _unread = n;
+    pushReady.then((p) => p?.setBadge(n)).catchError((Object _) {});
+  }
+
   String? error;
 
   /// Newer posts found by [checkForNew], held back until the reader asks for
