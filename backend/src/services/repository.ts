@@ -454,12 +454,14 @@ export class AuroraRepository implements Repository {
     return { exportedAt: new Date().toISOString(), profile: profile[0], posts, empathies, following, bookmarks, blocks };
   }
 
-  async cachedTranslation(postId: string, lang: string): Promise<string | null> {
+  async cachedTranslations(postIds: string[], lang: string): Promise<Map<string, string>> {
+    if (postIds.length === 0) return new Map();
     const rows = await this.query(
-      `SELECT body FROM translations WHERE post_id = :p::uuid AND target_lang = :l`,
-      { p: postId, l: lang },
+      `SELECT post_id::text AS id, body FROM translations
+        WHERE post_id = ANY(string_to_array(:ids, ',')::uuid[]) AND target_lang = :l`,
+      { ids: postIds.join(','), l: lang },
     );
-    return (rows[0]?.body as string | undefined) ?? null;
+    return new Map(rows.map((r) => [r.id as string, r.body as string]));
   }
 
   async saveTranslation(postId: string, lang: string, body: string): Promise<void> {

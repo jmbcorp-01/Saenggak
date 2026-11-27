@@ -316,10 +316,24 @@ export class SaenggakStack extends Stack {
       autoDeleteObjects: true,
     });
     const edgeFirewall = this.region === 'us-east-1' ? this.firewall('EdgeFirewall', 'CLOUDFRONT') : undefined;
+    // The web files tell browsers "no-cache" so a new deploy shows at once.
+    // Without a minimum TTL, CloudFront would honour that too and ask the
+    // bucket in us-east-1 on every load, which from Korea is a trip across the
+    // Pacific for each file. The minimum keeps them at the nearest edge
+    // instead; every deploy clears the edges (see WebFiles and WebFonts).
+    const webCache = new cloudfront.CachePolicy(this, 'WebEdgeCache', {
+      comment: 'Web app files: kept at the edge until the next deploy clears them',
+      minTtl: Duration.days(365),
+      defaultTtl: Duration.days(365),
+      maxTtl: Duration.days(365),
+      enableAcceptEncodingGzip: true,
+      enableAcceptEncodingBrotli: true,
+    });
     const cdn = new cloudfront.Distribution(this, 'Cdn', {
       webAclId: edgeFirewall?.attrArn,
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(site),
+        cachePolicy: webCache,
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         responseHeadersPolicy: cloudfront.ResponseHeadersPolicy.SECURITY_HEADERS,
       },
@@ -424,6 +438,8 @@ export class SaenggakStack extends Stack {
         exclude: ['*'],
         include: [fonts],
         prune: false,
+        distribution: cdn,
+        distributionPaths: [`/${fonts}`],
         memoryLimit: 512,
         cacheControl: [s3deploy.CacheControl.fromString('public, max-age=604800')],
       });

@@ -283,6 +283,17 @@ describe('GET /feed', () => {
     expect(calls).toBe(1);
   });
 
+  it('reads cached translations for a whole page in one lookup', async () => {
+    const { repo } = setup();
+    repo.feedPosts = [item('p1', 'en'), item('p2', 'en'), item('p3', 'en'), item('p4', 'ko')];
+    const api = apiHandler({ repo, translator: { translate: async (t: string) => `번역: ${t}` }, ...noStores });
+    await api(event('GET /feed', { queryStringParameters: { lang: 'ko' } }));
+    repo.translationLookups = 0;
+    const r = parse(await api(event('GET /feed', { queryStringParameters: { lang: 'ko' } })));
+    expect(repo.translationLookups).toBe(1);
+    expect(r.body.items[2].translation).toEqual({ lang: 'ko', body: '번역: body p3' });
+  });
+
   it('translates into English when the reader gives no language', async () => {
     const { repo } = setup();
     repo.feedPosts = [item('p1', 'en'), item('p2', 'ko')];

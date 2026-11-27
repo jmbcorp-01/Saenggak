@@ -14,19 +14,30 @@ export interface TranslatedPost extends FeedPost {
 
 /**
  * Adds a translation to every post written in another language. Translations
- * are cached per post and language, so each post is translated once. A failed
- * translation leaves the original text alone instead of failing the feed.
+ * are cached per post and language, so each post is translated once. Cached
+ * ones are read for the whole page in one query, since every query is a round
+ * trip to the database. A failed translation leaves the original text alone
+ * instead of failing the feed.
  */
 export async function translateFeed(
   deps: { repo: Repository; translator: Translator },
   posts: FeedPost[],
   viewerLang: Lang,
 ): Promise<TranslatedPost[]> {
+  const foreign = posts.filter((p) => p.lang !== viewerLang).map((p) => p.id);
+  let cached = new Map<string, string>();
+  if (foreign.length > 0) {
+    try {
+      cached = await deps.repo.cachedTranslations(foreign, viewerLang);
+    } catch {
+      // Translate afresh below; saving again is harmless.
+    }
+  }
   return Promise.all(
     posts.map(async (post): Promise<TranslatedPost> => {
       if (post.lang === viewerLang) return { ...post, translation: null };
       try {
-        let body = await deps.repo.cachedTranslation(post.id, viewerLang);
+        let body = cached.get(post.id) ?? null;
         if (body === null) {
           body = await deps.translator.translate(post.body, post.lang, viewerLang);
           await deps.repo.saveTranslation(post.id, viewerLang, body);

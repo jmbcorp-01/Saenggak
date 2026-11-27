@@ -4,6 +4,14 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 abstract class TokenStore {
   Future<String?> read();
   Future<void> write(String token);
+
+  /// The last access token and when it expires, so a launch within its hour
+  /// needs no trip to Cognito. Never more than the refresh token beside it
+  /// can already get.
+  Future<String?> readAccess();
+  Future<void> writeAccess(String value);
+
+  /// Forgets both.
   Future<void> delete();
 }
 
@@ -13,6 +21,7 @@ class SecureTokenStore implements TokenStore {
 
   static const _storage = FlutterSecureStorage();
   static const _key = 'refresh_token';
+  static const _accessKey = 'access_token';
 
   @override
   Future<String?> read() async {
@@ -33,9 +42,28 @@ class SecureTokenStore implements TokenStore {
   }
 
   @override
+  Future<String?> readAccess() async {
+    try {
+      return await _storage.read(key: _accessKey);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> writeAccess(String value) async {
+    try {
+      await _storage.write(key: _accessKey, value: value);
+    } catch (_) {
+      // Not saved: the next launch refreshes instead.
+    }
+  }
+
+  @override
   Future<void> delete() async {
     try {
       await _storage.delete(key: _key);
+      await _storage.delete(key: _accessKey);
     } catch (_) {}
   }
 }
@@ -50,6 +78,14 @@ class MemoryTokenStore implements TokenStore {
   @override
   Future<void> write(String token) async => this.token = token;
 
+  String? access;
+
   @override
-  Future<void> delete() async => token = null;
+  Future<String?> readAccess() async => access;
+
+  @override
+  Future<void> writeAccess(String value) async => access = value;
+
+  @override
+  Future<void> delete() async => token = access = null;
 }

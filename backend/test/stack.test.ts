@@ -58,6 +58,20 @@ describe('SaenggakStack', () => {
     }
   });
 
+  it('keeps the web files at the edge until a deploy clears them', () => {
+    // Browsers still revalidate on each load, but at the nearest edge, not in us-east-1.
+    template.hasResourceProperties('AWS::CloudFront::CachePolicy', {
+      CachePolicyConfig: Match.objectLike({
+        MinTTL: 31536000,
+        ParametersInCacheKeyAndForwardedToOrigin: Match.objectLike({ EnableAcceptEncodingBrotli: true }),
+      }),
+    });
+    template.hasResourceProperties('Custom::CDKBucketDeployment', {
+      SystemMetadata: { 'cache-control': 'no-cache' },
+      DistributionId: Match.anyValue(), // with no paths given, the whole site is cleared
+    });
+  });
+
   it('serves profile photos at /photos/* and lets only the write function store them', () => {
     template.hasResourceProperties('AWS::CloudFront::Distribution', {
       DistributionConfig: Match.objectLike({

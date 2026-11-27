@@ -41,6 +41,15 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
+  <!--
+    Open the connections the app needs while it is still downloading: the
+    Flutter engine from gstatic, and Cognito in us-east-1, which every
+    returning visitor asks for a fresh sign-in token before the first frame.
+    From Korea each new connection to us-east-1 costs about half a second.
+  -->
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cognito-idp.us-east-1.amazonaws.com" crossorigin>
+
   <title>생각</title>
   <link rel="manifest" href="manifest.json">
 </head>

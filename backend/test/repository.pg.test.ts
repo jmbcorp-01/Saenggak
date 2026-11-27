@@ -118,7 +118,7 @@ describe.skipIf(!url)('AuroraRepository on Postgres', () => {
 
     const edited = await editPost(deps(), { ...input(A, EDITED), session: editSession(TEXT, EDITED), postId: id });
     expect(edited.kind).toBe('published');
-    expect(await repo.cachedTranslation(id, 'en')).toBeNull();
+    expect((await repo.cachedTranslations([id], 'en')).has(id)).toBe(false);
     const [after] = await repo.feed(C, { following: false, authorId: A, limit: 1 });
     expect(after!.body).toBe(EDITED);
     expect(after!.editedAt).not.toBeNull();
