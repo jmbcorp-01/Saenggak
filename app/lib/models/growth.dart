@@ -14,6 +14,31 @@ class SharingSettings {
   final bool anonymous;
 }
 
+/// Which push alerts the reader wants. All on until they turn one off.
+class PushSettings {
+  const PushSettings({this.empathy = true, this.follow = true, this.posts = true});
+
+  factory PushSettings.fromJson(Map<String, dynamic> j) => PushSettings(
+    empathy: j['empathy'] as bool? ?? true,
+    follow: j['follow'] as bool? ?? true,
+    posts: j['posts'] as bool? ?? true,
+  );
+
+  /// Someone related to one of the reader's posts.
+  final bool empathy;
+
+  /// Someone followed the reader.
+  final bool follow;
+
+  /// A person whose bell the reader turned on wrote something new.
+  final bool posts;
+
+  Map<String, dynamic> toJson() => {'empathy': empathy, 'follow': follow, 'posts': posts};
+
+  PushSettings copyWith({bool? empathy, bool? follow, bool? posts}) =>
+      PushSettings(empathy: empathy ?? this.empathy, follow: follow ?? this.follow, posts: posts ?? this.posts);
+}
+
 /// The reader's own invite link.
 class Invite {
   const Invite({required this.code, required this.url});

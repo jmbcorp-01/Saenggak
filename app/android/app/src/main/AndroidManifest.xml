@@ -6,6 +6,13 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:localeConfig="@xml/locales_config">
+        <!-- Push alerts show the mark in the status bar, in the brand red. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_accent" />
         <!-- Google and Apple sign-in come back to saenggak://auth. -->
         <activity
             android:name="com.linusu.flutter_web_auth_2.CallbackActivity"

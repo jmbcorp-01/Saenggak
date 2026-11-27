@@ -296,6 +296,20 @@ class HttpBackend implements Backend {
       );
 
   @override
+  Future<void> registerPush(String token, String platform) async =>
+      _ok(await _send('PUT', 'me/push', body: {'token': token, 'platform': platform}));
+
+  @override
+  Future<void> unregisterPush(String token) async => _ok(await _send('POST', 'me/push/remove', body: {'token': token}));
+
+  @override
+  Future<PushSettings> pushSettings() async => PushSettings.fromJson(_ok(await _send('GET', 'me/push-settings')));
+
+  @override
+  Future<PushSettings> setPushSettings(PushSettings settings) async =>
+      PushSettings.fromJson(_ok(await _send('PUT', 'me/push-settings', body: settings.toJson())));
+
+  @override
   Future<void> setPostSharing(String postId, {required bool excluded}) async =>
       _ok(await _send('PUT', 'posts/$postId/sharing', body: {'excluded': excluded}));
 

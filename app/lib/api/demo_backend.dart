@@ -481,6 +481,22 @@ class DemoBackend implements Backend {
     recordedSource = code;
   }
 
+  /// Devices registered for push in the demo, token to platform.
+  final Map<String, String> pushTokens = {};
+  PushSettings _push = const PushSettings();
+
+  @override
+  Future<void> registerPush(String token, String platform) async => pushTokens[token] = platform;
+
+  @override
+  Future<void> unregisterPush(String token) async => pushTokens.remove(token);
+
+  @override
+  Future<PushSettings> pushSettings() async => _push;
+
+  @override
+  Future<PushSettings> setPushSettings(PushSettings settings) async => _push = settings;
+
   @override
   Future<DailyQuestion?> todayQuestion() async => question;
 

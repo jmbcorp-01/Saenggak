@@ -71,6 +71,7 @@ jobs:
               `- API: ${o.ApiUrl}`,
               `- Claude API key secret (for MODERATION_PROVIDER=anthropic): ${o.ClaudeApiKeySecret}`,
               `- Instagram and Threads tokens for the promo agent (deploy/PROMO.md): ${o.SocialTokensSecret}`,
+              `- Firebase service account for push alerts (deploy/PUSH.md): ${o.FirebaseSecret}`,
               "",
               "Mobile builds:",
               "```",

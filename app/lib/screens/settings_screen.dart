@@ -11,6 +11,7 @@ import 'blocked_screen.dart';
 import 'photo_capture_screen.dart';
 import 'profile_setup_screen.dart';
 import 'saved_screen.dart';
+import '../core/push.dart';
 import '../core/save_file.dart';
 import '../models/growth.dart';
 
@@ -185,6 +186,10 @@ class SettingsScreen extends StatelessWidget {
                 trailing: const Icon(Icons.ios_share, size: 20),
                 onTap: () => _shareInvite(context),
               ),
+              if (state.pushPermission != PushPermission.unsupported) ...[
+                _Header(t('푸시 알림')),
+                _PushTiles(state: state, run: (step, failed) => _run(context, step, failed)),
+              ],
               _Header(t('화면')),
               ListTile(
                 leading: const Icon(Icons.contrast_rounded),
@@ -325,6 +330,66 @@ class _SharingTilesState extends State<_SharingTiles> {
             value: sharing!.anonymous,
             onChanged: (v) => set(SharingSettings(shareOk: true, anonymous: v)),
           ),
+      ],
+    );
+  }
+}
+
+/// Which push alerts to send, and a way to turn them on from here.
+class _PushTiles extends StatefulWidget {
+  const _PushTiles({required this.state, required this.run});
+
+  final AppState state;
+  final Future<void> Function(Future<void> Function() step, String failed) run;
+
+  @override
+  State<_PushTiles> createState() => _PushTilesState();
+}
+
+class _PushTilesState extends State<_PushTiles> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.state.pushSettings == null) widget.state.loadPushSettings().catchError((Object _) {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
+    final s = state.pushSettings;
+    final allowed = state.pushPermission == PushPermission.granted;
+    void set(PushSettings next) => widget.run(() => state.setPushSettings(next), t('바꾸지 못했어요. 다시 시도해주세요.'));
+    Widget tile(
+      Key key,
+      String title,
+      bool Function(PushSettings) on,
+      PushSettings Function(PushSettings, bool) change,
+    ) => SwitchListTile(
+      key: key,
+      secondary: const SizedBox(width: 24),
+      title: Text(title),
+      value: s != null && on(s),
+      onChanged: s == null || !allowed ? null : (v) => set(change(s, v)),
+    );
+    return Column(
+      children: [
+        if (!allowed)
+          ListTile(
+            key: const Key('push-settings-enable'),
+            leading: const Icon(Icons.notifications_off_outlined),
+            title: Text(t('푸시 알림이 꺼져 있어요')),
+            subtitle: Text(
+              state.pushPermission == PushPermission.denied
+                  ? t('기기나 브라우저 설정에서 생각의 알림을 허용해 주세요.')
+                  : t('눌러서 이 기기에서 알림을 받아요.'),
+            ),
+            onTap: state.pushPermission == PushPermission.notAsked ? () => state.startPush(ask: true) : null,
+          )
+        else
+          ListTile(leading: const Icon(Icons.notifications_active_outlined), title: Text(t('이 기기에서 알림을 받고 있어요'))),
+        tile(const Key('push-empathy'), t('내 글에 공감'), (s) => s.empathy, (s, v) => s.copyWith(empathy: v)),
+        tile(const Key('push-follow'), t('새 팔로워'), (s) => s.follow, (s, v) => s.copyWith(follow: v)),
+        tile(const Key('push-posts'), t('알림을 켠 사람의 새 생각'), (s) => s.posts, (s, v) => s.copyWith(posts: v)),
       ],
     );
   }

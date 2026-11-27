@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -10,6 +11,7 @@ import 'api/http_backend.dart';
 import 'api/token_store.dart';
 import 'core/appearance.dart';
 import 'core/links.dart';
+import 'core/push.dart';
 import 'data/app_state.dart';
 import 'l10n/l10n.dart';
 import 'screens/auth_screen.dart';
@@ -32,15 +34,15 @@ Future<void> main() async {
   final auth = CognitoAuth(config, store: const SecureTokenStore());
   // Someone who signed in before goes straight to their feed.
   final resumed = await auth.restore();
-  runApp(
-    SaenggakApp(
-      state: AppState(
-        backend: HttpBackend(baseUrl: config.apiUrl, auth: auth),
-      ),
-      auth: auth,
-      resumed: resumed,
-    ),
-  );
+  final state =
+      AppState(
+          backend: HttpBackend(baseUrl: config.apiUrl, auth: auth),
+        )
+        // Firebase starts beside the first screen instead of before it.
+        ..pushReady = FirebasePushService.start(
+          kIsWeb ? FirebaseSettings.fromJson(config.firebase) : FirebaseSettings.fromEnvironment(),
+        );
+  runApp(SaenggakApp(state: state, auth: auth, resumed: resumed));
 }
 
 /// Without [auth] the app runs on the demo backend and skips sign-in.

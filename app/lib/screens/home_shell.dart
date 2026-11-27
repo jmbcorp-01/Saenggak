@@ -11,6 +11,7 @@ import '../widgets/right_panel.dart';
 import '../widgets/shell_chrome.dart';
 import '../widgets/side_nav.dart';
 import '../core/links.dart';
+import '../core/push.dart';
 import 'compose_screen.dart';
 import 'feed_screen.dart';
 import 'human_check_screen.dart';
@@ -52,6 +53,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   /// the top, or refreshes if it is already there.
   final _homeAgain = ValueNotifier(0);
   Timer? _check;
+  final _pushSubs = <StreamSubscription<Object?>>[];
 
   AppState get state => widget.state;
 
@@ -61,6 +63,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _check = Timer.periodic(widget.checkEvery, (_) => state.checkForNew());
     state.askHumanCheck = _askHumanCheck;
+    _listenForPush();
+    if (linkedTab() == 'notifications') WidgetsBinding.instance.addPostFrameCallback((_) => _select(_alerts));
     final linked = widget.openPostId ?? linkedPostId();
     if (linked != null) {
       WidgetsBinding.instance.addPostFrameCallback(
@@ -70,6 +74,37 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           ),
         ),
       );
+    }
+  }
+
+  /// Registers for push (asking once on a phone; on the web the person turns
+  /// it on from the notifications tab), refreshes the alerts list when one
+  /// arrives, and opens what a tapped alert is about.
+  Future<void> _listenForPush() async {
+    final push = await state.pushReady;
+    if (push == null || !mounted) return;
+    _pushSubs
+      ..add(push.foreground.listen((_) => state.loadNotifications()))
+      ..add(push.taps.listen(_openTap));
+    final launched = await push.launchTap();
+    if (launched != null && mounted) _openTap(launched);
+    await state.startPush(ask: push.platform != 'web');
+  }
+
+  void _openTap(PushTap tap) {
+    if (!mounted) return;
+    final post = tap.postId, user = tap.userId;
+    if (post != null) {
+      setState(() => _tab = _home);
+      _navigators[_home].currentState?.push(
+        MaterialPageRoute<void>(
+          builder: (_) => PostScreen(state: state, postId: post),
+        ),
+      );
+    } else if (user != null) {
+      _openAuthor(user);
+    } else {
+      _select(_alerts);
     }
   }
 
@@ -87,6 +122,9 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   @override
   void dispose() {
     _check?.cancel();
+    for (final s in _pushSubs) {
+      s.cancel();
+    }
     if (state.askHumanCheck == _askHumanCheck) state.askHumanCheck = null;
     WidgetsBinding.instance.removeObserver(this);
     _chrome.dispose();

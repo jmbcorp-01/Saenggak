@@ -16,6 +16,7 @@ class ApiConfig {
     required this.clientId,
     this.authDomain = '',
     this.signInWith = const [],
+    this.firebase,
   });
 
   static const _signInWith = String.fromEnvironment('SIGN_IN_WITH');
@@ -34,6 +35,7 @@ class ApiConfig {
     clientId: j['cognitoClientId'] as String? ?? '',
     authDomain: j['authDomain'] as String? ?? '',
     signInWith: [for (final p in j['signInWith'] as List? ?? const []) p as String],
+    firebase: j['firebase'],
   );
 
   /// Build-time settings first; on the web, config.json when there are none.
@@ -59,6 +61,9 @@ class ApiConfig {
 
   /// The other ways in that are set up: `google`, `apple`.
   final List<String> signInWith;
+
+  /// The web app's Firebase settings for push alerts, as config.json has them.
+  final Object? firebase;
 
   /// The ways in the app can offer: set up on the server and in this build.
   List<String> get socialProviders => authDomain.isEmpty ? const [] : signInWith;
