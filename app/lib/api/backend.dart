@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import '../core/typing_session.dart';
 import '../models/admin.dart';
+import '../models/growth.dart';
 import '../models/post.dart';
 import '../models/profile.dart';
 import '../models/publish_outcome.dart';
@@ -109,6 +110,50 @@ abstract class Backend {
   /// Alerts for a followed person's new posts. Throws [ApiException]
   /// `not_following` for someone the reader does not follow.
   Future<void> setPostAlerts(String userId, bool on);
+
+  /// Whether Saenggak's own accounts and public pages may show the reader's posts.
+  Future<SharingSettings> sharing();
+  Future<SharingSettings> setSharing({required bool shareOk, required bool anonymous});
+
+  /// Keeps one of the reader's posts out of sharing, or lets it back in.
+  Future<void> setPostSharing(String postId, {required bool excluded});
+
+  /// The reader's own invite link.
+  Future<Invite> invite();
+
+  /// Records the invite or link code a new person came with. Throws
+  /// [ApiException] `unknown_code` for a code that does not exist.
+  Future<void> recordSource(String code);
+
+  /// The question above the editor today, if an admin approved one.
+  Future<DailyQuestion?> todayQuestion();
+
+  /// Admin pages for growth.
+  Future<Dashboard> adminDashboard({int days = 30});
+  Future<List<AuditEntry>> adminAudit({DateTime? before});
+
+  /// [tab] is pending, scheduled or done.
+  Future<PromoPage> promoItems(String tab);
+
+  /// Runs the promo agent's morning pick now; returns how many posts it added.
+  Future<int> runPromoPick();
+
+  /// Approves (with the card image as PNG) or skips an item.
+  Future<void> decidePromo(String itemId, {required bool approve, String? caption, Uint8List? png, DateTime? at});
+
+  /// [status] is posted (posted by hand) or withdrawn (taken down by hand).
+  Future<void> markPromo(String itemId, String status);
+  Future<List<LinkStat>> linkStats();
+
+  /// Throws [ApiException] `taken` when the code exists.
+  Future<void> createLink({required String code, required String channel, String label = ''});
+  Future<List<AdminQuestion>> adminQuestions();
+  Future<AdminQuestion> saveQuestion(
+    String day, {
+    required String textKo,
+    required String textEn,
+    required bool approve,
+  });
 }
 
 class FeedPage {

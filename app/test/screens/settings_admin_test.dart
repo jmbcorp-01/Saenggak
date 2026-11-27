@@ -44,7 +44,7 @@ void main() {
 
   testWidgets('sign-out returns to the start screen with nothing left behind', (tester) async {
     final state = await openSettings(tester);
-    await tester.ensureVisible(find.text('로그아웃'));
+    await tester.scrollUntilVisible(find.text('로그아웃'), 300, scrollable: find.byType(Scrollable).last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('로그아웃'));
     await tester.pumpAndSettle();
@@ -55,7 +55,7 @@ void main() {
 
   testWidgets('account deletion asks first, then signs out', (tester) async {
     final state = await openSettings(tester);
-    await tester.ensureVisible(find.text('계정 삭제'));
+    await tester.scrollUntilVisible(find.text('계정 삭제'), 300, scrollable: find.byType(Scrollable).last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('계정 삭제'));
     await tester.pumpAndSettle();

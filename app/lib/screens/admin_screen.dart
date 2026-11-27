@@ -8,9 +8,11 @@ import '../models/post.dart' show avatarPalette, timeAgo;
 import '../models/social.dart' show reportReasons;
 import '../theme/tokens.dart';
 import '../widgets/post_tile.dart' show Avatar;
+import 'admin_growth.dart';
 
 /// The admin pages: posts the filter held, people (search, suspend, remove
-/// photo) and basic numbers. Only shown to people in the admins group; the
+/// photo), basic numbers, and growth: the dashboard, the promo queue, daily
+/// questions, link codes and the audit log. Only shown to people in the admins group; the
 /// server checks the group again on every request.
 class AdminScreen extends StatelessWidget {
   const AdminScreen({super.key, required this.state});
@@ -20,16 +22,23 @@ class AdminScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4,
+      length: 9,
       child: Scaffold(
         appBar: AppBar(
           title: Text(t('관리자')),
           bottom: TabBar(
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
             tabs: [
               Tab(text: t('검토 대기')),
               Tab(text: t('신고')),
               Tab(text: t('사람')),
               Tab(text: t('통계')),
+              Tab(text: t('대시보드')),
+              Tab(text: t('홍보')),
+              Tab(text: t('오늘의 질문')),
+              Tab(text: t('유입 링크')),
+              Tab(text: t('기록')),
             ],
           ),
         ),
@@ -39,6 +48,11 @@ class AdminScreen extends StatelessWidget {
             _ReportsTab(backend: state.backend),
             _UsersTab(backend: state.backend, myId: state.me?.id),
             _StatsTab(backend: state.backend),
+            AdminDashboardTab(backend: state.backend),
+            AdminPromoTab(backend: state.backend),
+            AdminQuestionsTab(backend: state.backend),
+            AdminLinksTab(backend: state.backend),
+            AdminAuditTab(backend: state.backend),
           ],
         ),
       ),

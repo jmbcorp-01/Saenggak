@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/appearance.dart';
@@ -11,6 +12,7 @@ import 'photo_capture_screen.dart';
 import 'profile_setup_screen.dart';
 import 'saved_screen.dart';
 import '../core/save_file.dart';
+import '../models/growth.dart';
 
 /// Time zones offered besides the device's own. Writing days follow the
 /// writer's calendar day, so this only matters for people who travel.
@@ -87,6 +89,17 @@ class SettingsScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _shareInvite(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final url = await state.inviteUrl();
+    if (url == null) {
+      messenger.showSnackBar(SnackBar(content: Text(t('초대 링크를 만들지 못했어요. 다시 시도해주세요.'))));
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: t('손으로 직접 쓴 생각만 올라오는 곳이에요. 같이 써요. {0}', [url])));
+    messenger.showSnackBar(SnackBar(content: Text(t('초대 링크를 복사했어요. 메신저에 붙여넣어 보내세요.'))));
+  }
+
   Future<void> _signOut(BuildContext context) async {
     await state.signOut();
     if (context.mounted) Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil('/', (_) => false);
@@ -161,6 +174,16 @@ class SettingsScreen extends StatelessWidget {
                 title: Text(t('내 기록 내보내기')),
                 subtitle: Text(t('프로필, 쓴 글, 공감, 팔로우를 파일 하나로 받아요.')),
                 onTap: () => _export(context),
+              ),
+              _Header(t('공유와 초대')),
+              _SharingTiles(state: state, run: (step, failed) => _run(context, step, failed)),
+              ListTile(
+                key: const Key('invite-link'),
+                leading: const Icon(Icons.link),
+                title: Text(t('내 초대 링크')),
+                subtitle: Text(t('친구가 이 링크로 들어오면 누가 초대했는지 기록돼요.')),
+                trailing: const Icon(Icons.ios_share, size: 20),
+                onTap: () => _shareInvite(context),
               ),
               _Header(t('화면')),
               ListTile(
@@ -250,6 +273,59 @@ class SettingsScreen extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+}
+
+/// The writer's consent for Saenggak's own accounts and public pages. Off
+/// until they turn it on; the second switch leaves their name out.
+class _SharingTiles extends StatefulWidget {
+  const _SharingTiles({required this.state, required this.run});
+
+  final AppState state;
+  final Future<void> Function(Future<void> Function() step, String failed) run;
+
+  @override
+  State<_SharingTiles> createState() => _SharingTilesState();
+}
+
+class _SharingTilesState extends State<_SharingTiles> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.state.sharing == null) widget.state.loadSharing().catchError((Object _) {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sharing = widget.state.sharing;
+    final on = sharing?.shareOk ?? false;
+    void set(SharingSettings next) => widget.run(
+      () => widget.state.setSharing(shareOk: next.shareOk, anonymous: next.anonymous),
+      t('바꾸지 못했어요. 다시 시도해주세요.'),
+    );
+    return Column(
+      children: [
+        SwitchListTile(
+          key: const Key('share-ok'),
+          secondary: const Icon(Icons.campaign_outlined),
+          title: Text(t('생각 공식 계정에 내 글 소개 허용')),
+          subtitle: Text(
+            t('켜면 생각의 인스타그램, 스레드와 공개 웹페이지에 내 글이 소개될 수 있어요. 올리기 전에 운영자가 한 편씩 확인해요. 끄면 앞으로 소개되지 않고, 이미 올린 글도 내려요.'),
+          ),
+          value: on,
+          onChanged: sharing == null ? null : (v) => set(SharingSettings(shareOk: v, anonymous: sharing.anonymous)),
+        ),
+        if (on)
+          SwitchListTile(
+            key: const Key('share-anonymous'),
+            secondary: const SizedBox(width: 24),
+            title: Text(t('이름 없이 소개')),
+            subtitle: Text(t('닉네임 대신 "어느 생각러"로 보여요.')),
+            value: sharing!.anonymous,
+            onChanged: (v) => set(SharingSettings(shareOk: true, anonymous: v)),
+          ),
+      ],
     );
   }
 }

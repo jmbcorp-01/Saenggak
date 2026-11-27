@@ -548,6 +548,7 @@ export class SaenggakStack extends Stack {
     }
 
     new CfnOutput(this, 'ClaudeApiKeySecret', { value: claudeKey.secretName });
+    new CfnOutput(this, 'SocialTokensSecret', { value: socialTokens.secretName });
     new CfnOutput(this, 'WebUrl', { value: `https://${webHost}` });
     new CfnOutput(this, 'CdnDomain', { value: cdn.distributionDomainName });
     new CfnOutput(this, 'ApiUrl', { value: apiUrl });

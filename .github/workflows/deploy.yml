@@ -55,6 +55,8 @@ jobs:
           CDK_DEFAULT_REGION: ${{ env.AWS_REGION }}
           MODERATION_PROVIDER: ${{ vars.MODERATION_PROVIDER }}
           MODERATION_MODEL: ${{ vars.MODERATION_MODEL }}
+          IOS_APP_URL: ${{ vars.IOS_APP_URL }}
+          ANDROID_APP_URL: ${{ vars.ANDROID_APP_URL }}
         run: npx cdk deploy --require-approval never --outputs-file outputs.json
 
       - name: Summary
@@ -68,6 +70,7 @@ jobs:
               `- Web app: ${o.WebUrl}`,
               `- API: ${o.ApiUrl}`,
               `- Claude API key secret (for MODERATION_PROVIDER=anthropic): ${o.ClaudeApiKeySecret}`,
+              `- Instagram and Threads tokens for the promo agent (deploy/PROMO.md): ${o.SocialTokensSecret}`,
               "",
               "Mobile builds:",
               "```",

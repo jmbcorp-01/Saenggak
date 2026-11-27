@@ -19,6 +19,8 @@
 <tr><td>저장한 글, 알림을 켠 사람</td><td>저장한 글 모아 보기, 팔로우한 사람의 새 글 알림</td></tr>
 <tr><td>활동 기록(공감, 팔로우, 신고, 차단, 글쓰기의 시각과 종류)</td><td>자동화된 이용(봇) 탐지. 짧은 시간에 활동이 몰리면 사람인지 확인하는 문장 입력을 요청합니다. 하루가 지나면 삭제합니다.</td></tr>
 <tr><td>검색어</td><td>사람과 비슷한 생각 찾기. 검색어는 저장하지 않습니다.</td></tr>
+<tr><td>생각 공식 계정 소개 동의 여부, 이름 없이 소개 여부, 소개에서 뺀 글</td><td>이용자가 직접 켠 경우에만 회사의 인스타그램, 스레드 계정과 공개 웹페이지에 글을 소개. 기본값은 꺼짐이며, 끄면 더 소개하지 않고 이미 올린 글도 내립니다.</td></tr>
+<tr><td>초대 코드, 가입 경로(가입할 때 쓴 초대 코드나 링크, 초대한 사람)</td><td>초대 링크 제공, 어떤 홍보가 가입으로 이어졌는지 집계. 링크를 누른 기록에는 코드와 기기 종류(iOS, Android, 웹)만 남기고 IP 주소 등 개인을 알아볼 수 있는 정보는 남기지 않습니다.</td></tr>
 <tr><td>언어, 시간대</td><td>번역 언어 선택, 글을 쓴 날짜 계산</td></tr>
 <tr><td>접속 기록(IP 주소, 접속 시각, 기기 정보)</td><td>보안, 부정 이용 방지, 장애 대응. 서버 운영 과정에서 자동으로 생성됩니다.</td></tr>
 </table>
@@ -38,11 +40,12 @@
 <table>
 <tr><th>받는 자</th><th>국가</th><th>이전 항목</th><th>목적</th></tr>
 <tr><td>Amazon Web Services, Inc. (privacy@amazon.com)</td><td>미국</td><td>위 1항의 모든 항목</td><td>서버, 데이터베이스, 사진 저장, 로그인(Cognito), 자동 번역(Translate), 얼굴 확인(Rekognition), 비슷한 생각 계산과 검색(Bedrock), 비정상 접속 차단(WAF)</td></tr>
-<tr><td>Anthropic, PBC (privacy@anthropic.com)</td><td>미국</td><td>작성한 글, 이름과 소개</td><td>욕설, 선정적 내용, 광고 등 운영 정책 위반 자동 확인. Anthropic은 이 내용을 AI 학습에 사용하지 않습니다.</td></tr>
+<tr><td>Anthropic, PBC (privacy@anthropic.com)</td><td>미국</td><td>작성한 글, 이름과 소개</td><td>욕설, 선정적 내용, 광고 등 운영 정책 위반 자동 확인, 공식 계정 소개에 동의한 글의 소개 문구 초안 작성. Anthropic은 이 내용을 AI 학습에 사용하지 않습니다.</td></tr>
 </table>
 
 <h2>4. 제3자 제공</h2>
 <p>회사는 이용자의 개인정보를 제3자에게 제공하지 않습니다. 다만 법령에 따라 수사기관 등이 적법한 절차로 요청하는 경우는 예외로 합니다. 이용자가 서비스에 공개한 글, 이름, 아이디, 프로필 사진은 다른 이용자에게 보입니다.</p>
+<p>공식 계정 소개에 동의한 이용자의 글은 운영자가 한 편씩 확인한 뒤 회사의 인스타그램, 스레드 계정(Meta Platforms, Inc. 운영)과 saenggak.app의 공개 웹페이지에 글, 타이핑 시간, 이름(이름 없이 소개를 고른 경우 제외)과 함께 게시될 수 있으며, 누구나 볼 수 있습니다. 설정 &gt; 공유와 초대에서 언제든 끌 수 있고, 글마다 소개에서 뺄 수도 있습니다. 끄거나 글을 지우면 웹페이지에서는 바로 내리고, 인스타그램과 스레드에 올린 글은 하루 안에 운영자가 지웁니다.</p>
 
 <h2>5. 이용자의 권리</h2>
 <p>이용자는 언제든지 자신의 개인정보를 열람, 정정, 삭제, 처리 정지할 수 있습니다. 프로필은 앱에서 직접 고칠 수 있고, 계정 삭제는 설정 &gt; 계정 삭제에서 할 수 있습니다. 설정 &gt; 내 기록 내보내기에서 저장된 내 정보를 파일로 받을 수 있습니다. 그 밖의 요청은 아래 개인정보 보호책임자에게 이메일로 보내주시면 10일 이내에 처리합니다.</p>
@@ -61,6 +64,6 @@
 <p>이 방침이 바뀌면 시행 7일 전(이용자에게 불리한 변경은 30일 전)부터 서비스 안에서 알립니다.</p>
 
 <h2>Summary in English</h2>
-<p>Saenggak is run by JMB Corporation Co., Ltd. (Korea). We collect your email, profile (handle, name, bio, a camera photo of your face), your posts and interactions, typing timings (not the keys you press) used to confirm a person typed the post, language and time zone, and server access logs. Data is processed by Amazon Web Services and Anthropic in the United States to run the service, translate posts, check photos and moderate content. We do not sell or share your data. Deleting your account in Settings erases it immediately, except access logs (3 months) and moderation records (1 year). Contact: support@saenggak.app.</p>
+<p>Saenggak is run by JMB Corporation Co., Ltd. (Korea). We collect your email, profile (handle, name, bio, a camera photo of your face), your posts and interactions, typing timings (not the keys you press) used to confirm a person typed the post, whether you let Saenggak's own accounts feature your posts (off by default), your invite code and the code you signed up with, language and time zone, and server access logs. Data is processed by Amazon Web Services and Anthropic in the United States to run the service, translate posts, check photos and moderate content. We do not sell or share your data. Deleting your account in Settings erases it immediately, except access logs (3 months) and moderation records (1 year). Contact: support@saenggak.app.</p>
 <footer>주식회사 제이엠비코퍼레이션 · 대표 서진호 · 사업자등록번호 109-87-02378 · 통신판매업 신고 2022-고양일산동-1250<br>(10401) 경기도 고양시 일산동구 중앙로1275번길 60-30 (장항동, 라페스타B) 401-104호 · 문의 support@saenggak.app</footer>
 </main></body></html>

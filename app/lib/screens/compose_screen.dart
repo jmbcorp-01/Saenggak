@@ -50,6 +50,11 @@ class _ComposeScreenState extends State<ComposeScreen> {
   void initState() {
     super.initState();
     _controller.addListener(() => setState(() {}));
+    if (widget.editing == null) {
+      widget.state.loadQuestion().then((_) {
+        if (mounted) setState(() {});
+      });
+    }
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
@@ -112,6 +117,8 @@ class _ComposeScreenState extends State<ComposeScreen> {
               body: text.trim(),
               edited: widget.editing != null,
               daysToFollow: widget.state.me?.daysToFollow ?? 10,
+              authorName: widget.state.me?.displayName,
+              inviteUrl: widget.state.inviteUrl,
             ),
             maxHeight: 760,
           ),
@@ -203,7 +210,10 @@ class _ComposeScreenState extends State<ComposeScreen> {
                           style: TextStyle(fontSize: 19, height: 1.6, color: SgColors.ink),
                           decoration: InputDecoration(
                             border: InputBorder.none,
-                            hintText: t('지금 어떤 생각을 하고 있나요?'),
+                            hintText: widget.editing == null
+                                ? widget.state.question?.text(widget.state.lang) ?? t('지금 어떤 생각을 하고 있나요?')
+                                : t('지금 어떤 생각을 하고 있나요?'),
+                            hintMaxLines: 3,
                             hintStyle: TextStyle(fontSize: 19, color: SgColors.muted),
                           ),
                         ),

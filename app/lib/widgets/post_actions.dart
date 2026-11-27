@@ -12,6 +12,7 @@ import '../screens/profile_screen.dart';
 import '../theme/tokens.dart';
 import 'post_tile.dart';
 import 'report_sheet.dart';
+import 'share_card.dart';
 
 /// A [PostTile] wired to the app: 공감, the author's profile, edit and delete.
 class ConnectedPostTile extends StatelessWidget {
@@ -39,7 +40,28 @@ class ConnectedPostTile extends StatelessWidget {
       onBlock: () => blockFlow(context, state, userId: post.authorId, handle: post.authorHandle),
       onBookmark: () => _bookmark(context),
       onCopyLink: () => _copyLink(context),
+      onShareCard: () => openShareCard(
+        context,
+        body: post.body,
+        typingTime: post.typingTime,
+        authorName: post.authorName,
+        inviteUrl: state.inviteUrl(),
+        lang: state.lang,
+      ),
+      onShareExclude: (state.sharing?.shareOk ?? false) ? () => _shareExclude(context) : null,
     );
+  }
+
+  Future<void> _shareExclude(BuildContext context) async {
+    final exclude = !post.shareExcluded;
+    try {
+      await state.setPostSharing(post, excluded: exclude);
+      if (context.mounted) {
+        _say(context, exclude ? t('이 글은 생각 공식 계정에 소개되지 않아요.') : t('이 글도 생각 공식 계정에 소개될 수 있어요.'));
+      }
+    } catch (_) {
+      if (context.mounted) _say(context, t('바꾸지 못했어요. 다시 시도해주세요.'));
+    }
   }
 
   void _say(BuildContext context, String text) => ScaffoldMessenger.of(context)

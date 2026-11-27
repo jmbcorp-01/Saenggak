@@ -18,6 +18,7 @@ class Post {
     this.bookmarked = false,
     this.isMine = false,
     this.authorPhotoUrl,
+    this.shareExcluded = false,
   });
 
   factory Post.fromJson(Map<String, dynamic> j, {required String myId}) {
@@ -38,6 +39,7 @@ class Post {
       bookmarked: j['bookmarkedByMe'] as bool? ?? false,
       isMine: j['authorId'] == myId,
       authorPhotoUrl: j['photoUrl'] as String?,
+      shareExcluded: j['shareExcluded'] as bool? ?? false,
     );
   }
 
@@ -66,6 +68,9 @@ class Post {
   /// The author's profile photo, or null when they have none.
   final String? authorPhotoUrl;
 
+  /// The reader's own post, kept out of Saenggak's accounts and public pages.
+  final bool shareExcluded;
+
   /// Posts can be edited only until they get their first empathy.
   bool get editable => isMine && empathyCount == 0;
 
@@ -77,7 +82,7 @@ class Post {
   /// Behind the initial when the author has no photo.
   int get avatarColor => avatarPalette[authorId.hashCode.abs() % avatarPalette.length];
 
-  Post copyWith({int? empathyCount, bool? empathizedByMe, bool? bookmarked}) => Post(
+  Post copyWith({int? empathyCount, bool? empathizedByMe, bool? bookmarked, bool? shareExcluded}) => Post(
     id: id,
     authorId: authorId,
     authorName: authorName,
@@ -93,6 +98,7 @@ class Post {
     bookmarked: bookmarked ?? this.bookmarked,
     isMine: isMine,
     authorPhotoUrl: authorPhotoUrl,
+    shareExcluded: shareExcluded ?? this.shareExcluded,
   );
 
   /// The same post with its author's current name, handle and photo, after
@@ -113,6 +119,7 @@ class Post {
     bookmarked: bookmarked,
     isMine: isMine,
     authorPhotoUrl: photoUrl,
+    shareExcluded: shareExcluded,
   );
 }
 

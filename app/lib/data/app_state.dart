@@ -7,6 +7,7 @@ import 'package:material_ui/material_ui.dart';
 import '../api/backend.dart';
 import '../core/typing_session.dart';
 import '../l10n/l10n.dart';
+import '../models/growth.dart';
 import '../models/post.dart';
 import '../models/profile.dart';
 import '../models/publish_outcome.dart';
@@ -159,6 +160,8 @@ class AppState extends ChangeNotifier {
     final saved = me?.locale;
     if (saved != null && saved != AppLang.instance.value) AppLang.instance.set(saved);
     notifyListeners();
+    // Decides whether the reader's own posts offer to stay out of sharing.
+    if (me != null) unawaited(loadSharing().catchError((Object _) {}));
   }
 
   /// The first page of each list. Until it arrives the feed shows
@@ -532,9 +535,99 @@ class AppState extends ChangeNotifier {
   }
 
   /// Signs out and forgets everything shown, so the next person starts clean.
+  /// Whether Saenggak's own accounts may show the reader's posts. Loaded
+  /// when settings open.
+  SharingSettings? sharing;
+
+  /// The reader's invite link, asked for once and then kept.
+  Future<Invite>? _invite;
+
+  /// An invite or link code the app was opened with (`?c=` on the web), kept
+  /// until the new profile is saved.
+  String? pendingCode;
+
+  /// The question above the editor today, asked for once a day.
+  DailyQuestion? question;
+  String? _questionDay;
+
+  Future<void> loadSharing() async {
+    sharing = await backend.sharing();
+    notifyListeners();
+  }
+
+  Future<void> setSharing({required bool shareOk, required bool anonymous}) async {
+    final was = sharing;
+    sharing = SharingSettings(shareOk: shareOk, anonymous: anonymous);
+    notifyListeners();
+    try {
+      sharing = await backend.setSharing(shareOk: shareOk, anonymous: anonymous);
+    } catch (_) {
+      sharing = was;
+      rethrow;
+    } finally {
+      notifyListeners();
+    }
+  }
+
+  /// Keeps one post out of Saenggak's own accounts, or lets it back in.
+  Future<void> setPostSharing(Post post, {required bool excluded}) async {
+    _replace(post.id, (p) => p.copyWith(shareExcluded: excluded));
+    try {
+      await backend.setPostSharing(post.id, excluded: excluded);
+    } catch (_) {
+      _replace(post.id, (p) => p.copyWith(shareExcluded: !excluded));
+      rethrow;
+    }
+  }
+
+  /// The reader's invite link. A failed ask is tried again next time.
+  Future<Invite> invite() async {
+    final asked = _invite ??= backend.invite();
+    try {
+      return await asked;
+    } catch (_) {
+      if (identical(_invite, asked)) _invite = null;
+      rethrow;
+    }
+  }
+
+  /// The invite link as text, or null when it cannot be had right now.
+  Future<String?> inviteUrl() async {
+    try {
+      return (await invite()).url;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Records where a new person came from. Throws `unknown_code` for a code
+  /// that does not exist.
+  Future<void> recordSource(String code) async {
+    await backend.recordSource(code.trim());
+    pendingCode = null;
+  }
+
+  /// Asks for today's question the first time the editor opens each day.
+  Future<void> loadQuestion() async {
+    final day = localDateOf(clock());
+    if (_questionDay == day) return;
+    _questionDay = day;
+    try {
+      question = await backend.todayQuestion();
+    } catch (_) {
+      _questionDay = null;
+      question = null;
+    }
+    notifyListeners();
+  }
+
   Future<void> signOut() async {
     await backend.signOut();
     me = null;
+    sharing = null;
+    _invite = null;
+    question = null;
+    _questionDay = null;
     feed = following = mine = saved = found = opened = incoming = incomingFollowing = const [];
     people = const [];
     searchQuery = '';

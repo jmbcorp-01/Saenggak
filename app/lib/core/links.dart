@@ -28,3 +28,11 @@ String? linkedPostId([Uri? at]) {
   final id = uri?.queryParameters['post'];
   return id != null && RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(id) ? id : null;
 }
+
+/// The invite or link code the web app was opened with (`/?c=CODE`), which
+/// the invite and post pages put on their start button.
+String? linkedCode([Uri? at]) {
+  final uri = at ?? (kIsWeb ? Uri.base : null);
+  final code = uri?.queryParameters['c'];
+  return code != null && RegExp(r'^[A-Za-z0-9][A-Za-z0-9-]{2,31}$').hasMatch(code) ? code : null;
+}

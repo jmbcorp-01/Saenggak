@@ -87,6 +87,8 @@ export interface FeedPost {
   bookmarkedByMe: boolean;
   createdAt: string;
   editedAt: string | null;
+  /** The reader's own post, kept out of sharing. */
+  shareExcluded?: boolean;
 }
 
 /** A person found by search. */

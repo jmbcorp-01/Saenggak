@@ -44,7 +44,8 @@ const FEED_COLUMNS = `p.id::text, p.author_id::text, u.handle, u.display_name, u
        p.body, p.lang, p.typing_ms, p.created_at::text, p.edited_at::text,
        (SELECT count(*) FROM empathies e WHERE e.post_id = p.id) AS empathy_count,
        EXISTS (SELECT 1 FROM empathies e WHERE e.post_id = p.id AND e.user_id = :v::uuid) AS mine,
-       EXISTS (SELECT 1 FROM bookmarks s WHERE s.post_id = p.id AND s.user_id = :v::uuid) AS saved`;
+       EXISTS (SELECT 1 FROM bookmarks s WHERE s.post_id = p.id AND s.user_id = :v::uuid) AS saved,
+       (p.author_id = :v::uuid AND p.share_excluded) AS share_excluded`;
 
 /** Published, by someone not suspended, and no block either way with the viewer :v. */
 const VISIBLE = `p.status = 'published' AND u.suspended_at IS NULL
@@ -66,6 +67,8 @@ function feedPost(r: Record<string, unknown>): FeedPost {
     bookmarkedByMe: Boolean(r.saved),
     createdAt: r.created_at as string,
     editedAt: (r.edited_at as string | null) ?? null,
+    // Only ever true on the reader's own posts.
+    ...(r.share_excluded ? { shareExcluded: true } : {}),
   };
 }
 
