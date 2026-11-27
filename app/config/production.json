@@ -4,5 +4,14 @@
   "COGNITO_CLIENT_ID": "4i4dpflbvoetuite7sce3jhpa6",
   "SITE_URL": "https://saenggak.app",
   "AUTH_DOMAIN": "auth.saenggak.app",
-  "SIGN_IN_WITH": "apple,google"
+  "SIGN_IN_WITH": "apple,google",
+  "FIREBASE_PROJECT_ID": "testapp-25a64",
+  "FIREBASE_SENDER_ID": "475828933202",
+  "FIREBASE_ANDROID_API_KEY": "AIzaSyBLyxr-_qNNgwfaGIqDzHx5mLXGmdS_PvA",
+  "FIREBASE_ANDROID_APP_ID": "1:475828933202:android:babd82564a876f0fe6858b",
+  "FIREBASE_IOS_API_KEY": "AIzaSyBQpUg8psfIBE9idQpiF2m1Ixend5doRiI",
+  "FIREBASE_IOS_APP_ID": "1:475828933202:ios:b4cd074fd6fef487e6858b",
+  "FIREBASE_WEB_API_KEY": "AIzaSyDVj-h4x3M0nMbH8dXNqvd9_X3x6QUQCTk",
+  "FIREBASE_WEB_APP_ID": "1:475828933202:web:412b1390e6e689cce6858b",
+  "FIREBASE_VAPID_KEY": "BLvLw7TyYD5jbGngi1Pgp2_5loZoS4-TSwfIIfApVGgHe2eV5HfKgFThNVnqAiuWlj137iPyR4ucOJT8EHzYOaE"
 }

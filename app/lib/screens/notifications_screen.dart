@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../core/nav.dart';
+import '../core/push.dart';
 import '../data/app_state.dart';
 import '../l10n/l10n.dart';
 import '../models/post.dart' show avatarPalette, timeAgo;
@@ -82,10 +83,51 @@ class NotificationsScreen extends StatelessWidget {
               ),
               child: Semantics(header: true, child: Text(t('알림'), style: SgText.title)),
             ),
+            if (state.pushPermission == PushPermission.notAsked || state.pushPermission == PushPermission.denied)
+              _PushBanner(state: state),
             Expanded(child: list),
           ],
         );
       },
+    );
+  }
+}
+
+/// Offers push alerts until the person turns them on, or says how to when
+/// the device or browser blocks them.
+class _PushBanner extends StatelessWidget {
+  const _PushBanner({required this.state});
+
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final denied = state.pushPermission == PushPermission.denied;
+    return Container(
+      key: const Key('push-banner'),
+      padding: const EdgeInsets.fromLTRB(SgSpace.lg, 12, SgSpace.sm, 12),
+      decoration: BoxDecoration(
+        color: SgColors.band,
+        border: Border(bottom: BorderSide(color: SgColors.line)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.notifications_active_outlined, color: SgColors.accent),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              denied ? t('알림이 막혀 있어요. 기기나 브라우저 설정에서 생각의 알림을 허용해 주세요.') : t('앱을 닫아도 공감과 팔로우 소식을 알려드릴게요.'),
+              style: SgText.small,
+            ),
+          ),
+          if (!denied)
+            TextButton(
+              key: const Key('push-enable'),
+              onPressed: () => state.startPush(ask: true),
+              child: Text(t('알림 켜기')),
+            ),
+        ],
+      ),
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../api/backend.dart';
+import '../core/push.dart';
 import '../core/typing_session.dart';
 import '../l10n/l10n.dart';
 import '../models/growth.dart';
@@ -461,6 +462,8 @@ class AppState extends ChangeNotifier {
   /// Erases the account on the server and signs out.
   Future<void> deleteAccount() async {
     await backend.deleteAccount();
+    // The server dropped this device with the account.
+    _pushToken = null;
     await signOut();
   }
 
@@ -621,7 +624,74 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Push alerts on this device: null without Firebase in this build. Set
+  /// by main() while the app starts, so the first screen does not wait.
+  Future<PushService?> pushReady = Future.value(null);
+  PushPermission pushPermission = PushPermission.unsupported;
+  PushSettings? pushSettings;
+  String? _pushToken;
+  StreamSubscription<String>? _tokenRefresh;
+
+  /// Registers this device once the person allows alerts. With [ask], asks
+  /// them first if they have never been asked.
+  Future<void> startPush({bool ask = false}) async {
+    final push = await pushReady;
+    if (push == null || me == null) return;
+    var permission = await push.permission();
+    if (permission == PushPermission.notAsked && ask) permission = await push.request();
+    pushPermission = permission;
+    notifyListeners();
+    if (permission != PushPermission.granted) return;
+    final token = await push.token();
+    if (token == null) return;
+    _pushToken = token;
+    try {
+      await backend.registerPush(token, push.platform);
+    } catch (_) {
+      // Tried again on the next launch.
+    }
+    _tokenRefresh ??= push.tokenRefresh.listen((t) {
+      _pushToken = t;
+      backend.registerPush(t, push.platform).catchError((Object _) {});
+    });
+  }
+
+  Future<void> loadPushSettings() async {
+    pushSettings = await backend.pushSettings();
+    notifyListeners();
+  }
+
+  Future<void> setPushSettings(PushSettings next) async {
+    final was = pushSettings;
+    pushSettings = next;
+    notifyListeners();
+    try {
+      pushSettings = await backend.setPushSettings(next);
+    } catch (_) {
+      pushSettings = was;
+      rethrow;
+    } finally {
+      notifyListeners();
+    }
+  }
+
+  Future<void> _stopPush() async {
+    final token = _pushToken;
+    _pushToken = null;
+    await _tokenRefresh?.cancel();
+    _tokenRefresh = null;
+    pushSettings = null;
+    if (token == null) return;
+    try {
+      await backend.unregisterPush(token);
+    } catch (_) {
+      // The server forgets it once Firebase says the token is gone.
+    }
+  }
+
   Future<void> signOut() async {
+    // Alerts for this account stop on this device before the sign-in goes.
+    await _stopPush();
     await backend.signOut();
     me = null;
     sharing = null;

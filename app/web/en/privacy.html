@@ -22,6 +22,7 @@
 <tr><td>Search terms</td><td>Finding people and similar thoughts. Search terms are not stored.</td></tr>
 <tr><td>Whether you let Saenggak's own accounts feature your posts, whether without your name, and posts you kept out</td><td>Featuring your posts on the Company's Instagram and Threads accounts and public web pages, only if you turn this on. It is off by default; turning it off stops new features and takes down what was posted.</td></tr>
 <tr><td>Invite code and how you joined (the invite code or link you signed up with, and who invited you)</td><td>Giving you an invite link and counting which promotion led to sign-ups. A click on a link records only the code and the kind of device (iOS, Android or web), never an IP address or anything else that identifies a person.</td></tr>
+<tr><td>Push alert tokens (one per device, with the kind of device) and which kinds of alert you want</td><td>Sending relates, follows and new posts while the app or browser is closed. Only collected if you allow alerts on the device, and deleted when you sign out.</td></tr>
 <tr><td>Language and time zone</td><td>Choosing the translation language and working out the day you wrote</td></tr>
 <tr><td>Access logs (IP address, access time and device information)</td><td>Security, preventing abuse and handling outages. These are created automatically when the servers run.</td></tr>
 </table>
@@ -42,6 +43,7 @@
 <table>
 <tr><th>Recipient</th><th>Country</th><th>Information</th><th>Purpose</th></tr>
 <tr><td>Amazon Web Services, Inc. (privacy@amazon.com)</td><td>United States</td><td>Everything in section 1</td><td>Servers, database, photo storage, sign-in (Cognito), automatic translation (Translate), face checks (Rekognition) and counting similar thoughts and search (Bedrock), and blocking abusive traffic (WAF)</td></tr>
+<tr><td>Google LLC (Firebase Cloud Messaging)</td><td>United States</td><td>Push alert tokens and the alert text (the sender's name and the start of the post)</td><td>Delivering push alerts. Alerts to iOS devices also pass through Apple Inc.'s push service.</td></tr>
 <tr><td>Anthropic, PBC (privacy@anthropic.com)</td><td>United States</td><td>Your posts, name and bio</td><td>Automatic checks for policy violations such as abuse, sexual content and advertising, and drafting captions for posts whose writers agreed to be featured. Anthropic does not use this content to train AI.</td></tr>
 </table>
 

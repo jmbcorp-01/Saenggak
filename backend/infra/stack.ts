@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CfnOutput, Duration, RemovalPolicy, SecretValue, Stack, type StackProps } from 'aws-cdk-lib';
@@ -31,6 +31,24 @@ const handlerPath = (name: string) => path.join(here, '..', 'src', 'handlers', `
 const migrationsDir = path.join(here, '..', 'src', 'db', 'migrations');
 /** The Flutter web build. Deployed when present; build it first with `flutter build web`. */
 const webBuild = path.join(here, '..', '..', 'app', 'build', 'web');
+const appConfig = path.join(here, '..', '..', 'app', 'config', 'production.json');
+
+/**
+ * The web app's Firebase settings for push alerts, from the same file the
+ * mobile builds use. Undefined until the web keys are filled in there.
+ */
+export function firebaseWebConfig(file = appConfig): Record<string, string> | undefined {
+  if (!existsSync(file)) return undefined;
+  const c = JSON.parse(readFileSync(file, 'utf8')) as Record<string, string | undefined>;
+  const web = {
+    apiKey: c.FIREBASE_WEB_API_KEY ?? '',
+    appId: c.FIREBASE_WEB_APP_ID ?? '',
+    messagingSenderId: c.FIREBASE_SENDER_ID ?? '',
+    projectId: c.FIREBASE_PROJECT_ID ?? '',
+    vapidKey: c.FIREBASE_VAPID_KEY ?? '',
+  };
+  return Object.values(web).every((v) => v.length > 0) ? web : undefined;
+}
 
 /**
  * Everything the MVP needs: sign-in (Cognito), the database (Aurora
@@ -191,6 +209,13 @@ export class SaenggakStack extends Stack {
     agentJob('PromoPublish', events.Schedule.cron({ minute: '5' }), 'publish'); // every hour
     agentJob('PromoQuestions', events.Schedule.cron({ weekDay: 'SUN', hour: '21', minute: '0' }), 'questions'); // Mon 06:00 KST
     agentJob('PromoTokens', events.Schedule.cron({ weekDay: 'SAT', hour: '20', minute: '0' }), 'tokens'); // Sun 05:00 KST
+    // Push alerts: device tokens and settings, and every minute one alert per
+    // person and kind for what happened since the last run.
+    const push = fn('push', 50);
+    new events.Rule(this, 'PushSend', {
+      schedule: events.Schedule.rate(Duration.minutes(1)),
+      targets: [new targets.LambdaFunction(push, { event: events.RuleTargetInput.fromObject({ job: 'send' }) })],
+    });
     // Deletes old rate-limit rows, admin logs and resolved reports each day.
     new events.Rule(this, 'DailyCleanup', {
       schedule: events.Schedule.cron({ hour: '18', minute: '30' }), // 03:30 in Korea
@@ -237,6 +262,17 @@ export class SaenggakStack extends Stack {
     socialTokens.grantRead(promoAgent);
     socialTokens.grantWrite(promoAgent);
     for (const f of [admin, promoAgent]) f.addEnvironment('SOCIAL_TOKENS_SECRET_ARN', socialTokens.secretArn);
+    // The Firebase service account key for push alerts (see deploy/PUSH.md).
+    // Until the real key is pasted over the placeholder, nothing is sent.
+    const firebaseKey = new secretsmanager.Secret(this, 'FirebaseServiceAccount', {
+      description: 'Firebase service account JSON for Saenggak push alerts',
+      generateSecretString: {
+        secretStringTemplate: JSON.stringify({ project_id: 'REPLACE', client_email: 'REPLACE', private_key: 'REPLACE' }),
+        generateStringKey: 'unused',
+      },
+    });
+    firebaseKey.grantRead(push);
+    push.addEnvironment('FIREBASE_SECRET_ARN', firebaseKey.secretArn);
     api.addToRolePolicy(new iam.PolicyStatement({ actions: ['translate:TranslateText'], resources: ['*'] }));
     // Searching posts by meaning embeds the search words.
     api.addToRolePolicy(
@@ -276,7 +312,7 @@ export class SaenggakStack extends Stack {
       description: 'Header value CloudFront adds to API requests so the API answers only through the CDN',
       generateSecretString: { excludePunctuation: true, passwordLength: 40 },
     });
-    for (const f of [write, api, admin, growth, publicPages]) {
+    for (const f of [write, api, admin, growth, publicPages, push]) {
       f.addEnvironment('ORIGIN_SECRET', originSecret.secretValue.unsafeUnwrap());
     }
 
@@ -302,6 +338,7 @@ export class SaenggakStack extends Stack {
     const adminIntegration = new HttpLambdaIntegration('AdminFn', admin);
     const growthIntegration = new HttpLambdaIntegration('GrowthFn', growth);
     const publicIntegration = new HttpLambdaIntegration('PublicFn', publicPages);
+    const pushIntegration = new HttpLambdaIntegration('PushFn', push);
     const routes: [string, apigw.HttpMethod, HttpLambdaIntegration][] = [
       ['/posts', M.POST, writeIntegration],
       ['/posts/{id}', M.PATCH, writeIntegration],
@@ -359,6 +396,10 @@ export class SaenggakStack extends Stack {
       ['/me/invite', M.GET, growthIntegration],
       ['/me/source', M.POST, growthIntegration],
       ['/questions/today', M.GET, growthIntegration],
+      ['/me/push', M.PUT, pushIntegration],
+      ['/me/push/remove', M.POST, pushIntegration],
+      ['/me/push-settings', M.GET, pushIntegration],
+      ['/me/push-settings', M.PUT, pushIntegration],
     ];
     for (const [path, method, integration] of routes) http.addRoutes({ path, methods: [method], integration });
     // Public pages need no sign-in; the origin header still keeps them behind CloudFront.
@@ -512,11 +553,13 @@ export class SaenggakStack extends Stack {
     for (const f of [write, api, admin, promoAgent]) f.addEnvironment('PHOTO_BUCKET', photos.bucketName);
     for (const f of [write, api, admin, promoAgent]) f.addEnvironment('PHOTO_BASE_URL', `https://${webHost}`);
 
+    const firebase = firebaseWebConfig();
     const config = {
       apiUrl,
       cognitoRegion: this.region,
       cognitoClientId: appClient.userPoolClientId,
       ...(signIn && { authDomain: signIn.authDomain, signInWith: providers.map((p) => p.name) }),
+      ...(firebase && { firebase }),
     };
     // Our own font files rarely change and are the largest download, so
     // browsers keep them a week instead of asking again on every visit.
@@ -526,6 +569,11 @@ export class SaenggakStack extends Stack {
       sources: [
         ...(existsSync(webBuild) ? [s3deploy.Source.asset(webBuild)] : []),
         s3deploy.Source.jsonData('config.json', config),
+        // Read by firebase-messaging-sw.js, which cannot wait for config.json.
+        s3deploy.Source.data(
+          'firebase-config.js',
+          `self.FIREBASE_CONFIG = ${JSON.stringify(firebase ? { ...firebase, vapidKey: undefined } : null)};\n`,
+        ),
       ],
       exclude: [fonts],
       distribution: cdn,
@@ -549,6 +597,7 @@ export class SaenggakStack extends Stack {
 
     new CfnOutput(this, 'ClaudeApiKeySecret', { value: claudeKey.secretName });
     new CfnOutput(this, 'SocialTokensSecret', { value: socialTokens.secretName });
+    new CfnOutput(this, 'FirebaseSecret', { value: firebaseKey.secretName });
     new CfnOutput(this, 'WebUrl', { value: `https://${webHost}` });
     new CfnOutput(this, 'CdnDomain', { value: cdn.distributionDomainName });
     new CfnOutput(this, 'ApiUrl', { value: apiUrl });

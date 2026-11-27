@@ -36,3 +36,10 @@ String? linkedCode([Uri? at]) {
   final code = uri?.queryParameters['c'];
   return code != null && RegExp(r'^[A-Za-z0-9][A-Za-z0-9-]{2,31}$').hasMatch(code) ? code : null;
 }
+
+/// The tab a link asked for, such as `/?tab=notifications` from a web push alert.
+String? linkedTab([Uri? at]) {
+  final uri = at ?? (kIsWeb ? Uri.base : null);
+  final tab = uri?.queryParameters['tab'];
+  return tab == 'notifications' ? tab : null;
+}

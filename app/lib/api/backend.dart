@@ -125,6 +125,14 @@ abstract class Backend {
   /// [ApiException] `unknown_code` for a code that does not exist.
   Future<void> recordSource(String code);
 
+  /// Registers this device for push alerts. [platform] is ios, android or web.
+  Future<void> registerPush(String token, String platform);
+
+  /// Stops push alerts to this device, before signing out.
+  Future<void> unregisterPush(String token);
+  Future<PushSettings> pushSettings();
+  Future<PushSettings> setPushSettings(PushSettings settings);
+
   /// The question above the editor today, if an admin approved one.
   Future<DailyQuestion?> todayQuestion();
 
