@@ -113,7 +113,7 @@ class _SearchScreenState extends State<SearchScreen> {
     if (state.searchQuery.isEmpty) {
       return ListView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        children: [note(t('이름이나 @아이디로 사람을, 문장으로 비슷한 생각을 찾아요.'))],
+        children: [note(t('닉네임이나 @아이디로 사람을, 문장으로 비슷한 생각을 찾아요.'))],
       );
     }
     if (state.people.isEmpty && state.found.isEmpty) {

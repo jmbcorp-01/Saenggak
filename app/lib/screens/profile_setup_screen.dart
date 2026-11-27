@@ -57,7 +57,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       setState(
         () => _error = switch (e.code) {
           'handle_taken' => t('이미 쓰고 있는 아이디예요.'),
-          'profile_blocked' => t('이름이나 소개에 쓸 수 없는 표현이 있어요.'),
+          'profile_blocked' => t('닉네임이나 소개에 쓸 수 없는 표현이 있어요.'),
           'rate_limited' => t('잠시 후 다시 저장해주세요.'),
           _ => t('저장하지 못했어요. 다시 시도해주세요.'),
         },
@@ -102,7 +102,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             controller: _name,
             maxLength: 30,
             textInputAction: TextInputAction.next,
-            decoration: InputDecoration(labelText: t('이름')),
+            decoration: InputDecoration(labelText: t('닉네임')),
           ),
           TextField(
             key: const Key('handle'),
